@@ -10,10 +10,12 @@ import {
   Settings,
   ChevronRight,
   LogOut,
+  MonitorPlay,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin",           label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/admin/pos",       label: "POS",          icon: MonitorPlay },
   { href: "/admin/orders",    label: "คำสั่งซื้อ",   icon: ShoppingBag },
   { href: "/admin/quotes",    label: "ใบเสนอราคา",  icon: FileText },
   { href: "/admin/products",  label: "สินค้า",       icon: Package },

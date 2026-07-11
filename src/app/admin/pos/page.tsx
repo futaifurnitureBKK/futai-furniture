@@ -4,8 +4,8 @@ import Image from "next/image";
 import QRCode from "react-qr-code";
 import {
   Search, Plus, Minus, Trash2, X, Printer,
-  QrCode, FileText, CheckCircle2, User, Phone,
-  Building2, ChevronDown, RotateCcw, ShoppingBag,
+  QrCode, FileText, CheckCircle2, User,
+  RotateCcw, ShoppingBag,
 } from "lucide-react";
 import { PRODUCTS, CATEGORIES } from "@/data/mock";
 import type { Product } from "@/types";

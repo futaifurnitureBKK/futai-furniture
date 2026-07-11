@@ -157,7 +157,17 @@ export const PRODUCTS: Product[] = [
   { id:"sh-2", sku:"JQ-D1400",   name_th:"ชั้นวาง JQ-D1400 กว้าง 140cm",  name_en:"JQ Display Shelf D1400",           category_id:"15", category_slug:"shelf",          description_th:"ชั้นวางไม้กว้าง 140cm สำหรับแสดงสินค้าหรือเก็บหนังสือ ดีไซน์สะอาด",  description_en:"140cm wood display shelf for books and décor, clean design.",                    dimensions:"1400*350*1800 mm", price:null,   stock_status:"in_stock",    images:[img("JQ-D1400")], tags:["wood","display","books"],          is_featured:false, view_count:80,  created_at:"2024-01-01", updated_at:"2024-01-01" },
 ];
 
-// Cycle through CATEGORY_IMAGES so hand-crafted products without images each get a different one
+// Merge Shopee products first (dedupe by SKU), clear their CDN images
+// so category fallback images are used instead of potentially wrong banner images
+const _existingSkus = new Set(PRODUCTS.map((p) => p.sku));
+for (const p of SHOPEE_PRODUCTS) {
+  if (!_existingSkus.has(p.sku)) {
+    PRODUCTS.push({ ...p, images: [] }); // images assigned below by category pool
+    _existingSkus.add(p.sku);
+  }
+}
+
+// Assign category images to every product that has no local image
 const _catIdx: Record<string, number> = {};
 for (const p of PRODUCTS) {
   if (!p.images[0]) {
@@ -165,15 +175,6 @@ for (const p of PRODUCTS) {
     const idx = _catIdx[p.category_slug] ?? 0;
     p.images = [pool[idx % pool.length]];
     _catIdx[p.category_slug] = idx + 1;
-  }
-}
-
-// Merge Shopee products (append, dedupe by SKU)
-const _existingSkus = new Set(PRODUCTS.map((p) => p.sku));
-for (const p of SHOPEE_PRODUCTS) {
-  if (!_existingSkus.has(p.sku)) {
-    PRODUCTS.push(p);
-    _existingSkus.add(p.sku);
   }
 }
 

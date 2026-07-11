@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { ShoppingBag, Package, Users, AlertCircle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">Dashboard</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">ภาพรวมธุรกิจ ฟู่ไท เฟอร์นิเจอร์</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">ภาพรวมธุรกิจ ฟูไท่ เฟอร์นิเจอร์</p>
         </div>
         <div className="flex gap-3">
           <Link

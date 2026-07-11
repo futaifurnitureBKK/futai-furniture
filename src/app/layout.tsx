@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Sarabun } from "next/font/google";
 import "./globals.css";
@@ -19,10 +19,10 @@ const sarabun = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "ฟู่ไท เฟอร์นิเจอร์ | Futai Furniture",
+  title: "ฟูไท่ เฟอร์นิเจอร์ | Futai Furniture",
   description:
     "เฟอร์นิเจอร์สำนักงานคุณภาพสูง — คลังสินค้าในไทย ติดตั้งฟรี บริการหลังขายจริง | Premium office furniture in Thailand",
-  keywords: ["เฟอร์นิเจอร์สำนักงาน", "office furniture", "ฟู่ไท", "Futai"],
+  keywords: ["เฟอร์นิเจอร์สำนักงาน", "office furniture", "ฟูไท่", "Futai"],
   icons: {
     icon: "/icon.png",
   },

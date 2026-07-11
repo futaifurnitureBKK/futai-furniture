@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
@@ -137,7 +137,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.8, ease: EASE }}
               >
-                บริษัท ฟู่ไท เฟอร์นิเจอร์ จำกัด
+                บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด
               </motion.p>
 
               <div className="overflow-hidden mb-2">
@@ -372,7 +372,7 @@ export default function HomePage() {
         <div className="bg-white border-t border-[#E8E5E0]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div>
-              <p className="text-[#1A1A1A] font-bold text-base mb-0.5">โชว์รูม ฟู่ไท เฟอร์นิเจอร์</p>
+              <p className="text-[#1A1A1A] font-bold text-base mb-0.5">โชว์รูม ฟูไท่ เฟอร์นิเจอร์</p>
               <p className="text-[#999] text-sm">ลำลูกกา ปทุมธานี · จ–ส 9:00–18:00</p>
             </div>
             <div className="flex gap-3 flex-wrap">

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MapPin, Phone, Mail } from "lucide-react";
 import { CATEGORIES } from "@/data/mock";
 
@@ -13,7 +13,7 @@ export function Footer() {
               FUTAI
             </h3>
             <p className="text-xs leading-relaxed mb-4">
-              บริษัท ฟู่ไท เฟอร์นิเจอร์ จำกัด
+              บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด
               <br />
               富泰家具
             </p>
@@ -68,7 +68,7 @@ export function Footer() {
             <ul className="space-y-3 text-xs">
               <li className="flex gap-2">
                 <MapPin size={14} className="shrink-0 mt-0.5 text-[#C9A876]" />
-                <span>ตึกฟู่ไท ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี</span>
+                <span>ตึกฟูไท่ ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี</span>
               </li>
               <li className="flex gap-2">
                 <Phone size={14} className="shrink-0 mt-0.5 text-[#C9A876]" />
@@ -95,7 +95,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 mt-12 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-white/40">
-          <p>© 2024 บริษัท ฟู่ไท เฟอร์นิเจอร์ จำกัด. All rights reserved.</p>
+          <p>© 2024 บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/showroom" className="hover:text-white/70 transition-colors">
               โชว์รูม

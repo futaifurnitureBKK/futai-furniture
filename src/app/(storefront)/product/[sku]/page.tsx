@@ -184,7 +184,7 @@ export default function ProductPage({ params }: PageProps) {
                 className="flex items-center gap-2 text-sm text-[#6B6B6B] hover:text-[#C8102E] transition-colors"
               >
                 <MapPin size={14} />
-                {t("ดูสินค้าจริงที่โชว์รูม ตึกฟู่ไท ชั้น 4 →", "See in our showroom, Futai Building 4F →")}
+                {t("ดูสินค้าจริงที่โชว์รูม ตึกฟูไท่ ชั้น 4 →", "See in our showroom, Futai Building 4F →")}
               </Link>
             </div>
           </FadeIn>

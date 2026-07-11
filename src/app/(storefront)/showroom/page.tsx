@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail, Clock } from "lucide-react";
+﻿import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { FadeIn } from "@/components/animations/FadeIn";
 import { StaggerChildren, StaggerItem } from "@/components/animations/StaggerChildren";
 
@@ -10,7 +10,7 @@ const HOURS = [
 
 export const metadata = {
   title: "โชว์รูม | Futai Furniture",
-  description: "ตึกฟู่ไท ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี",
+  description: "ตึกฟูไท่ ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี",
 };
 
 export default function ShowroomPage() {
@@ -22,7 +22,7 @@ export default function ShowroomPage() {
           <p className="text-[#C9A876] text-xs tracking-[0.3em] uppercase mb-3">
             Come Visit Us
           </p>
-          <h1 className="text-white text-4xl font-bold mb-4">โชว์รูม ฟู่ไท</h1>
+          <h1 className="text-white text-4xl font-bold mb-4">โชว์รูม ฟูไท่</h1>
           <p className="text-white/60 text-sm">
             ชมสินค้าจริง นั่งทดลอง สัมผัสคุณภาพด้วยตัวเอง
           </p>
@@ -40,7 +40,7 @@ export default function ShowroomPage() {
                   <MapPin size={18} className="text-[#C8102E]" />
                   {" "}ที่ตั้งโชว์รูม
                 </h2>
-                <p className="text-[#1A1A1A] font-medium">ตึกฟู่ไท ชั้น 4</p>
+                <p className="text-[#1A1A1A] font-medium">ตึกฟูไท่ ชั้น 4</p>
                 <p className="text-[#6B6B6B] text-sm mt-1">
                   คลอง 8 ลำลูกกา ปทุมธานี
                   <br />

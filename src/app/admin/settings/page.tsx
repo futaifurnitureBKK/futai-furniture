@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,7 @@ export default function SettingsPage() {
           <Label>ที่อยู่โชว์รูม</Label>
           <Textarea
             className="mt-1"
-            defaultValue="ตึกฟู่ไท ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี"
+            defaultValue="ตึกฟูไท่ ชั้น 4 คลอง 8 ลำลูกกา ปทุมธานี"
             rows={2}
           />
         </div>

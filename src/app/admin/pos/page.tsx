@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import QRCode from "react-qr-code";
@@ -41,7 +41,7 @@ function promptPayQR(phone: string, amount: number) {
 const PROMPTPAY_PHONE = "0812345678";
 const BANK_NAME       = "กสิกรไทย (KBank)";
 const BANK_ACCOUNT    = "XXX-X-XXXXX-X";
-const ACCOUNT_NAME    = "บริษัท ฟู่ไท เฟอร์นิเจอร์ จำกัด";
+const ACCOUNT_NAME    = "บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด";
 
 /* ── Types ───────────────────────────────────────────────── */
 interface POSItem { product: Product; quantity: number }
@@ -415,8 +415,8 @@ export default function POSPage() {
                       <p className="text-xs text-[#6B6B6B]">วันที่: {new Date().toLocaleDateString("th-TH", { year:"numeric", month:"long", day:"numeric" })}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-[#1A1A1A]">ฟู่ไท เฟอร์นิเจอร์</p>
-                      <p className="text-[10px] text-[#6B6B6B]">บริษัท ฟู่ไท เฟอร์นิเจอร์ จำกัด</p>
+                      <p className="font-bold text-[#1A1A1A]">ฟูไท่ เฟอร์นิเจอร์</p>
+                      <p className="text-[10px] text-[#6B6B6B]">บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด</p>
                     </div>
                   </div>
                   {/* Customer */}

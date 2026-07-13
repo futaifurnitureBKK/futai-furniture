@@ -11,16 +11,18 @@ import {
   ChevronRight,
   LogOut,
   MonitorPlay,
+  ImagePlus,
 } from "lucide-react";
 
 const NAV = [
-  { href: "/admin",           label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/admin/pos",       label: "POS",          icon: MonitorPlay },
-  { href: "/admin/orders",    label: "คำสั่งซื้อ",   icon: ShoppingBag },
-  { href: "/admin/quotes",    label: "ใบเสนอราคา",  icon: FileText },
-  { href: "/admin/products",  label: "สินค้า",       icon: Package },
-  { href: "/admin/customers", label: "ลูกค้า",       icon: Users },
-  { href: "/admin/settings",  label: "ตั้งค่า",      icon: Settings },
+  { href: "/admin",                   label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/admin/pos",               label: "POS",          icon: MonitorPlay },
+  { href: "/admin/orders",            label: "คำสั่งซื้อ",   icon: ShoppingBag },
+  { href: "/admin/quotes",            label: "ใบเสนอราคา",  icon: FileText },
+  { href: "/admin/products",          label: "สินค้า",       icon: Package },
+  { href: "/admin/products/images",   label: "รูปสินค้า",    icon: ImagePlus },
+  { href: "/admin/customers",         label: "ลูกค้า",       icon: Users },
+  { href: "/admin/settings",          label: "ตั้งค่า",      icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

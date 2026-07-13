@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Bottom */}
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-2">
           <Link
             href="/"
             className="flex items-center gap-2 text-xs text-white/40 hover:text-white transition-colors"
@@ -71,6 +71,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <LogOut size={13} />
             กลับไปหน้าเว็บ
           </Link>
+          <button
+            onClick={async () => {
+              await fetch("/api/admin/auth", { method: "DELETE" });
+              window.location.href = "/admin/login";
+            }}
+            className="flex items-center gap-2 text-xs text-white/20 hover:text-red-400 transition-colors w-full"
+          >
+            <LogOut size={13} />
+            ออกจากระบบ
+          </button>
         </div>
       </aside>
 

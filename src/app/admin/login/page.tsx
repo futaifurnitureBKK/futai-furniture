@@ -23,7 +23,8 @@ function LoginForm() {
     if (res.ok) {
       router.push(from);
     } else {
-      setError("รหัสผ่านไม่ถูกต้อง");
+      const data = await res.json().catch(() => ({}));
+      setError(res.status === 500 ? `Server error: ${data.error ?? "unknown"}` : "รหัสผ่านไม่ถูกต้อง");
       setLoading(false);
     }
   }

@@ -95,10 +95,10 @@ function buildProducts(rows, idOffset = 0, skuCount = {}) {
   });
 }
 
-// Parse both files; newer file overrides older file for same SKU
+// Parse both files; later file overrides earlier for the same SKU
 const skuCount = {};
-const file1Rows = parseFile("../../Copy of mass_update_basic_info_1789223733_20260711160628.xlsx");
-const file2Rows = parseFile("../../mass_update_basic_info_1789223733_20260713121850.xlsx");
+const file1Rows = parseFile("../../mass_update_basic_info_1789223733_20260713121850.xlsx");
+const file2Rows = parseFile("../../mass_update_basic_info_1789223733_20260713123241.xlsx");
 
 const products1 = buildProducts(file1Rows, 0, skuCount);
 const products2 = buildProducts(file2Rows, products1.length, skuCount);
@@ -106,7 +106,7 @@ const products2 = buildProducts(file2Rows, products1.length, skuCount);
 // Merge: file2 overrides file1 for matching SKUs
 const skuMap = new Map();
 for (const p of products1) skuMap.set(p.sku, p);
-for (const p of products2) skuMap.set(p.sku, p); // override
+for (const p of products2) skuMap.set(p.sku, p);
 const products = [...skuMap.values()];
 
 // Re-assign sequential IDs

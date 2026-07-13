@@ -1,13 +1,19 @@
 const XLSX = require("xlsx");
 const fs = require("fs");
 
-const wb = XLSX.readFile("../Copy of mass_update_basic_info_1789223733_20260711160628.xlsx");
-const ws = wb.Sheets[wb.SheetNames[0]];
-const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-const data = rows.slice(6).filter((r) => r[0] || r[2]);
+function parseFile(filePath) {
+  const wb = XLSX.readFile(filePath);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  return rows.slice(6).filter((r) => r[0] || r[2]);
+}
 
-function extractImages(desc) {
-  return (desc || "").match(/https:\/\/cf\.shopee\.co\.th\/file\/[^\s\r\n]+/g) || [];
+// Use first image URL ONLY if it appears before any text in description
+// (URL-first = product photo; text-first = promotional banner)
+function extractLeadImage(desc) {
+  const d = (desc || "").trim();
+  const m = d.match(/^https:\/\/cf\.shopee\.co\.th\/file\/[^\s\r\n]+/);
+  return m ? [m[0]] : [];
 }
 
 function cleanDesc(desc) {
@@ -65,43 +71,74 @@ const CAT_IDS = {
   "standing-desk": "14", "shelf": "15",
 };
 
-const skuCount = {};
-const products = data.map((r, i) => {
-  const shopeeId = String(r[0] || "");
-  const rawName = String(r[2] || "");
-  const rawDesc = String(r[3] || "");
-  const name = cleanName(rawName);
-  const slug = detectCategory(rawName, rawDesc);
-  const catId = CAT_IDS[slug] || "6";
-  let sku = extractSku(rawName) || "SP-" + shopeeId.slice(-5);
-  if (skuCount[sku]) { skuCount[sku]++; sku = sku + "-" + skuCount[sku]; } else { skuCount[sku] = 1; }
-  const images = extractImages(rawDesc);
-  const desc = cleanDesc(rawDesc);
-  return { id: "sp-" + (i + 1), sku, name_th: name, name_en: name, category_id: catId, category_slug: slug, description_th: desc, description_en: desc, dimensions: "", price: null, stock_status: "in_stock", images, tags: [], is_featured: false, view_count: 0, created_at: "2024-01-01", updated_at: "2024-01-01" };
-});
+function buildProducts(rows, idOffset = 0, skuCount = {}) {
+  return rows.map((r, i) => {
+    const shopeeId = String(r[0] || "");
+    const rawName = String(r[2] || "");
+    const rawDesc = String(r[3] || "");
+    const name = cleanName(rawName);
+    const slug = detectCategory(rawName, rawDesc);
+    const catId = CAT_IDS[slug] || "6";
+    let sku = extractSku(rawName) || "SP-" + shopeeId.slice(-5);
+    if (skuCount[sku]) { skuCount[sku]++; sku = sku + "-" + skuCount[sku]; } else { skuCount[sku] = 1; }
+    const images = extractLeadImage(rawDesc);
+    const desc = cleanDesc(rawDesc);
+    return {
+      id: "sp-" + (idOffset + i + 1),
+      sku, name_th: name, name_en: name,
+      category_id: catId, category_slug: slug,
+      description_th: desc, description_en: desc,
+      dimensions: "", price: null, stock_status: "in_stock",
+      images, tags: [], is_featured: false, view_count: 0,
+      created_at: "2024-01-01", updated_at: "2024-01-01",
+    };
+  });
+}
 
-// Serialize safely
+// Parse both files; newer file overrides older file for same SKU
+const skuCount = {};
+const file1Rows = parseFile("../../Copy of mass_update_basic_info_1789223733_20260711160628.xlsx");
+const file2Rows = parseFile("../../mass_update_basic_info_1789223733_20260713121850.xlsx");
+
+const products1 = buildProducts(file1Rows, 0, skuCount);
+const products2 = buildProducts(file2Rows, products1.length, skuCount);
+
+// Merge: file2 overrides file1 for matching SKUs
+const skuMap = new Map();
+for (const p of products1) skuMap.set(p.sku, p);
+for (const p of products2) skuMap.set(p.sku, p); // override
+const products = [...skuMap.values()];
+
+// Re-assign sequential IDs
+products.forEach((p, i) => { p.id = "sp-" + (i + 1); });
+
 function serialize(p) {
   const safe = (s) => JSON.stringify(s);
   const imgs = JSON.stringify(p.images);
   return `  { id:${safe(p.id)}, sku:${safe(p.sku)}, name_th:${safe(p.name_th)}, name_en:${safe(p.name_en)}, category_id:${safe(p.category_id)}, category_slug:${safe(p.category_slug)}, description_th:${safe(p.description_th)}, description_en:${safe(p.description_en)}, dimensions:"", price:null, stock_status:"in_stock", images:${imgs}, tags:[], is_featured:false, view_count:0, created_at:"2024-01-01", updated_at:"2024-01-01" },`;
 }
 
+const withImages = products.filter((p) => p.images.length > 0);
+
 const tsContent = `import type { Product } from "@/types";
 
 // Auto-generated from Shopee export — ${products.length} products
+// ${withImages.length} products have lead images from Shopee CDN
 // Run scripts/parse-shopee.js to regenerate
 export const SHOPEE_PRODUCTS: Product[] = [
 ${products.map(serialize).join("\n")}
 ];
 `;
 
-fs.mkdirSync("src/data", { recursive: true });
-fs.writeFileSync("src/data/shopee-products.ts", tsContent, "utf8");
+fs.mkdirSync("../src/data", { recursive: true });
+fs.writeFileSync("../src/data/shopee-products.ts", tsContent, "utf8");
 
-// stats
+// Stats
 const cats = {};
 products.forEach((p) => { cats[p.category_slug] = (cats[p.category_slug] || 0) + 1; });
 console.log("Category counts:");
 Object.entries(cats).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${k}: ${v}`));
-console.log(`\nTotal: ${products.length} products written to src/data/shopee-products.ts`);
+console.log(`\nTotal: ${products.length} products`);
+console.log(`With Shopee images: ${withImages.length} (${withImages.map((p) => p.sku).join(", ")})`);
+console.log(`Without images (category fallback): ${products.length - withImages.length}`);
+console.log("Written to src/data/shopee-products.ts");

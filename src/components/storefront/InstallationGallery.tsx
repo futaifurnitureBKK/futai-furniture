@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -19,6 +19,18 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
   const [dir, setDir] = useState<1 | -1>(1);
   const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const trackContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = trackContainerRef.current;
+    if (!el) return;
+    const update = () => setTrackWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const clamp = useCallback((i: number) => Math.max(0, Math.min(count - 1, i)), [count]);
 
@@ -90,6 +102,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
 
         {/* ── Horizontal carousel ──────────────────────────────────── */}
         <div
+          ref={trackContainerRef}
           className="relative flex-1 flex items-center overflow-hidden"
           style={{ height: CONTAINER_H }}
           onMouseEnter={() => setPaused(true)}
@@ -99,9 +112,9 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
           <div className="pointer-events-none absolute right-0 inset-y-0 w-16 sm:w-24 bg-gradient-to-l from-white to-transparent z-10" />
 
           <motion.div
-            className="absolute top-1/2"
+            className="absolute top-1/2 left-0"
             style={{ y: "-50%" }}
-            animate={{ x: `calc(50% - ${COL_WIDTH / 2}px - ${centerIndex * COL_WIDTH}px)` }}
+            animate={{ x: trackWidth / 2 - COL_WIDTH / 2 - centerIndex * COL_WIDTH }}
             transition={{ type: "spring", stiffness: 240, damping: 30 }}
           >
             <div className="flex">

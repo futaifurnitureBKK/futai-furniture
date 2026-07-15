@@ -2,16 +2,21 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Expand } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Expand, Plus } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
+const INITIAL_COUNT = 10;
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
   const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const inView = useInView(gridRef, { once: true, margin: "-60px 0px" });
+
+  const visiblePhotos = showAll ? photos : photos.slice(0, INITIAL_COUNT);
+  const remaining = photos.length - INITIAL_COUNT;
 
   const close = () => setOpenIndex(null);
   const prev = () => setOpenIndex((i) => (i === null ? null : (i - 1 + photos.length) % photos.length));
@@ -35,33 +40,49 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
   return (
     <>
       <div ref={gridRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 sm:gap-2">
-        {photos.map((src, i) => (
-          <motion.button
-            key={src}
-            type="button"
-            onClick={() => setOpenIndex(i)}
-            className="group relative aspect-square overflow-hidden bg-[#E8E5E0] cursor-pointer"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-            transition={{ duration: 0.5, delay: i * 0.03, ease: EASE }}
-          >
-            <Image
-              src={src}
-              alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-              fill
-              className="object-cover group-hover:scale-110 transition-transform duration-500"
-              sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
-              priority={i === 0}
-            />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-300 flex items-center justify-center">
-              <Expand
-                size={18}
-                className="text-white opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300"
+        <AnimatePresence initial={false}>
+          {visiblePhotos.map((src, i) => (
+            <motion.button
+              key={src}
+              type="button"
+              onClick={() => setOpenIndex(i)}
+              className="group relative aspect-square overflow-hidden bg-[#E8E5E0] cursor-pointer"
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.5, delay: i < INITIAL_COUNT ? i * 0.03 : (i - INITIAL_COUNT) * 0.03, ease: EASE }}
+            >
+              <Image
+                src={src}
+                alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                fill
+                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
+                priority={i === 0}
               />
-            </div>
-          </motion.button>
-        ))}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-300 flex items-center justify-center">
+                <Expand
+                  size={18}
+                  className="text-white opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300"
+                />
+              </div>
+            </motion.button>
+          ))}
+        </AnimatePresence>
       </div>
+
+      {!showAll && remaining > 0 && (
+        <div className="flex justify-center mt-6">
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="group inline-flex items-center gap-2 border border-[#E8E5E0] hover:border-[#C8102E] text-[#444] hover:text-[#C8102E] text-sm font-semibold px-6 h-11 transition-colors"
+          >
+            <Plus size={15} className="group-hover:rotate-90 transition-transform duration-300" />
+            {t(`ดูเพิ่มเติม (+${remaining})`, `View More (+${remaining})`, `查看更多 (+${remaining})`)}
+          </button>
+        </div>
+      )}
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}
       <AnimatePresence>

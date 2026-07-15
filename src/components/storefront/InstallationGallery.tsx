@@ -1,33 +1,70 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence, useInView } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Expand, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const INITIAL_COUNT = 10;
+const ROW_HEIGHT = 118;
+const BOX_W = 220;
+const BOX_H = 132;
+const CONTAINER_H = 420;
+const AUTOPLAY_MS = 2400;
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
   const { t } = useLanguage();
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const inView = useInView(gridRef, { once: true, margin: "-60px 0px" });
+  const count = photos.length;
+  const [centerIndex, setCenterIndex] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [paused, setPaused] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const visiblePhotos = showAll ? photos : photos.slice(0, INITIAL_COUNT);
-  const remaining = photos.length - INITIAL_COUNT;
+  const clamp = useCallback((i: number) => Math.max(0, Math.min(count - 1, i)), [count]);
 
-  const close = () => setOpenIndex(null);
-  const prev = () => setOpenIndex((i) => (i === null ? null : (i - 1 + photos.length) % photos.length));
-  const next = () => setOpenIndex((i) => (i === null ? null : (i + 1) % photos.length));
+  const goTo = useCallback(
+    (i: number) => setCenterIndex(clamp(i)),
+    [clamp]
+  );
+  const prev = useCallback(() => {
+    setDir(-1);
+    goTo(centerIndex - 1);
+  }, [centerIndex, goTo]);
+  const next = useCallback(() => {
+    setDir(1);
+    goTo(centerIndex + 1);
+  }, [centerIndex, goTo]);
+
+  // Autoplay — bounces back and forth so it loops without a jarring jump-cut.
+  useEffect(() => {
+    if (paused || lightboxIndex !== null || count <= 1) return;
+    const id = setInterval(() => {
+      setCenterIndex((i) => {
+        let n = i + dir;
+        if (n >= count - 1) {
+          setDir(-1);
+          n = count - 1;
+        } else if (n <= 0) {
+          setDir(1);
+          n = 0;
+        }
+        return n;
+      });
+    }, AUTOPLAY_MS);
+    return () => clearInterval(id);
+  }, [paused, lightboxIndex, count, dir]);
+
+  // Lightbox keyboard nav
+  const closeLightbox = () => setLightboxIndex(null);
+  const lightboxPrev = () => setLightboxIndex((i) => (i === null ? null : (i - 1 + count) % count));
+  const lightboxNext = () => setLightboxIndex((i) => (i === null ? null : (i + 1) % count));
 
   useEffect(() => {
-    if (openIndex === null) return;
+    if (lightboxIndex === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowLeft") prev();
-      if (e.key === "ArrowRight") next();
+      if (e.key === "Escape") closeLightbox();
+      if (e.key === "ArrowLeft") lightboxPrev();
+      if (e.key === "ArrowRight") lightboxNext();
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -35,69 +72,100 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [openIndex]);
+  }, [lightboxIndex]);
 
   return (
-    <>
-      <div ref={gridRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 sm:gap-2">
-        <AnimatePresence initial={false}>
-          {visiblePhotos.map((src, i) => (
-            <motion.button
-              key={src}
-              type="button"
-              onClick={() => setOpenIndex(i)}
-              className="group relative aspect-square overflow-hidden bg-[#E8E5E0] cursor-pointer"
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.5, delay: i < INITIAL_COUNT ? i * 0.03 : (i - INITIAL_COUNT) * 0.03, ease: EASE }}
-            >
-              <Image
-                src={src}
-                alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                fill
-                className="object-cover group-hover:scale-110 transition-transform duration-500"
-                sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
-                priority={i === 0}
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-300 flex items-center justify-center">
-                <Expand
-                  size={18}
-                  className="text-white opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300"
-                />
+    <div className="flex flex-col items-center">
+      {/* ── Up button ────────────────────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={prev}
+        disabled={centerIndex === 0}
+        aria-label={t("เลื่อนขึ้น", "Scroll up", "向上滚动")}
+        className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none mb-2"
+      >
+        <ChevronUp size={18} />
+      </button>
+
+      {/* ── Vertical carousel ────────────────────────────────────────── */}
+      <div
+        className="relative w-full flex justify-center overflow-hidden"
+        style={{ height: CONTAINER_H }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div className="pointer-events-none absolute top-0 inset-x-0 h-20 bg-gradient-to-b from-white to-transparent z-10" />
+        <div className="pointer-events-none absolute bottom-0 inset-x-0 h-20 bg-gradient-to-t from-white to-transparent z-10" />
+
+        <motion.div
+          className="absolute left-1/2"
+          style={{ x: "-50%" }}
+          animate={{ y: CONTAINER_H / 2 - ROW_HEIGHT / 2 - centerIndex * ROW_HEIGHT }}
+          transition={{ type: "spring", stiffness: 240, damping: 30 }}
+        >
+          {photos.map((src, i) => {
+            const dist = i - centerIndex;
+            const abs = Math.abs(dist);
+            const isCenter = dist === 0;
+            const scale = isCenter ? 1.28 : Math.max(0.55, 1 - abs * 0.18);
+            const opacity = Math.max(0, 1 - abs * 0.3);
+
+            return (
+              <div key={src} className="flex items-center justify-center" style={{ height: ROW_HEIGHT }}>
+                {opacity > 0 && (
+                  <motion.button
+                    type="button"
+                    onClick={() => (isCenter ? setLightboxIndex(i) : goTo(i))}
+                    className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
+                    animate={{ scale, opacity }}
+                    transition={{ duration: 0.35, ease: EASE }}
+                    style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
+                  >
+                    <Image
+                      src={src}
+                      alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                      fill
+                      className="object-cover"
+                      sizes="220px"
+                      priority={i === 0}
+                    />
+                    {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
+                  </motion.button>
+                )}
               </div>
-            </motion.button>
-          ))}
-        </AnimatePresence>
+            );
+          })}
+        </motion.div>
       </div>
 
-      {!showAll && remaining > 0 && (
-        <div className="flex justify-center mt-6">
-          <button
-            type="button"
-            onClick={() => setShowAll(true)}
-            className="group inline-flex items-center gap-2 border border-[#E8E5E0] hover:border-[#C8102E] text-[#444] hover:text-[#C8102E] text-sm font-semibold px-6 h-11 transition-colors"
-          >
-            <Plus size={15} className="group-hover:rotate-90 transition-transform duration-300" />
-            {t(`ดูเพิ่มเติม (+${remaining})`, `View More (+${remaining})`, `查看更多 (+${remaining})`)}
-          </button>
-        </div>
-      )}
+      {/* ── Down button + counter ───────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={next}
+        disabled={centerIndex === count - 1}
+        aria-label={t("เลื่อนลง", "Scroll down", "向下滚动")}
+        className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none mt-2"
+      >
+        <ChevronDown size={18} />
+      </button>
+      <p className="text-[#999] text-xs mt-3 tracking-wide">
+        {centerIndex + 1} / {count}
+      </p>
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {openIndex !== null && (
+        {lightboxIndex !== null && (
           <motion.div
             className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 sm:p-10"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            onClick={close}
+            onClick={closeLightbox}
           >
             <button
               type="button"
-              onClick={close}
+              onClick={closeLightbox}
               aria-label={t("ปิด", "Close", "关闭")}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
             >
@@ -108,7 +176,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                prev();
+                lightboxPrev();
               }}
               aria-label={t("ก่อนหน้า", "Previous", "上一张")}
               className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
@@ -119,7 +187,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                next();
+                lightboxNext();
               }}
               aria-label={t("ถัดไป", "Next", "下一张")}
               className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
@@ -128,7 +196,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
             </button>
 
             <motion.div
-              key={openIndex}
+              key={lightboxIndex}
               className="relative w-full h-full max-w-4xl max-h-[80vh]"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -137,7 +205,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
               onClick={(e) => e.stopPropagation()}
             >
               <Image
-                src={photos[openIndex]}
+                src={photos[lightboxIndex]}
                 alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
                 fill
                 className="object-contain"
@@ -147,11 +215,11 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
             </motion.div>
 
             <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-wide">
-              {openIndex + 1} / {photos.length}
+              {lightboxIndex + 1} / {count}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }

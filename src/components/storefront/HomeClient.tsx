@@ -7,6 +7,7 @@ import { ArrowRight, ChevronRight, Search, ShoppingCart } from "lucide-react";
 import { ProductCard } from "@/components/storefront/ProductCard";
 import { CategoryTile } from "@/components/storefront/CategoryTile";
 import { VideoHero } from "@/components/storefront/VideoHero";
+import { InstallationGallery } from "@/components/storefront/InstallationGallery";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/store/cart";
@@ -420,23 +421,7 @@ export function HomeClient({
             </h2>
           </Reveal>
 
-          <StaggerGrid
-            className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 sm:gap-2"
-            stagger={0.03}
-          >
-            {INSTALLATION_PHOTOS.map((src, i) => (
-              <div key={src} className="group relative aspect-square overflow-hidden bg-[#E8E5E0]">
-                <Image
-                  src={src}
-                  alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
-                  priority={i === 0}
-                />
-              </div>
-            ))}
-          </StaggerGrid>
+          <InstallationGallery photos={INSTALLATION_PHOTOS} />
         </section>
       )}
 

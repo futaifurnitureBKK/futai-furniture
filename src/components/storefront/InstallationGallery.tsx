@@ -2,14 +2,14 @@
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const ROW_HEIGHT = 118;
+const COL_WIDTH = 190;
 const BOX_W = 220;
-const BOX_H = 132;
-const CONTAINER_H = 420;
+const BOX_H = 160;
+const CONTAINER_H = 260;
 const AUTOPLAY_MS = 2400;
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
@@ -76,78 +76,82 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
 
   return (
     <div className="flex flex-col items-center">
-      {/* ── Up button ────────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={prev}
-        disabled={centerIndex === 0}
-        aria-label={t("เลื่อนขึ้น", "Scroll up", "向上滚动")}
-        className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none mb-2"
-      >
-        <ChevronUp size={18} />
-      </button>
-
-      {/* ── Vertical carousel ────────────────────────────────────────── */}
-      <div
-        className="relative w-full flex justify-center overflow-hidden"
-        style={{ height: CONTAINER_H }}
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        <div className="pointer-events-none absolute top-0 inset-x-0 h-20 bg-gradient-to-b from-white to-transparent z-10" />
-        <div className="pointer-events-none absolute bottom-0 inset-x-0 h-20 bg-gradient-to-t from-white to-transparent z-10" />
-
-        <motion.div
-          className="absolute left-1/2"
-          style={{ x: "-50%" }}
-          animate={{ y: CONTAINER_H / 2 - ROW_HEIGHT / 2 - centerIndex * ROW_HEIGHT }}
-          transition={{ type: "spring", stiffness: 240, damping: 30 }}
+      <div className="flex items-center gap-3 w-full">
+        {/* ── Left button ──────────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={prev}
+          disabled={centerIndex === 0}
+          aria-label={t("เลื่อนไปทางซ้าย", "Scroll left", "向左滚动")}
+          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none"
         >
-          {photos.map((src, i) => {
-            const dist = i - centerIndex;
-            const abs = Math.abs(dist);
-            const isCenter = dist === 0;
-            const scale = isCenter ? 1.28 : Math.max(0.55, 1 - abs * 0.18);
-            const opacity = Math.max(0, 1 - abs * 0.3);
+          <ChevronLeft size={18} />
+        </button>
 
-            return (
-              <div key={src} className="flex items-center justify-center" style={{ height: ROW_HEIGHT }}>
-                {opacity > 0 && (
-                  <motion.button
-                    type="button"
-                    onClick={() => (isCenter ? setLightboxIndex(i) : goTo(i))}
-                    className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
-                    animate={{ scale, opacity }}
-                    transition={{ duration: 0.35, ease: EASE }}
-                    style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
-                  >
-                    <Image
-                      src={src}
-                      alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                      fill
-                      className="object-cover"
-                      sizes="220px"
-                      priority={i === 0}
-                    />
-                    {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
-                  </motion.button>
-                )}
-              </div>
-            );
-          })}
-        </motion.div>
+        {/* ── Horizontal carousel ──────────────────────────────────── */}
+        <div
+          className="relative flex-1 flex items-center overflow-hidden"
+          style={{ height: CONTAINER_H }}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <div className="pointer-events-none absolute left-0 inset-y-0 w-16 sm:w-24 bg-gradient-to-r from-white to-transparent z-10" />
+          <div className="pointer-events-none absolute right-0 inset-y-0 w-16 sm:w-24 bg-gradient-to-l from-white to-transparent z-10" />
+
+          <motion.div
+            className="absolute top-1/2"
+            style={{ y: "-50%" }}
+            animate={{ x: `calc(50% - ${COL_WIDTH / 2}px - ${centerIndex * COL_WIDTH}px)` }}
+            transition={{ type: "spring", stiffness: 240, damping: 30 }}
+          >
+            <div className="flex">
+              {photos.map((src, i) => {
+                const dist = i - centerIndex;
+                const abs = Math.abs(dist);
+                const isCenter = dist === 0;
+                const scale = isCenter ? 1.28 : Math.max(0.55, 1 - abs * 0.18);
+                const opacity = Math.max(0, 1 - abs * 0.3);
+
+                return (
+                  <div key={src} className="flex items-center justify-center" style={{ width: COL_WIDTH }}>
+                    {opacity > 0 && (
+                      <motion.button
+                        type="button"
+                        onClick={() => (isCenter ? setLightboxIndex(i) : goTo(i))}
+                        className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
+                        animate={{ scale, opacity }}
+                        transition={{ duration: 0.35, ease: EASE }}
+                        style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
+                      >
+                        <Image
+                          src={src}
+                          alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                          fill
+                          className="object-cover"
+                          sizes="220px"
+                          priority={i === 0}
+                        />
+                        {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
+                      </motion.button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ── Right button ─────────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={next}
+          disabled={centerIndex === count - 1}
+          aria-label={t("เลื่อนไปทางขวา", "Scroll right", "向右滚动")}
+          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
-
-      {/* ── Down button + counter ───────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={next}
-        disabled={centerIndex === count - 1}
-        aria-label={t("เลื่อนลง", "Scroll down", "向下滚动")}
-        className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none mt-2"
-      >
-        <ChevronDown size={18} />
-      </button>
       <p className="text-[#999] text-xs mt-3 tracking-wide">
         {centerIndex + 1} / {count}
       </p>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,16 +11,32 @@ const BOX_W = 220;
 const BOX_H = 160;
 const CONTAINER_H = 260;
 const AUTOPLAY_MS = 2400;
+const RADIUS = 8; // how many items to render on each side of center
+
+const mod = (n: number, m: number) => ((n % m) + m) % m;
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
   const { t } = useLanguage();
   const count = photos.length;
-  const [centerIndex, setCenterIndex] = useState(0);
-  const [dir, setDir] = useState<1 | -1>(1);
+
+  // Render 3 copies back to back so the strip can keep sliding one direction
+  // forever. `centerIndex` is an index into this tripled array and always
+  // stays inside the middle copy — when it drifts into copy 1 or 3, it gets
+  // silently shifted back by ±count (same photo, so the jump is invisible).
+  const track = useMemo(() => [...photos, ...photos, ...photos], [photos]);
+  const skipAnimRef = useRef(false);
+
+  const [centerIndex, setCenterIndex] = useState(() => count + Math.floor(count / 2));
   const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const trackContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Runs after every render — clears the "instant jump" flag once the
+    // motion.div has already picked it up for the render that needed it.
+    skipAnimRef.current = false;
+  });
 
   useEffect(() => {
     const el = trackContainerRef.current;
@@ -32,44 +48,37 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
     return () => ro.disconnect();
   }, []);
 
-  const clamp = useCallback((i: number) => Math.max(0, Math.min(count - 1, i)), [count]);
-
-  const goTo = useCallback(
-    (i: number) => setCenterIndex(clamp(i)),
-    [clamp]
-  );
-  const prev = useCallback(() => {
-    setDir(-1);
-    goTo(centerIndex - 1);
-  }, [centerIndex, goTo]);
-  const next = useCallback(() => {
-    setDir(1);
-    goTo(centerIndex + 1);
-  }, [centerIndex, goTo]);
-
-  // Autoplay — bounces back and forth so it loops without a jarring jump-cut.
-  useEffect(() => {
-    if (paused || lightboxIndex !== null || count <= 1) return;
-    const id = setInterval(() => {
+  const step = useCallback(
+    (delta: number) => {
       setCenterIndex((i) => {
-        let n = i + dir;
-        if (n >= count - 1) {
-          setDir(-1);
-          n = count - 1;
-        } else if (n <= 0) {
-          setDir(1);
-          n = 0;
+        let n = i + delta;
+        if (n >= 2 * count) {
+          skipAnimRef.current = true;
+          n -= count;
+        } else if (n < count) {
+          skipAnimRef.current = true;
+          n += count;
         }
         return n;
       });
-    }, AUTOPLAY_MS);
+    },
+    [count]
+  );
+  const prev = useCallback(() => step(-1), [step]);
+  const next = useCallback(() => step(1), [step]);
+  const goTo = useCallback((i: number) => step(i - centerIndex), [step, centerIndex]);
+
+  // Autoplay — endless loop in one direction, no bounce, no visible jump-cut.
+  useEffect(() => {
+    if (paused || lightboxIndex !== null || count <= 1) return;
+    const id = setInterval(() => step(1), AUTOPLAY_MS);
     return () => clearInterval(id);
-  }, [paused, lightboxIndex, count, dir]);
+  }, [paused, lightboxIndex, count, step]);
 
   // Lightbox keyboard nav
   const closeLightbox = () => setLightboxIndex(null);
-  const lightboxPrev = () => setLightboxIndex((i) => (i === null ? null : (i - 1 + count) % count));
-  const lightboxNext = () => setLightboxIndex((i) => (i === null ? null : (i + 1) % count));
+  const lightboxPrev = () => setLightboxIndex((i) => (i === null ? null : mod(i - 1, count)));
+  const lightboxNext = () => setLightboxIndex((i) => (i === null ? null : mod(i + 1, count)));
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -93,9 +102,8 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
         <button
           type="button"
           onClick={prev}
-          disabled={centerIndex === 0}
           aria-label={t("เลื่อนไปทางซ้าย", "Scroll left", "向左滚动")}
-          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
         >
           <ChevronLeft size={18} />
         </button>
@@ -115,38 +123,38 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
             className="absolute top-1/2 left-0"
             style={{ y: "-50%" }}
             animate={{ x: trackWidth / 2 - COL_WIDTH / 2 - centerIndex * COL_WIDTH }}
-            transition={{ type: "spring", stiffness: 240, damping: 30 }}
+            transition={skipAnimRef.current ? { duration: 0 } : { type: "spring", stiffness: 240, damping: 30 }}
           >
             <div className="flex">
-              {photos.map((src, i) => {
+              {track.map((src, i) => {
                 const dist = i - centerIndex;
                 const abs = Math.abs(dist);
+                if (abs > RADIUS) return <div key={i} style={{ width: COL_WIDTH }} />;
+
                 const isCenter = dist === 0;
                 const scale = isCenter ? 1.28 : Math.max(0.55, 1 - abs * 0.18);
                 const opacity = Math.max(0, 1 - abs * 0.3);
 
                 return (
-                  <div key={src} className="flex items-center justify-center" style={{ width: COL_WIDTH }}>
-                    {opacity > 0 && (
-                      <motion.button
-                        type="button"
-                        onClick={() => (isCenter ? setLightboxIndex(i) : goTo(i))}
-                        className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
-                        animate={{ scale, opacity }}
-                        transition={{ duration: 0.35, ease: EASE }}
-                        style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
-                      >
-                        <Image
-                          src={src}
-                          alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                          fill
-                          className="object-cover"
-                          sizes="220px"
-                          priority={i === 0}
-                        />
-                        {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
-                      </motion.button>
-                    )}
+                  <div key={i} className="flex items-center justify-center" style={{ width: COL_WIDTH }}>
+                    <motion.button
+                      type="button"
+                      onClick={() => (isCenter ? setLightboxIndex(mod(i, count)) : goTo(i))}
+                      className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
+                      animate={{ scale, opacity }}
+                      transition={{ duration: 0.35, ease: EASE }}
+                      style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
+                    >
+                      <Image
+                        src={src}
+                        alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                        fill
+                        className="object-cover"
+                        sizes="220px"
+                        priority={isCenter}
+                      />
+                      {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
+                    </motion.button>
                   </div>
                 );
               })}
@@ -158,15 +166,14 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
         <button
           type="button"
           onClick={next}
-          disabled={centerIndex === count - 1}
           aria-label={t("เลื่อนไปทางขวา", "Scroll right", "向右滚动")}
-          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
         >
           <ChevronRight size={18} />
         </button>
       </div>
       <p className="text-[#999] text-xs mt-3 tracking-wide">
-        {centerIndex + 1} / {count}
+        {mod(centerIndex, count) + 1} / {count}
       </p>
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}

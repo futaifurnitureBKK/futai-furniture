@@ -11,7 +11,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/store/cart";
 import { useLanguage } from "@/store/language";
-import { TESTIMONIALS } from "@/data/testimonials";
+import { INSTALLATION_PHOTOS } from "@/data/testimonials";
 import type { Category, Product } from "@/types";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
@@ -409,7 +409,7 @@ export function HomeClient({
       </div>
 
       {/* ── Real Installations (customer proof) ─────────────────────── */}
-      {TESTIMONIALS.length > 0 && (
+      {INSTALLATION_PHOTOS.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Reveal className="mb-8">
             <p className="text-[#C8102E] text-xs tracking-[0.3em] uppercase font-semibold mb-3">
@@ -420,30 +420,23 @@ export function HomeClient({
             </h2>
           </Reveal>
 
-          {TESTIMONIALS.map((item, i) => (
-            <Reveal key={item.id} delay={i * 0.1} className={i > 0 ? "mt-10" : ""}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                {item.images.map((src, imgI) => (
-                  <div key={src} className="relative aspect-[3/4] sm:aspect-[4/5] overflow-hidden bg-[#E8E5E0]">
-                    <Image
-                      src={src}
-                      alt={t(item.th, item.en, item.zh)}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, 50vw"
-                      priority={i === 0 && imgI === 0}
-                    />
-                  </div>
-                ))}
+          <StaggerGrid
+            className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 sm:gap-2"
+            stagger={0.03}
+          >
+            {INSTALLATION_PHOTOS.map((src, i) => (
+              <div key={src} className="group relative aspect-square overflow-hidden bg-[#E8E5E0]">
+                <Image
+                  src={src}
+                  alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, 16vw"
+                  priority={i === 0}
+                />
               </div>
-              <div className="flex items-start gap-3 mt-4">
-                <span className="flex-none bg-[#1A1A1A] text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1">
-                  {t(item.tagTh, item.tagEn, item.tagZh)}
-                </span>
-                <p className="text-[#555] text-sm leading-relaxed">{t(item.th, item.en, item.zh)}</p>
-              </div>
-            </Reveal>
-          ))}
+            ))}
+          </StaggerGrid>
         </section>
       )}
 

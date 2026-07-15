@@ -24,7 +24,13 @@ function LoginForm() {
       router.push(from);
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(res.status === 500 ? `Server error: ${data.error ?? "unknown"}` : "รหัสผ่านไม่ถูกต้อง");
+      if (res.status === 500) {
+        setError(`Server error: ${data.error ?? "unknown"}`);
+      } else if (res.status === 429) {
+        setError(data.error ?? "ลองผิดหลายครั้งเกินไป กรุณารอสักครู่");
+      } else {
+        setError(data.error ?? "รหัสผ่านไม่ถูกต้อง");
+      }
       setLoading(false);
     }
   }

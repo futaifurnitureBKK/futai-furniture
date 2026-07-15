@@ -12,21 +12,27 @@ import {
   LogOut,
   MonitorPlay,
   ImagePlus,
+  LayoutGrid,
 } from "lucide-react";
+import { useLanguage } from "@/store/language";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const NAV = [
-  { href: "/admin",                   label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/admin/pos",               label: "POS",          icon: MonitorPlay },
-  { href: "/admin/orders",            label: "คำสั่งซื้อ",   icon: ShoppingBag },
-  { href: "/admin/quotes",            label: "ใบเสนอราคา",  icon: FileText },
-  { href: "/admin/products",          label: "สินค้า",       icon: Package },
-  { href: "/admin/products/images",   label: "รูปสินค้า",    icon: ImagePlus },
-  { href: "/admin/customers",         label: "ลูกค้า",       icon: Users },
-  { href: "/admin/settings",          label: "ตั้งค่า",      icon: Settings },
+  { href: "/admin",                   labelTh: "Dashboard",    labelEn: "Dashboard",    labelZh: "仪表盘",     icon: LayoutDashboard },
+  { href: "/admin/pos",               labelTh: "POS",          labelEn: "POS",          labelZh: "收银台",     icon: MonitorPlay },
+  { href: "/admin/orders",            labelTh: "คำสั่งซื้อ",   labelEn: "Orders",       labelZh: "订单",       icon: ShoppingBag },
+  { href: "/admin/quotes",            labelTh: "ใบเสนอราคา",  labelEn: "Quotes",       labelZh: "报价单",     icon: FileText },
+  { href: "/admin/products",          labelTh: "สินค้า",       labelEn: "Products",     labelZh: "产品",       icon: Package },
+  { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus },
+  { href: "/admin/categories",        labelTh: "รูปหมวดหมู่",  labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },
+  { href: "/admin/customers",         labelTh: "ลูกค้า",       labelEn: "Customers",    labelZh: "客户",       icon: Users },
+  { href: "/admin/settings",          labelTh: "ตั้งค่า",      labelEn: "Settings",     labelZh: "设置",       icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t, lang } = useLanguage();
+  const dateLocale = lang === "th" ? "th-TH" : lang === "zh" ? "zh-CN" : "en-US";
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] flex">
@@ -42,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, labelTh, labelEn, labelZh, icon: Icon }) => {
             const active =
               href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
             return (
@@ -56,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }`}
               >
                 <Icon size={16} />
-                {label}
+                {t(labelTh, labelEn, labelZh)}
               </Link>
             );
           })}
@@ -69,7 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="flex items-center gap-2 text-xs text-white/40 hover:text-white transition-colors"
           >
             <LogOut size={13} />
-            กลับไปหน้าเว็บ
+            {t("กลับไปหน้าเว็บ", "Back to website", "返回网站")}
           </Link>
           <button
             onClick={async () => {
@@ -79,7 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="flex items-center gap-2 text-xs text-white/20 hover:text-red-400 transition-colors w-full"
           >
             <LogOut size={13} />
-            ออกจากระบบ
+            {t("ออกจากระบบ", "Log out", "退出登录")}
           </button>
         </div>
       </aside>
@@ -99,8 +105,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </>
             )}
           </div>
-          <div className="text-xs text-[#6B6B6B]">
-            วันนี้: {new Date().toLocaleDateString("th-TH")}
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-[#6B6B6B]">
+              {new Date().toLocaleDateString(dateLocale)}
+            </span>
+            <LanguageSwitcher />
           </div>
         </header>
 

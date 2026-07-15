@@ -17,16 +17,16 @@ export default function CartPage() {
       <div className="bg-[#FAF7F2] min-h-screen flex flex-col items-center justify-center text-center px-4 pt-16">
         <ShoppingBag size={64} className="text-[#E8E5E0] mb-6" />
         <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">
-          {t("ตะกร้าของคุณว่างเปล่า", "Your cart is empty")}
+          {t("ตะกร้าของคุณว่างเปล่า", "Your cart is empty", "您的购物车是空的")}
         </h1>
         <p className="text-[#6B6B6B] mb-8">
-          {t("เพิ่มสินค้าที่ต้องการเพื่อดำเนินการต่อ", "Add some products to get started")}
+          {t("เพิ่มสินค้าที่ต้องการเพื่อดำเนินการต่อ", "Add some products to get started", "添加产品以继续")}
         </p>
         <Link
           href="/category/office-chair"
           className={cn(buttonVariants(), "bg-[#C8102E] hover:bg-[#a30d25] text-white")}
         >
-          {t("เลือกซื้อสินค้า", "Browse Products")}
+          {t("เลือกซื้อสินค้า", "Browse Products", "浏览产品")}
         </Link>
       </div>
     );
@@ -37,7 +37,7 @@ export default function CartPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <FadeIn>
           <h1 className="text-3xl font-bold text-[#1A1A1A] mb-10">
-            {t("ตะกร้าสินค้า", "Shopping Cart")}
+            {t("ตะกร้าสินค้า", "Shopping Cart", "购物车")}
           </h1>
         </FadeIn>
 
@@ -50,7 +50,7 @@ export default function CartPage() {
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#FAF7F2] shrink-0">
                     <Image
                       src={item.product.images[0]}
-                      alt={item.product.name_th}
+                      alt={t(item.product.name_th, item.product.name_en, item.product.name_zh)}
                       fill
                       sizes="80px"
                       className="object-cover"
@@ -59,7 +59,7 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-[#6B6B6B] font-mono">{item.product.sku}</p>
                     <p className="font-medium text-[#1A1A1A] text-sm leading-snug line-clamp-2">
-                      {t(item.product.name_th, item.product.name_en)}
+                      {t(item.product.name_th, item.product.name_en, item.product.name_zh)}
                     </p>
                     {item.product.price !== null ? (
                       <p className="text-[#C8102E] font-semibold mt-1">
@@ -67,7 +67,7 @@ export default function CartPage() {
                       </p>
                     ) : (
                       <p className="text-xs text-[#C8102E] mt-1">
-                        {t("ราคาตามใบเสนอราคา", "Price on quote")}
+                        {t("ราคาตามใบเสนอราคา", "Price on quote", "价格以报价单为准")}
                       </p>
                     )}
                   </div>
@@ -104,18 +104,18 @@ export default function CartPage() {
           <FadeIn delay={0.1}>
             <div className="bg-white rounded-xl p-6 shadow-sm h-fit sticky top-24">
               <h2 className="font-semibold text-[#1A1A1A] mb-4">
-                {t("สรุปคำสั่งซื้อ", "Order Summary")}
+                {t("สรุปคำสั่งซื้อ", "Order Summary", "订单摘要")}
               </h2>
               <div className="space-y-3 text-sm mb-6">
                 <div className="flex justify-between text-[#6B6B6B]">
-                  <span>{t("จำนวนสินค้า", "Items")}</span>
+                  <span>{t("จำนวนสินค้า", "Items", "商品数量")}</span>
                   <span>{items.reduce((s, i) => s + i.quantity, 0)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-[#1A1A1A] pt-3 border-t border-[#E8E5E0]">
-                  <span>{t("ยอดรวม", "Total")}</span>
+                  <span>{t("ยอดรวม", "Total", "总计")}</span>
                   <span>
                     {hasUnpricedItems()
-                      ? t("ตามใบเสนอราคา", "Per Quote")
+                      ? t("ตามใบเสนอราคา", "Per Quote", "以报价为准")
                       : `฿${(subtotal() ?? 0).toLocaleString()}`}
                   </span>
                 </div>
@@ -124,7 +124,8 @@ export default function CartPage() {
                 <p className="text-xs text-[#6B6B6B] bg-[#FAF7F2] p-3 rounded mb-4">
                   {t(
                     "มีสินค้าที่ยังไม่มีราคา ทีมงานจะติดต่อเพื่อแจ้งราคาหลังจากคุณส่งคำสั่งซื้อ",
-                    "Some items have no price yet. Our team will confirm pricing after you submit."
+                    "Some items have no price yet. Our team will confirm pricing after you submit.",
+                    "部分商品尚未标价，提交后我们的团队会与您确认价格"
                   )}
                 </p>
               )}
@@ -136,8 +137,8 @@ export default function CartPage() {
                 )}
               >
                 {hasUnpricedItems()
-                  ? t("ส่งคำขอใบเสนอราคา", "Submit Quote Request")
-                  : t("ดำเนินการชำระเงิน", "Proceed to Checkout")}
+                  ? t("ส่งคำขอใบเสนอราคา", "Submit Quote Request", "提交报价申请")
+                  : t("ดำเนินการชำระเงิน", "Proceed to Checkout", "前往结算")}
               </Link>
               <Link
                 href="/category/office-chair"
@@ -146,7 +147,7 @@ export default function CartPage() {
                   "w-full mt-2 text-[#6B6B6B] justify-center"
                 )}
               >
-                {t("เลือกสินค้าเพิ่ม", "Continue Shopping")}
+                {t("เลือกสินค้าเพิ่ม", "Continue Shopping", "继续购物")}
               </Link>
             </div>
           </FadeIn>

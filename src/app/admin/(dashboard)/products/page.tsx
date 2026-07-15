@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { PRODUCTS, CATEGORIES } from "@/data/mock";
+import { supabase } from "@/lib/supabase/browser";
+import { CATEGORIES } from "@/data/mock";
+import type { Product } from "@/types";
 
 const STOCK_LABEL: Record<string, string> = {
   in_stock: "มีสินค้า",
@@ -20,10 +22,39 @@ const STOCK_COLOR: Record<string, string> = {
 };
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
 
-  const filtered = PRODUCTS.filter((p) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+      if (!cancelled) {
+        setProducts((data as Product[]) ?? []);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function toggleActive(product: Product) {
+    const next = !product.is_active;
+    setProducts((prev) => prev.map((p) => (p.sku === product.sku ? { ...p, is_active: next } : p)));
+    const res = await fetch(`/api/admin/products/${encodeURIComponent(product.sku)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: next }),
+    });
+    if (!res.ok) {
+      setProducts((prev) => prev.map((p) => (p.sku === product.sku ? { ...p, is_active: !next } : p)));
+    }
+  }
+
+  const filtered = products.filter((p) => {
     const matchCat = catFilter === "all" || p.category_slug === catFilter;
     const matchSearch =
       !search ||
@@ -39,9 +70,11 @@ export default function ProductsPage() {
         <h1 className="text-2xl font-bold text-[#1A1A1A]">จัดการสินค้า</h1>
         <div className="flex gap-3">
           <Button size="sm" variant="outline">Import CSV</Button>
-          <Button size="sm" className="bg-[#C8102E] hover:bg-[#a30d25] text-white gap-1">
-            <Plus size={14} /> เพิ่มสินค้า
-          </Button>
+          <Link href="/admin/products/new">
+            <Button size="sm" className="bg-[#C8102E] hover:bg-[#a30d25] text-white gap-1">
+              <Plus size={14} /> เพิ่มสินค้า
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -66,7 +99,9 @@ export default function ProductsPage() {
             <option key={c.slug} value={c.slug}>{c.name_th}</option>
           ))}
         </select>
-        <p className="text-xs text-[#6B6B6B] self-center">{filtered.length} รายการ</p>
+        <p className="text-xs text-[#6B6B6B] self-center">
+          {loading ? "กำลังโหลด..." : `${filtered.length} รายการ`}
+        </p>
       </div>
 
       {/* Product grid */}
@@ -74,7 +109,9 @@ export default function ProductsPage() {
         {filtered.map((product) => (
           <div
             key={product.sku}
-            className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+            className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
+              !product.is_active ? "opacity-60" : ""
+            }`}
           >
             <div className="relative aspect-video bg-[#FAF7F2]">
               <Image
@@ -84,11 +121,14 @@ export default function ProductsPage() {
                 sizes="80px"
                 className="object-contain p-2"
               />
-              {product.is_featured && (
-                <div className="absolute top-2 right-2">
+              <div className="absolute top-2 right-2 flex gap-1">
+                {product.is_featured && (
                   <Badge className="bg-[#C9A876] text-white text-[10px] px-1.5 py-0.5">Featured</Badge>
-                </div>
-              )}
+                )}
+                {!product.is_active && (
+                  <Badge className="bg-[#1A1A1A] text-white text-[10px] px-1.5 py-0.5">ซ่อนอยู่</Badge>
+                )}
+              </div>
             </div>
             <div className="p-3">
               <p className="text-[10px] font-mono text-[#6B6B6B] mb-0.5">{product.sku}</p>
@@ -102,13 +142,34 @@ export default function ProductsPage() {
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
-                <Button size="sm" variant="outline" className="flex-1 h-7 text-xs">
-                  แก้ไข
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1 h-7 text-xs text-[#C8102E] border-[#C8102E]/30 hover:bg-[#C8102E]/5">
-                  ดูหน้า
+                <Link href={`/admin/products/${encodeURIComponent(product.sku)}/edit`} className="flex-1">
+                  <Button size="sm" variant="outline" className="w-full h-7 text-xs">
+                    แก้ไข
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => toggleActive(product)}
+                  className="flex-1 h-7 text-xs gap-1"
+                  title={product.is_active ? "ซ่อนสินค้าจากหน้าเว็บ" : "แสดงสินค้าบนหน้าเว็บ"}
+                >
+                  {product.is_active ? <EyeOff size={12} /> : <Eye size={12} />}
+                  {product.is_active ? "ซ่อนสินค้า" : "แสดงสินค้า"}
                 </Button>
               </div>
+              {product.is_active && (
+                <a
+                  href={`/product/${encodeURIComponent(product.sku)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block mt-2"
+                >
+                  <Button size="sm" variant="outline" className="w-full h-7 text-xs text-[#C8102E] border-[#C8102E]/30 hover:bg-[#C8102E]/5">
+                    ดูหน้า
+                  </Button>
+                </a>
+              )}
             </div>
           </div>
         ))}

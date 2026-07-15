@@ -2,10 +2,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ShoppingCart, Menu, X, Globe } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Search, ShoppingCart, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/store/cart";
 import { useLanguage } from "@/store/language";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/mock";
 
@@ -13,7 +15,10 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { totalItems } = useCart();
-  const { lang, setLang, t } = useLanguage();
+  const { t } = useLanguage();
+  const pathname = usePathname();
+  // Homepage has its own category-tab row where the switcher lives instead.
+  const isHome = pathname === "/";
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
@@ -21,10 +26,13 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  // Homepage has its own single-row header (logo, tabs, search, cart, language) instead.
+  if (isHome) return null;
+
   const navLinks = [
-    { label: t("หมวดหมู่สินค้า", "Categories"), href: "/category/office-chair" },
-    { label: t("โชว์รูม", "Showroom"), href: "/showroom" },
-    { label: t("เกี่ยวกับเรา", "About"), href: "#about" },
+    { label: t("หมวดหมู่สินค้า", "Categories", "产品分类"), href: "/category/office-chair" },
+    { label: t("โชว์รูม", "Showroom", "展厅"), href: "/showroom" },
+    { label: t("เกี่ยวกับเรา", "About", "关于我们"), href: "#about" },
   ];
 
   return (
@@ -56,7 +64,7 @@ export function Navbar() {
                   scrolled ? "text-[#1A1A1A] hover:text-[#C8102E]" : "text-white hover:text-[#C9A876]"
                 }`}
               >
-                {t("สินค้า", "Products")}
+                {t("สินค้า", "Products", "产品")}
               </button>
               {/* Dropdown */}
               <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[480px] bg-white rounded-lg shadow-xl p-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 grid grid-cols-3 gap-2">
@@ -66,14 +74,14 @@ export function Navbar() {
                     href={`/category/${cat.slug}`}
                     className="text-xs text-[#1A1A1A] hover:text-[#C8102E] py-1 truncate"
                   >
-                    {t(cat.name_th, cat.name_en)}
+                    {t(cat.name_th, cat.name_en, cat.name_zh)}
                   </Link>
                 ))}
                 <Link
                   href="/category/office-desk"
                   className="text-xs text-[#C8102E] font-medium py-1 col-span-3"
                 >
-                  {t("ดูทั้งหมด →", "View all →")}
+                  {t("ดูทั้งหมด →", "View all →", "查看全部 →")}
                 </Link>
               </div>
             </div>
@@ -93,19 +101,9 @@ export function Navbar() {
 
           {/* Right icons */}
           <div className="flex items-center gap-3">
-            {/* Language toggle */}
-            <button
-              onClick={() => setLang(lang === "th" ? "en" : "th")}
-              className={`flex items-center gap-1 text-xs font-medium ${
-                scrolled ? "text-[#6B6B6B] hover:text-[#1A1A1A]" : "text-white/80 hover:text-white"
-              }`}
-              aria-label="Toggle language"
-            >
-              <Globe size={14} />
-              {lang === "th" ? "EN" : "TH"}
-            </button>
+            <LanguageSwitcher variant={scrolled ? "dark" : "light"} />
 
-            <Link href="/search" aria-label={t("ค้นหา", "Search")}>
+            <Link href="/search" aria-label={t("ค้นหา", "Search", "搜索")}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -115,7 +113,7 @@ export function Navbar() {
               </Button>
             </Link>
 
-            <Link href="/cart" aria-label={t("ตะกร้า", "Cart")} className="relative">
+            <Link href="/cart" aria-label={t("ตะกร้า", "Cart", "购物车")} className="relative">
               <Button
                 variant="ghost"
                 size="icon"
@@ -157,7 +155,7 @@ export function Navbar() {
                 className="py-2 text-[#1A1A1A] font-medium"
                 onClick={() => setMenuOpen(false)}
               >
-                {t("หน้าแรก", "Home")}
+                {t("หน้าแรก", "Home", "首页")}
               </Link>
               {CATEGORIES.map((cat) => (
                 <Link
@@ -166,7 +164,7 @@ export function Navbar() {
                   className="py-1.5 text-sm text-[#6B6B6B] hover:text-[#C8102E] pl-2"
                   onClick={() => setMenuOpen(false)}
                 >
-                  {t(cat.name_th, cat.name_en)}
+                  {t(cat.name_th, cat.name_en, cat.name_zh)}
                 </Link>
               ))}
               <Link
@@ -174,7 +172,7 @@ export function Navbar() {
                 className="py-2 text-[#1A1A1A] font-medium"
                 onClick={() => setMenuOpen(false)}
               >
-                {t("โชว์รูม", "Showroom")}
+                {t("โชว์รูม", "Showroom", "展厅")}
               </Link>
             </nav>
           </motion.div>

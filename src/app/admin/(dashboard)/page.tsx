@@ -1,9 +1,12 @@
-﻿import Link from "next/link";
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ShoppingBag, Package, Users, AlertCircle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_ORDERS, MOCK_CUSTOMERS, PRODUCTS, MOCK_QUOTES } from "@/data/mock";
+import { supabase } from "@/lib/supabase/browser";
+import type { Order, Customer, QuoteRequest, Product } from "@/types";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "รอดำเนินการ",
@@ -23,46 +26,74 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
-const KPI = [
-  {
-    title: "ออเดอร์รอดำเนินการ",
-    value: MOCK_ORDERS.filter((o) => o.status === "pending").length,
-    icon: AlertCircle,
-    color: "text-yellow-600",
-    bg: "bg-yellow-50",
-    href: "/admin/orders",
-  },
-  {
-    title: "ออเดอร์ทั้งหมด",
-    value: MOCK_ORDERS.length,
-    icon: ShoppingBag,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    href: "/admin/orders",
-  },
-  {
-    title: "สินค้าทั้งหมด",
-    value: PRODUCTS.length,
-    icon: Package,
-    color: "text-[#C8102E]",
-    bg: "bg-red-50",
-    href: "/admin/products",
-  },
-  {
-    title: "ลูกค้าทั้งหมด",
-    value: MOCK_CUSTOMERS.length,
-    icon: Users,
-    color: "text-green-600",
-    bg: "bg-green-50",
-    href: "/admin/customers",
-  },
-];
-
-const TOP_PRODUCTS = [...PRODUCTS]
-  .sort((a, b) => b.view_count - a.view_count)
-  .slice(0, 5);
-
 export default function AdminDashboard() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [ordersRes, customersRes, quotesRes, productsRes] = await Promise.all([
+        fetch("/api/admin/orders"),
+        fetch("/api/admin/customers"),
+        fetch("/api/admin/quotes"),
+        supabase.from("products").select("*"),
+      ]);
+      const ordersData = await ordersRes.json();
+      const customersData = await customersRes.json();
+      const quotesData = await quotesRes.json();
+      if (!cancelled) {
+        setOrders(ordersRes.ok ? ordersData.orders : []);
+        setCustomers(customersRes.ok ? customersData.customers : []);
+        setQuotes(quotesRes.ok ? quotesData.quotes : []);
+        setProducts((productsRes.data as Product[]) ?? []);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const KPI = [
+    {
+      title: "ออเดอร์รอดำเนินการ",
+      value: orders.filter((o) => o.status === "pending").length,
+      icon: AlertCircle,
+      color: "text-yellow-600",
+      bg: "bg-yellow-50",
+      href: "/admin/orders",
+    },
+    {
+      title: "ออเดอร์ทั้งหมด",
+      value: orders.length,
+      icon: ShoppingBag,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      href: "/admin/orders",
+    },
+    {
+      title: "สินค้าทั้งหมด",
+      value: products.length,
+      icon: Package,
+      color: "text-[#C8102E]",
+      bg: "bg-red-50",
+      href: "/admin/products",
+    },
+    {
+      title: "ลูกค้าทั้งหมด",
+      value: customers.length,
+      icon: Users,
+      color: "text-green-600",
+      bg: "bg-green-50",
+      href: "/admin/customers",
+    },
+  ];
+
+  const topProducts = [...products].sort((a, b) => b.view_count - a.view_count).slice(0, 5);
+  const pendingQuotes = quotes.filter((q) => q.status === "pending").length;
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -111,14 +142,14 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quote requests alert */}
-      {MOCK_QUOTES.filter((q) => q.status === "pending").length > 0 && (
+      {pendingQuotes > 0 && (
         <Card className="border-[#C8102E]/30 bg-[#C8102E]/5">
           <CardContent className="p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <AlertCircle size={18} className="text-[#C8102E] shrink-0" />
               <p className="text-sm text-[#1A1A1A]">
                 มีคำขอใบเสนอราคา{" "}
-                <strong>{MOCK_QUOTES.filter((q) => q.status === "pending").length}</strong>{" "}
+                <strong>{pendingQuotes}</strong>{" "}
                 รายการรอตอบกลับ
               </p>
             </div>
@@ -148,22 +179,26 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {MOCK_ORDERS.slice(0, 5).map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between py-2 border-b border-[#E8E5E0] last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-[#1A1A1A]">{order.order_number}</p>
-                    <p className="text-xs text-[#6B6B6B]">
-                      {new Date(order.created_at).toLocaleDateString("th-TH")}
-                    </p>
+              {orders.length === 0 ? (
+                <p className="text-sm text-[#6B6B6B] py-4 text-center">ยังไม่มีคำสั่งซื้อ</p>
+              ) : (
+                orders.slice(0, 5).map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between py-2 border-b border-[#E8E5E0] last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-[#1A1A1A]">{order.order_number}</p>
+                      <p className="text-xs text-[#6B6B6B]">
+                        {new Date(order.created_at).toLocaleDateString("th-TH")}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLOR[order.status]}`}>
+                      {STATUS_LABEL[order.status]}
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLOR[order.status]}`}>
-                    {STATUS_LABEL[order.status]}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -180,7 +215,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {TOP_PRODUCTS.map((p, i) => (
+              {topProducts.map((p, i) => (
                 <div
                   key={p.sku}
                   className="flex items-center gap-3 py-2 border-b border-[#E8E5E0] last:border-0"
@@ -208,10 +243,10 @@ export default function AdminDashboard() {
         <CardContent className="p-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
             {[
-              { label: "สินค้าทั้งหมด", value: PRODUCTS.length },
+              { label: "สินค้าทั้งหมด", value: products.length },
               { label: "หมวดหมู่", value: 15 },
-              { label: "สินค้ามีสต็อก", value: PRODUCTS.filter((p) => p.stock_status === "in_stock").length },
-              { label: "สินค้า Featured", value: PRODUCTS.filter((p) => p.is_featured).length },
+              { label: "สินค้ามีสต็อก", value: products.filter((p) => p.stock_status === "in_stock").length },
+              { label: "สินค้า Featured", value: products.filter((p) => p.is_featured).length },
             ].map((s) => (
               <div key={s.label}>
                 <p className="text-2xl font-bold text-[#1A1A1A]">{s.value}</p>

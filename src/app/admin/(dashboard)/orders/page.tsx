@@ -1,13 +1,12 @@
 "use client";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { MOCK_ORDERS, MOCK_CUSTOMERS } from "@/data/mock";
-import type { OrderStatus } from "@/types";
+import type { Order, OrderStatus } from "@/types";
 
 const STATUSES: { value: OrderStatus | "all"; label: string }[] = [
   { value: "all",       label: "ทั้งหมด" },
@@ -29,17 +28,33 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function OrdersPage() {
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
 
-  const orders = MOCK_ORDERS.filter((o) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/admin/orders");
+      const data = await res.json();
+      if (!cancelled) {
+        setAllOrders(res.ok ? data.orders : []);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const orders = allOrders.filter((o) => {
     if (filter !== "all" && o.status !== filter) return false;
     if (search) {
-      const customer = MOCK_CUSTOMERS.find((c) => c.id === o.customer_id);
       return (
         o.order_number.toLowerCase().includes(search.toLowerCase()) ||
-        customer?.name.includes(search) ||
-        customer?.company?.toLowerCase().includes(search.toLowerCase())
+        o.customer?.name.includes(search) ||
+        o.customer?.company?.toLowerCase().includes(search.toLowerCase())
       );
     }
     return true;
@@ -92,48 +107,53 @@ export default function OrdersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
+                  กำลังโหลด...
+                </TableCell>
+              </TableRow>
+            ) : orders.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
                   ไม่พบออเดอร์
                 </TableCell>
               </TableRow>
             ) : (
-              orders.map((order) => {
-                const customer = MOCK_CUSTOMERS.find((c) => c.id === order.customer_id);
-                return (
-                  <TableRow key={order.id} className="hover:bg-[#FAF7F2]/50">
-                    <TableCell className="font-mono text-sm font-medium">
-                      {order.order_number}
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm font-medium">{customer?.name ?? "-"}</p>
-                      <p className="text-xs text-[#6B6B6B]">{customer?.company}</p>
-                    </TableCell>
-                    <TableCell className="text-xs text-[#6B6B6B]">
-                      {new Date(order.created_at).toLocaleDateString("th-TH")}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {order.delivery_method === "delivery" ? "จัดส่ง" : "รับเอง"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {order.total ? `฿${order.total.toLocaleString()}` : (
-                        <span className="text-[#C8102E]">ตามใบเสนอราคา</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLOR[order.status]}`}>
-                        {STATUSES.find((s) => s.value === order.status)?.label}
-                      </span>
-                    </TableCell>
-                    <TableCell>
+              orders.map((order) => (
+                <TableRow key={order.id} className="hover:bg-[#FAF7F2]/50">
+                  <TableCell className="font-mono text-sm font-medium">
+                    {order.order_number}
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-sm font-medium">{order.customer?.name ?? "-"}</p>
+                    <p className="text-xs text-[#6B6B6B]">{order.customer?.company}</p>
+                  </TableCell>
+                  <TableCell className="text-xs text-[#6B6B6B]">
+                    {new Date(order.created_at).toLocaleDateString("th-TH")}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {order.delivery_method === "delivery" ? "จัดส่ง" : "รับเอง"}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {order.total ? `฿${order.total.toLocaleString()}` : (
+                      <span className="text-[#C8102E]">ตามใบเสนอราคา</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLOR[order.status]}`}>
+                      {STATUSES.find((s) => s.value === order.status)?.label}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/admin/orders/${order.id}`}>
                       <Button size="sm" variant="outline" className="h-7 text-xs">
                         ดูรายละเอียด
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

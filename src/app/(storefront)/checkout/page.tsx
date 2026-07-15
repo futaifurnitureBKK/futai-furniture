@@ -30,17 +30,35 @@ export default function CheckoutPage() {
   const { items, clearCart, hasUnpricedItems } = useCart();
   const { t } = useLanguage();
   const [submitted, setSubmitted] = useState(false);
-  const [orderNumber] = useState(
-    `FT-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`
-  );
+  const [orderNumber, setOrderNumber] = useState("");
+  const [submitError, setSubmitError] = useState("");
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { delivery_method: "delivery" },
   });
 
-  const onSubmit = async () => {
-    await new Promise((r) => setTimeout(r, 1000));
+  const onSubmit = async (data: FormValues) => {
+    setSubmitError("");
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        items: items.map((i) => ({
+          sku: i.product.sku,
+          quantity: i.quantity,
+        })),
+      }),
+    });
+
+    if (!res.ok) {
+      setSubmitError(t("ส่งคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่", "Failed to submit order, please try again", "提交失败，请重试"));
+      return;
+    }
+
+    const { order } = await res.json();
+    setOrderNumber(order.order_number);
     clearCart();
     setSubmitted(true);
   };
@@ -51,10 +69,10 @@ export default function CheckoutPage() {
         <div className="bg-white rounded-2xl p-10 max-w-md w-full shadow-sm">
           <CheckCircle2 size={56} className="text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">
-            {t("ส่งคำสั่งซื้อเรียบร้อย!", "Order Submitted!")}
+            {t("ส่งคำสั่งซื้อเรียบร้อย!", "Order Submitted!", "订单已提交！")}
           </h1>
           <p className="text-[#6B6B6B] text-sm mb-1">
-            {t("หมายเลขคำสั่งซื้อ", "Order Number")}
+            {t("หมายเลขคำสั่งซื้อ", "Order Number", "订单编号")}
           </p>
           <p className="text-2xl font-mono font-bold text-[#C8102E] mb-6">
             {orderNumber}
@@ -62,7 +80,8 @@ export default function CheckoutPage() {
           <p className="text-sm text-[#6B6B6B] mb-8">
             {t(
               "ทีมงานจะติดต่อกลับภายใน 24 ชั่วโมง ผ่านทางโทรศัพท์หรือ LINE",
-              "Our team will contact you within 24 hours via phone or LINE."
+              "Our team will contact you within 24 hours via phone or LINE.",
+              "我们的团队将在24小时内通过电话或LINE与您联系"
             )}
           </p>
           <a
@@ -71,7 +90,7 @@ export default function CheckoutPage() {
             rel="noopener noreferrer"
             className="block w-full bg-[#06C755] hover:bg-[#05b34d] text-white text-center py-3 rounded-lg font-medium transition-colors"
           >
-            {t("ติดตามผ่าน LINE OA", "Follow up on LINE OA")}
+            {t("ติดตามผ่าน LINE OA", "Follow up on LINE OA", "通过 LINE OA 跟进")}
           </a>
         </div>
       </div>
@@ -84,34 +103,34 @@ export default function CheckoutPage() {
         <FadeIn>
           <h1 className="text-3xl font-bold text-[#1A1A1A] mb-8">
             {hasUnpricedItems()
-              ? t("ส่งคำขอใบเสนอราคา", "Request Quote")
-              : t("ดำเนินการสั่งซื้อ", "Checkout")}
+              ? t("ส่งคำขอใบเสนอราคา", "Request Quote", "索取报价")
+              : t("ดำเนินการสั่งซื้อ", "Checkout", "结算")}
           </h1>
         </FadeIn>
 
         <FadeIn delay={0.1}>
           <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl p-6 shadow-sm space-y-5">
             <h2 className="font-semibold text-[#1A1A1A] text-lg border-b border-[#E8E5E0] pb-3">
-              {t("ข้อมูลติดต่อ", "Contact Information")}
+              {t("ข้อมูลติดต่อ", "Contact Information", "联系信息")}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>{t("ชื่อ-นามสกุล", "Full Name")} *</Label>
+                <Label>{t("ชื่อ-นามสกุล", "Full Name", "姓名")} *</Label>
                 <Input {...register("name")} className="mt-1" />
-                {errors.name && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกชื่อ", "Required")}</p>}
+                {errors.name && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกชื่อ", "Required", "必填")}</p>}
               </div>
               <div>
-                <Label>{t("ชื่อบริษัท", "Company")}</Label>
+                <Label>{t("ชื่อบริษัท", "Company", "公司名称")}</Label>
                 <Input {...register("company")} className="mt-1" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>{t("เบอร์โทรศัพท์", "Phone")} *</Label>
+                <Label>{t("เบอร์โทรศัพท์", "Phone", "电话号码")} *</Label>
                 <Input {...register("phone")} className="mt-1" />
-                {errors.phone && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกเบอร์โทร", "Required")}</p>}
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกเบอร์โทร", "Required", "必填")}</p>}
               </div>
               <div>
                 <Label>LINE ID</Label>
@@ -122,26 +141,26 @@ export default function CheckoutPage() {
             <div>
               <Label>Email *</Label>
               <Input {...register("email")} type="email" className="mt-1" />
-              {errors.email && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกอีเมล", "Required")}</p>}
+              {errors.email && <p className="text-xs text-red-500 mt-1">{t("กรุณากรอกอีเมล", "Required", "必填")}</p>}
             </div>
 
             <div>
               <Label className="mb-3 block">
-                {t("วิธีรับสินค้า", "Delivery Method")} *
+                {t("วิธีรับสินค้า", "Delivery Method", "收货方式")} *
               </Label>
               <RadioGroup defaultValue="delivery" className="grid grid-cols-2 gap-3">
                 <Label className="flex items-center gap-3 border border-[#E8E5E0] rounded-lg p-3 cursor-pointer has-[[data-state=checked]]:border-[#C8102E] has-[[data-state=checked]]:bg-[#C8102E]/5">
                   <RadioGroupItem value="delivery" {...register("delivery_method")} />
                   <div>
-                    <p className="font-medium text-sm">{t("จัดส่งถึงบ้าน", "Delivery")}</p>
-                    <p className="text-xs text-[#6B6B6B]">{t("นัดวันกับทีมงาน", "Schedule with team")}</p>
+                    <p className="font-medium text-sm">{t("จัดส่งถึงบ้าน", "Delivery", "配送")}</p>
+                    <p className="text-xs text-[#6B6B6B]">{t("นัดวันกับทีมงาน", "Schedule with team", "与团队预约时间")}</p>
                   </div>
                 </Label>
                 <Label className="flex items-center gap-3 border border-[#E8E5E0] rounded-lg p-3 cursor-pointer has-[[data-state=checked]]:border-[#C8102E] has-[[data-state=checked]]:bg-[#C8102E]/5">
                   <RadioGroupItem value="pickup" {...register("delivery_method")} />
                   <div>
-                    <p className="font-medium text-sm">{t("รับที่โชว์รูม", "Pickup")}</p>
-                    <p className="text-xs text-[#6B6B6B]">ลำลูกกา ปทุมธานี</p>
+                    <p className="font-medium text-sm">{t("รับที่โชว์รูม", "Pickup", "到店自取")}</p>
+                    <p className="text-xs text-[#6B6B6B]">{t("ลำลูกกา ปทุมธานี", "Lam Luk Ka, Pathum Thani", "兰鲁卡，巴吞他尼")}</p>
                   </div>
                 </Label>
               </RadioGroup>
@@ -149,23 +168,26 @@ export default function CheckoutPage() {
 
             {watch("delivery_method") === "delivery" && (
               <div>
-                <Label>{t("ที่อยู่จัดส่ง", "Delivery Address")}</Label>
+                <Label>{t("ที่อยู่จัดส่ง", "Delivery Address", "送货地址")}</Label>
                 <Textarea {...register("address")} className="mt-1" rows={3} />
               </div>
             )}
 
             <div>
-              <Label>{t("หมายเหตุเพิ่มเติม", "Notes")}</Label>
+              <Label>{t("หมายเหตุเพิ่มเติม", "Notes", "备注")}</Label>
               <Textarea
                 {...register("notes")}
                 placeholder={t(
                   "เช่น ต้องการใบกำกับภาษี, นัดเวลาส่ง...",
-                  "e.g. VAT invoice required, preferred delivery time..."
+                  "e.g. VAT invoice required, preferred delivery time...",
+                  "如：需要增值税发票、指定送货时间..."
                 )}
                 className="mt-1"
                 rows={3}
               />
             </div>
+
+            {submitError && <p className="text-sm text-red-500">{submitError}</p>}
 
             <Button
               type="submit"
@@ -173,10 +195,10 @@ export default function CheckoutPage() {
               className="w-full h-12 bg-[#C8102E] hover:bg-[#a30d25] text-white text-base"
             >
               {isSubmitting
-                ? t("กำลังส่ง...", "Submitting...")
+                ? t("กำลังส่ง...", "Submitting...", "提交中...")
                 : hasUnpricedItems()
-                ? t("ส่งคำขอ", "Submit Request")
-                : t("ยืนยันคำสั่งซื้อ", "Place Order")}
+                ? t("ส่งคำขอ", "Submit Request", "提交申请")
+                : t("ยืนยันคำสั่งซื้อ", "Place Order", "确认下单")}
             </Button>
           </form>
         </FadeIn>

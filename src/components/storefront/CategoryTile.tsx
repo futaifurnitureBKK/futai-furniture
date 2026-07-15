@@ -24,7 +24,7 @@ export function CategoryTile({ category, size = "medium" }: CategoryTileProps) {
         />
       </div>
       <p className="text-[11px] sm:text-xs font-semibold text-[#1A1A1A] line-clamp-2 leading-tight group-hover:text-[#C8102E] transition-colors">
-        {t(category.name_th, category.name_en)}
+        {t(category.name_th, category.name_en, category.name_zh)}
       </p>
     </Link>
   );

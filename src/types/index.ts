@@ -14,9 +14,11 @@ export interface Category {
   slug: string;
   name_th: string;
   name_en: string;
+  name_zh: string;
   banner_url: string;
   description_th: string;
   description_en: string;
+  description_zh: string;
   sort_order: number;
   product_count?: number;
 }
@@ -26,16 +28,19 @@ export interface Product {
   sku: string;
   name_th: string;
   name_en: string;
+  name_zh: string;
   category_id: string;
   category_slug: string;
   description_th: string;
   description_en: string;
+  description_zh: string;
   dimensions: string;
   price: number | null;
   stock_status: StockStatus;
   images: string[];
   tags: string[];
   is_featured: boolean;
+  is_active: boolean;
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -78,15 +83,13 @@ export interface Order {
 
 export interface QuoteRequest {
   id: string;
-  product_id: string;
-  product?: Product;
-  customer_info: {
-    name: string;
-    company: string;
-    phone: string;
-    email: string;
-    line_id: string;
-  };
+  product_sku: string;
+  product_name_snapshot: string;
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
+  line_id: string;
   quantity: number;
   message: string;
   status: QuoteStatus;

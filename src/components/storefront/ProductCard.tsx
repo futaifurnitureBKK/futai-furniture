@@ -24,7 +24,7 @@ export function ProductCard({ product }: ProductCardProps) {
         />
         {product.is_featured && (
           <div className="absolute top-2 left-2 bg-[#C8102E] text-white text-[9px] font-bold tracking-wider uppercase px-2 py-0.5">
-            แนะนำ
+            {t("แนะนำ", "Featured", "推荐")}
           </div>
         )}
       </div>
@@ -32,14 +32,14 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Info */}
       <div>
         <h3 className="text-[13px] font-semibold text-[#1A1A1A] leading-snug line-clamp-2 mb-1 group-hover:text-[#C8102E] transition-colors">
-          {t(product.name_th, product.name_en)}
+          {t(product.name_th, product.name_en, product.name_zh)}
         </h3>
         <p className="text-[11px] text-[#999] mb-2">{product.dimensions}</p>
         <div>
           {product.price !== null ? (
             <p className="text-sm font-bold text-[#1A1A1A]">฿{product.price.toLocaleString()}</p>
           ) : (
-            <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote")}</p>
+            <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote", "索取报价")}</p>
           )}
         </div>
       </div>

@@ -19,6 +19,7 @@ const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 const MARQUEE_ITEMS: [string, string, string][] = [
   ["คลังสินค้าในไทย", "In-stock in Thailand", "泰国本地仓库"],
+  ["นำเข้าเฟอร์นิเจอร์คุณภาพจากจีน", "Quality furniture imported from China", "从中国进口优质家具"],
   ["ติดตั้งฟรีทั่วประเทศ", "Free installation nationwide", "全国免费安装"],
   ["ออกใบกำกับภาษีได้", "Tax invoice available", "可开具税务发票"],
   ["10+ ปีประสบการณ์", "10+ years of experience", "10年以上经验"],
@@ -201,7 +202,7 @@ export function HomeClient({
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1, duration: 0.7 }}
               >
-                {t("คลังสินค้าในไทย · ติดตั้งฟรี · ออกใบกำกับภาษีได้", "In-stock in Thailand · Free installation · Tax invoice available", "泰国现货 · 免费安装 · 可开税票")}
+                {t("นำเข้าเฟอร์นิเจอร์จากจีน · คลังสินค้าในไทย · ติดตั้งฟรี", "Furniture imported from China · In-stock in Thailand · Free installation", "家具从中国进口 · 泰国现货 · 免费安装")}
               </motion.p>
 
               <motion.div

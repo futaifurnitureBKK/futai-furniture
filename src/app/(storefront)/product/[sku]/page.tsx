@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ProductPageClient } from "@/components/storefront/ProductPageClient";
 import { getProductBySku, getProductsByCategory } from "@/lib/products";
+import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
   params: Promise<{ sku: string }>;
@@ -37,5 +38,35 @@ export default async function ProductPage({ params }: PageProps) {
     .filter((p) => p.sku !== sku)
     .slice(0, 4);
 
-  return <ProductPageClient product={product} related={related} />;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name_th,
+    description: product.description_th,
+    sku: product.sku,
+    image: product.images,
+    brand: { "@type": "Brand", name: "Futai Furniture" },
+    offers: {
+      "@type": "Offer",
+      url: `${SITE_URL}/product/${product.sku}`,
+      priceCurrency: "THB",
+      ...(product.price ? { price: product.price } : {}),
+      availability:
+        product.stock_status === "in_stock"
+          ? "https://schema.org/InStock"
+          : product.stock_status === "on_order"
+            ? "https://schema.org/PreOrder"
+            : "https://schema.org/OutOfStock",
+    },
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <ProductPageClient product={product} related={related} />
+    </>
+  );
 }

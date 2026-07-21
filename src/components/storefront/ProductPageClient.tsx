@@ -124,47 +124,30 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </div>
             )}
 
-            {/* Price / CTA */}
+            {/* Price / CTA — pricing is hidden storefront-wide (quote-only model) */}
             <div className="space-y-3">
-              {product.price !== null ? (
-                <>
-                  <p className="text-3xl font-bold text-[#C8102E]">
-                    ฿{product.price.toLocaleString()}
-                  </p>
-                  <Button
-                    onClick={handleAddToCart}
-                    disabled={product.stock_status === "out_of_stock"}
-                    className="w-full h-12 bg-[#C8102E] hover:bg-[#a30d25] text-white text-base"
-                  >
-                    <ShoppingCart size={18} className="mr-2" />
-                    {t("เพิ่มลงตะกร้า", "Add to Cart", "加入购物车")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-[#6B6B6B] text-sm">
-                    {t(
-                      "สินค้านี้ยังไม่แสดงราคา กรุณาขอใบเสนอราคา",
-                      "Price on request — please fill in the quote form.",
-                      "该产品暂未标价，请填写报价申请表"
-                    )}
-                  </p>
-                  <Button
-                    onClick={() => setQuoteOpen(true)}
-                    className="w-full h-12 bg-[#C8102E] hover:bg-[#a30d25] text-white text-base"
-                  >
-                    {t("ขอใบเสนอราคา", "Request Quote", "索取报价")}
-                  </Button>
-                  <Button
-                    onClick={handleAddToCart}
-                    variant="outline"
-                    className="w-full h-11 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
-                  >
-                    <ShoppingCart size={16} className="mr-2" />
-                    {t("เพิ่มลงตะกร้า", "Add to Cart", "加入购物车")}
-                  </Button>
-                </>
-              )}
+              <p className="text-[#6B6B6B] text-sm">
+                {t(
+                  "สินค้านี้ยังไม่แสดงราคา กรุณาขอใบเสนอราคา",
+                  "Price on request — please fill in the quote form.",
+                  "该产品暂未标价，请填写报价申请表"
+                )}
+              </p>
+              <Button
+                onClick={() => setQuoteOpen(true)}
+                className="w-full h-12 bg-[#C8102E] hover:bg-[#a30d25] text-white text-base"
+              >
+                {t("ขอใบเสนอราคา", "Request Quote", "索取报价")}
+              </Button>
+              <Button
+                onClick={handleAddToCart}
+                disabled={product.stock_status === "out_of_stock"}
+                variant="outline"
+                className="w-full h-11 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
+              >
+                <ShoppingCart size={16} className="mr-2" />
+                {t("เพิ่มลงตะกร้า", "Add to Cart", "加入购物车")}
+              </Button>
             </div>
 
             {/* Showroom link */}

@@ -58,17 +58,11 @@ export const useCart = create<CartStore>()(
       totalItems: () =>
         get().items.reduce((sum, i) => sum + i.quantity, 0),
 
-      subtotal: () => {
-        const items = get().items;
-        if (items.some((i) => i.product.price === null)) return null;
-        return items.reduce(
-          (sum, i) => sum + (i.product.price ?? 0) * i.quantity,
-          0
-        );
-      },
+      // Pricing is hidden storefront-wide (quote-only model) — always report
+      // "unpriced" regardless of what's on the product record.
+      subtotal: () => null,
 
-      hasUnpricedItems: () =>
-        get().items.some((i) => i.product.price === null),
+      hasUnpricedItems: () => true,
     }),
     { name: "futai-cart" }
   )

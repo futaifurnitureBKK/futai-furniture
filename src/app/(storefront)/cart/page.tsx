@@ -61,15 +61,9 @@ export default function CartPage() {
                     <p className="font-medium text-[#1A1A1A] text-sm leading-snug line-clamp-2">
                       {t(item.product.name_th, item.product.name_en, item.product.name_zh)}
                     </p>
-                    {item.product.price !== null ? (
-                      <p className="text-[#C8102E] font-semibold mt-1">
-                        ฿{item.product.price.toLocaleString()}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-[#C8102E] mt-1">
-                        {t("ราคาตามใบเสนอราคา", "Price on quote", "价格以报价单为准")}
-                      </p>
-                    )}
+                    <p className="text-xs text-[#C8102E] mt-1">
+                      {t("ราคาตามใบเสนอราคา", "Price on quote", "价格以报价单为准")}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-3 shrink-0">
                     <button

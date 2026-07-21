@@ -36,11 +36,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </h3>
         <p className="text-[11px] text-[#999] mb-2">{product.dimensions}</p>
         <div>
-          {product.price !== null ? (
-            <p className="text-sm font-bold text-[#1A1A1A]">฿{product.price.toLocaleString()}</p>
-          ) : (
-            <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote", "索取报价")}</p>
-          )}
+          <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote", "索取报价")}</p>
         </div>
       </div>
     </Link>

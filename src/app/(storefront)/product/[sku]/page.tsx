@@ -49,8 +49,7 @@ export default async function ProductPage({ params }: PageProps) {
     offers: {
       "@type": "Offer",
       url: `${SITE_URL}/product/${product.sku}`,
-      priceCurrency: "THB",
-      ...(product.price ? { price: product.price } : {}),
+      // Pricing is hidden storefront-wide (quote-only model) — no price field.
       availability:
         product.stock_status === "in_stock"
           ? "https://schema.org/InStock"

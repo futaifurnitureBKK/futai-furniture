@@ -89,7 +89,7 @@ export function QuoteModal({ product, open, onClose }: QuoteModalProps) {
           </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>{t("ชื่อ-นามสกุล", "Full Name", "姓名")} *</Label>

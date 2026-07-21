@@ -109,7 +109,7 @@ export default function CheckoutPage() {
         </FadeIn>
 
         <FadeIn delay={0.1}>
-          <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl p-6 shadow-sm space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="bg-white rounded-xl p-6 shadow-sm space-y-5">
             <h2 className="font-semibold text-[#1A1A1A] text-lg border-b border-[#E8E5E0] pb-3">
               {t("ข้อมูลติดต่อ", "Contact Information", "联系信息")}
             </h2>

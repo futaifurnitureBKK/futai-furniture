@@ -12,9 +12,12 @@ export function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
 
   return (
-    <Link href={`/product/${product.sku}`} className="group block bg-white">
+    <Link
+      href={`/product/${product.sku}`}
+      className="group block bg-white border border-[#E8E5E0] hover:border-[#C8102E] hover:shadow-md transition-all duration-200"
+    >
       {/* Image */}
-      <div className="relative aspect-square overflow-hidden bg-[#F5F5F5] mb-3">
+      <div className="relative aspect-square overflow-hidden bg-[#F5F5F5]">
         <Image
           src={product.images[0] ?? "/products/DHX-BK-BG.jpg"}
           alt={product.name_th}
@@ -30,7 +33,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Info */}
-      <div>
+      <div className="p-3 border-t border-[#E8E5E0]">
         <h3 className="text-[13px] font-semibold text-[#1A1A1A] leading-snug line-clamp-2 mb-1 group-hover:text-[#C8102E] transition-colors">
           {t(product.name_th, product.name_en, product.name_zh)}
         </h3>

@@ -83,7 +83,7 @@ export function ShowroomPageClient() {
                   </li>
                   <li>
                     <a
-                      href="https://line.me/R/ti/p/660305099"
+                      href="https://line.me/ti/p/KJFKqUTMk-"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 bg-[#06C755] text-white text-xs px-4 py-2 rounded-lg hover:bg-[#05b34d] transition-colors font-medium"

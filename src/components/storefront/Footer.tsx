@@ -86,12 +86,12 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://line.me/R/ti/p/660305099"
+                  href="https://line.me/ti/p/KJFKqUTMk-"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 mt-2 bg-[#06C755] text-white text-xs px-3 py-1.5 rounded hover:bg-[#05b34d] transition-colors"
                 >
-                  LINE: @660305099
+                  LINE OA
                 </a>
               </li>
             </ul>

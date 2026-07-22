@@ -85,7 +85,7 @@ export default function CheckoutPage() {
             )}
           </p>
           <a
-            href="https://line.me/R/ti/p/660305099"
+            href="https://line.me/ti/p/KJFKqUTMk-"
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full bg-[#06C755] hover:bg-[#05b34d] text-white text-center py-3 rounded-lg font-medium transition-colors"

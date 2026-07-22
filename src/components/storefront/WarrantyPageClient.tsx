@@ -126,7 +126,7 @@ export function WarrantyPageClient() {
               <a href="tel:0638261333" className="inline-flex items-center gap-2 border border-white/30 hover:border-white text-white text-sm px-6 h-11 transition-colors">
                 <Phone size={15} /> 063-826-1333
               </a>
-              <a href="https://line.me/R/ti/p/660305099" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-bold px-6 h-11 transition-colors">
+              <a href="https://line.me/ti/p/KJFKqUTMk-" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-bold px-6 h-11 transition-colors">
                 <PhoneCall size={15} /> LINE OA
               </a>
             </div>

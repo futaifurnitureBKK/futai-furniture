@@ -441,7 +441,7 @@ export function HomeClient({
               <a href="tel:0638261333" className="border border-[#E8E5E0] hover:border-[#C8102E] text-[#444] hover:text-[#C8102E] text-sm px-6 h-10 flex items-center transition-colors">
                 063-826-1333
               </a>
-              <a href="https://line.me/R/ti/p/660305099" target="_blank" rel="noopener noreferrer" className="bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-bold px-6 h-10 flex items-center transition-colors">
+              <a href="https://line.me/ti/p/KJFKqUTMk-" target="_blank" rel="noopener noreferrer" className="bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-bold px-6 h-10 flex items-center transition-colors">
                 LINE OA
               </a>
             </div>

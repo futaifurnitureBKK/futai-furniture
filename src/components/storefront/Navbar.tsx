@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -12,21 +12,12 @@ import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/mock";
 
 export function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { t } = useLanguage();
   const pathname = usePathname();
-  // Homepage has its own category-tab row where the switcher lives instead.
-  const isHome = pathname === "/";
-
-  useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handler);
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
-
   // Homepage has its own single-row header (logo, tabs, search, cart, language) instead.
+  const isHome = pathname === "/";
   if (isHome) return null;
 
   const navLinks = [
@@ -36,22 +27,17 @@ export function Navbar() {
   ];
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/95 backdrop-blur-sm shadow-sm" : "bg-transparent"
-      }`}
-    >
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <Image
-              src={scrolled ? "/logo.png" : "/logo-white.png"}
+              src="/logo.png"
               alt="Futai Furniture"
               width={160}
               height={64}
               className="h-14 w-auto object-contain"
-              style={scrolled ? {} : { filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.6))" }}
             />
           </Link>
 
@@ -59,11 +45,7 @@ export function Navbar() {
           <nav className="hidden md:flex items-center gap-8">
             {/* Categories mega-hint */}
             <div className="relative group">
-              <button
-                className={`text-sm font-medium transition-colors ${
-                  scrolled ? "text-[#1A1A1A] hover:text-[#C8102E]" : "text-white hover:text-[#C9A876]"
-                }`}
-              >
+              <button className="text-sm font-medium text-[#1A1A1A] hover:text-[#C8102E] transition-colors">
                 {t("สินค้า", "Products", "产品")}
               </button>
               {/* Dropdown */}
@@ -90,9 +72,7 @@ export function Navbar() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`text-sm font-medium transition-colors ${
-                  scrolled ? "text-[#1A1A1A] hover:text-[#C8102E]" : "text-white hover:text-[#C9A876]"
-                }`}
+                className="text-sm font-medium text-[#1A1A1A] hover:text-[#C8102E] transition-colors"
               >
                 {l.label}
               </Link>
@@ -101,24 +81,16 @@ export function Navbar() {
 
           {/* Right icons */}
           <div className="flex items-center gap-3">
-            <LanguageSwitcher variant={scrolled ? "dark" : "light"} />
+            <LanguageSwitcher variant="dark" />
 
             <Link href="/search" aria-label={t("ค้นหา", "Search", "搜索")}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${scrolled ? "" : "text-white hover:bg-white/20"}`}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <Search size={18} />
               </Button>
             </Link>
 
             <Link href="/cart" aria-label={t("ตะกร้า", "Cart", "购物车")} className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${scrolled ? "" : "text-white hover:bg-white/20"}`}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <ShoppingCart size={18} />
                 {totalItems() > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#C8102E] text-white text-[10px] flex items-center justify-center font-bold">
@@ -130,7 +102,7 @@ export function Navbar() {
 
             {/* Mobile menu button */}
             <button
-              className={`md:hidden ${scrolled ? "text-[#1A1A1A]" : "text-white"}`}
+              className="md:hidden text-[#1A1A1A]"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Menu"
             >

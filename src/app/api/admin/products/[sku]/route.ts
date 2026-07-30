@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { translateToEnZh } from "@/lib/translate";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sku: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -13,12 +14,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
   const update: Record<string, unknown> = {};
   for (const key of [
     "name_th",
-    "name_en",
-    "name_zh",
     "category_slug",
     "description_th",
-    "description_en",
-    "description_zh",
     "dimensions",
     "price",
     "stock_status",
@@ -37,6 +34,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
       .eq("slug", update.category_slug as string)
       .maybeSingle();
     update.category_id = cat?.id ?? null;
+  }
+
+  // Re-translate Thai name/description into English/Chinese whenever they change.
+  try {
+    if ("name_th" in update) {
+      const { en, zh } = await translateToEnZh(update.name_th as string, false);
+      update.name_en = en;
+      update.name_zh = zh;
+    }
+    if ("description_th" in update) {
+      const { en, zh } = await translateToEnZh(update.description_th as string, true);
+      update.description_en = en;
+      update.description_zh = zh;
+    }
+  } catch (err) {
+    return NextResponse.json({ error: `Translation failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
   }
 
   const { data, error } = await db.from("products").update(update).eq("sku", sku).select().single();

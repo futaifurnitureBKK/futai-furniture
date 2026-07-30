@@ -23,7 +23,7 @@ export default function CartPage() {
           {t("เพิ่มสินค้าที่ต้องการเพื่อดำเนินการต่อ", "Add some products to get started", "添加产品以继续")}
         </p>
         <Link
-          href="/category/office-chair"
+          href="/search"
           className={cn(buttonVariants(), "bg-[#C8102E] hover:bg-[#a30d25] text-white")}
         >
           {t("เลือกซื้อสินค้า", "Browse Products", "浏览产品")}
@@ -135,7 +135,7 @@ export default function CartPage() {
                   : t("ดำเนินการชำระเงิน", "Proceed to Checkout", "前往结算")}
               </Link>
               <Link
-                href="/category/office-chair"
+                href="/search"
                 className={cn(
                   buttonVariants({ variant: "ghost" }),
                   "w-full mt-2 text-[#6B6B6B] justify-center"

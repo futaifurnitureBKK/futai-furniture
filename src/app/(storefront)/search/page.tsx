@@ -13,23 +13,24 @@ export default function SearchPage() {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const q = query.trim();
 
   useEffect(() => {
-    if (q.length <= 1) {
-      setResults([]);
-      return;
-    }
     let cancelled = false;
+    setLoading(true);
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .or(`sku.ilike.%${q}%,name_th.ilike.%${q}%,name_en.ilike.%${q}%,name_zh.ilike.%${q}%`)
-        .limit(48);
-      if (!cancelled) setResults((data as Product[]) ?? []);
-    }, 250);
+      let request = supabase.from("products").select("*").eq("is_active", true);
+      request =
+        q.length > 1
+          ? request.or(`sku.ilike.%${q}%,name_th.ilike.%${q}%,name_en.ilike.%${q}%,name_zh.ilike.%${q}%`).limit(48)
+          : request.order("created_at", { ascending: false }).limit(96);
+      const { data } = await request;
+      if (!cancelled) {
+        setResults((data as Product[]) ?? []);
+        setLoading(false);
+      }
+    }, q.length > 1 ? 250 : 0);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -40,7 +41,9 @@ export default function SearchPage() {
     <div className="bg-[#FAF7F2] min-h-screen pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <FadeIn>
-          <h1 className="text-3xl font-bold text-[#1A1A1A] mb-8">{t("ค้นหาสินค้า", "Search Products", "搜索产品")}</h1>
+          <h1 className="text-3xl font-bold text-[#1A1A1A] mb-8">
+            {q.length > 1 ? t("ค้นหาสินค้า", "Search Products", "搜索产品") : t("สินค้าทั้งหมด", "All Products", "全部产品")}
+          </h1>
           <div className="relative max-w-xl mb-10">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B6B6B]" size={18} />
             <Input
@@ -53,10 +56,12 @@ export default function SearchPage() {
           </div>
         </FadeIn>
 
-        {q.length > 1 && (
+        {!loading && (
           <FadeIn>
             <p className="text-sm text-[#6B6B6B] mb-6">
-              {t(`พบ ${results.length} รายการ สำหรับ "${query}"`, `Found ${results.length} results for "${query}"`, `找到 ${results.length} 个与"${query}"相关的结果`)}
+              {q.length > 1
+                ? t(`พบ ${results.length} รายการ สำหรับ "${query}"`, `Found ${results.length} results for "${query}"`, `找到 ${results.length} 个与"${query}"相关的结果`)
+                : t(`ทั้งหมด ${results.length} รายการ`, `${results.length} products total`, `共 ${results.length} 件产品`)}
             </p>
           </FadeIn>
         )}
@@ -72,7 +77,7 @@ export default function SearchPage() {
               </StaggerItem>
             ))}
           </StaggerChildren>
-        ) : q.length > 1 ? (
+        ) : !loading ? (
           <div className="text-center py-16 text-[#6B6B6B]">
             <p className="text-lg mb-2">{t("ไม่พบสินค้าที่ค้นหา", "No products found", "未找到相关产品")}</p>
             <p className="text-sm">{t("ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่", "Try a different search term or browse categories", "请尝试其他关键词或浏览分类")}</p>

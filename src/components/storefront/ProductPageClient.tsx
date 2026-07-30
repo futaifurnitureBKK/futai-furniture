@@ -107,25 +107,8 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               <p className="font-mono text-[#1A1A1A] font-medium">{product.dimensions}</p>
             </div>
 
-            {/* Description */}
-            <div
-              className="prose prose-sm max-w-none text-[#6B6B6B] leading-relaxed mb-8"
-              dangerouslySetInnerHTML={{ __html: t(product.description_th, product.description_en, product.description_zh) }}
-            />
-
-            {/* Tags */}
-            {product.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-8">
-                {product.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
             {/* Price / CTA — pricing is hidden storefront-wide (quote-only model) */}
-            <div className="space-y-3">
+            <div className="space-y-3 mb-8">
               <p className="text-[#6B6B6B] text-sm">
                 {t(
                   "สินค้านี้ยังไม่แสดงราคา กรุณาขอใบเสนอราคา",
@@ -150,6 +133,17 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </Button>
             </div>
 
+            {/* Tags */}
+            {product.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-8">
+                {product.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
             {/* Showroom link */}
             <div className="mt-8 pt-6 border-t border-[#E8E5E0]">
               <Link
@@ -162,6 +156,21 @@ export function ProductPageClient({ product, related }: { product: Product; rela
             </div>
           </FadeIn>
         </div>
+
+        {/* Description — full-width section below the gallery/info, Shopee-style */}
+        {(product.description_th || product.description_en || product.description_zh) && (
+          <FadeIn className="mt-16">
+            <div className="bg-white rounded-xl p-6 sm:p-8 shadow-sm">
+              <h2 className="text-lg font-bold text-[#1A1A1A] mb-4 pb-4 border-b border-[#E8E5E0]">
+                {t("รายละเอียดสินค้า", "Product Description", "产品详情")}
+              </h2>
+              <div
+                className="prose prose-sm max-w-none text-[#6B6B6B] leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: t(product.description_th, product.description_en, product.description_zh) }}
+              />
+            </div>
+          </FadeIn>
+        )}
 
         {/* Related products */}
         {related.length > 0 && (

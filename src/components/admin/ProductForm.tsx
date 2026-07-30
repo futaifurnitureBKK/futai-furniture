@@ -17,12 +17,8 @@ const STOCK_OPTIONS: { value: StockStatus; label: string }[] = [
 export interface ProductFormValues {
   sku: string;
   name_th: string;
-  name_en: string;
-  name_zh: string;
   category_slug: string;
   description_th: string;
-  description_en: string;
-  description_zh: string;
   dimensions: string;
   price: string;
   stock_status: StockStatus;
@@ -36,12 +32,8 @@ function toFormValues(p?: Product): ProductFormValues {
   return {
     sku: p?.sku ?? "",
     name_th: p?.name_th ?? "",
-    name_en: p?.name_en ?? "",
-    name_zh: p?.name_zh ?? "",
     category_slug: p?.category_slug ?? CATEGORIES[0].slug,
     description_th: p?.description_th ?? "",
-    description_en: p?.description_en ?? "",
-    description_zh: p?.description_zh ?? "",
     dimensions: p?.dimensions ?? "",
     price: p?.price != null ? String(p.price) : "",
     stock_status: p?.stock_status ?? "in_stock",
@@ -77,12 +69,8 @@ export function ProductForm({
     const payload = {
       sku: values.sku.trim(),
       name_th: values.name_th.trim(),
-      name_en: values.name_en.trim(),
-      name_zh: values.name_zh.trim(),
       category_slug: values.category_slug,
       description_th: values.description_th.trim(),
-      description_en: values.description_en.trim(),
-      description_zh: values.description_zh.trim(),
       dimensions: values.dimensions.trim(),
       price: values.price.trim() === "" ? null : Number(values.price),
       stock_status: values.stock_status,
@@ -153,17 +141,10 @@ export function ProductForm({
           </select>
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">ชื่อสินค้า (ไทย)</label>
           <Input value={values.name_th} onChange={(e) => set("name_th", e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">ชื่อสินค้า (English)</label>
-          <Input value={values.name_en} onChange={(e) => set("name_en", e.target.value)} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">ชื่อสินค้า (中文)</label>
-          <Input value={values.name_zh} onChange={(e) => set("name_zh", e.target.value)} />
+          <p className="text-xs text-[#9B9B9B] mt-1">ระบบจะแปลเป็นอังกฤษและจีนให้อัตโนมัติตอนบันทึก</p>
         </div>
 
         <div>
@@ -195,22 +176,7 @@ export function ProductForm({
             onChange={(html) => set("description_th", html)}
             placeholder="รายละเอียดสินค้า..."
           />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">รายละเอียด (English)</label>
-          <RichTextEditor
-            value={values.description_en}
-            onChange={(html) => set("description_en", html)}
-            placeholder="Product description..."
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">รายละเอียด (中文)</label>
-          <RichTextEditor
-            value={values.description_zh}
-            onChange={(html) => set("description_zh", html)}
-            placeholder="产品说明..."
-          />
+          <p className="text-xs text-[#9B9B9B] mt-1">ระบบจะแปลเป็นอังกฤษและจีนให้อัตโนมัติตอนบันทึก</p>
         </div>
 
         <div className="sm:col-span-2">
@@ -252,7 +218,7 @@ export function ProductForm({
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={saving} className="bg-[#C8102E] hover:bg-[#a30d25] text-white">
-          {saving ? "กำลังบันทึก..." : "บันทึก"}
+          {saving ? "กำลังแปลและบันทึก..." : "บันทึก"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>
           ยกเลิก

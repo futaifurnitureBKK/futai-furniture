@@ -6,8 +6,8 @@ export type Lang = "th" | "en" | "zh";
 interface LanguageStore {
   lang: Lang;
   setLang: (lang: Lang) => void;
-  // zh falls back to en when not yet translated, so existing 2-arg call
-  // sites keep working while content is migrated incrementally.
+  // Falls back to Thai (always present) whenever a translation is missing
+  // or empty — e.g. content saved before auto-translate existed.
   t: (th: string, en: string, zh?: string) => string;
 }
 
@@ -19,8 +19,9 @@ export const useLanguage = create<LanguageStore>()(
       t: (th, en, zh) => {
         const lang = get().lang;
         if (lang === "th") return th;
-        if (lang === "zh") return zh || en;
-        return en;
+        if (lang === "en") return en || th;
+        if (lang === "zh") return zh || en || th;
+        return th;
       },
     }),
     { name: "futai-lang" }

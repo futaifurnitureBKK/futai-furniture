@@ -212,7 +212,7 @@ export function HomeClient({
                 transition={{ delay: 1.1, duration: 0.6 }}
               >
                 <Link
-                  href="/category/office-chair"
+                  href="/search"
                   className="group inline-flex items-center gap-2 bg-[#C8102E] hover:bg-[#a30d25] text-white text-sm font-bold px-8 h-12 transition-colors"
                 >
                   {t("ดูสินค้าทั้งหมด", "Shop All Products", "查看所有产品")}

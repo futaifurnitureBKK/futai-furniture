@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { notifyAdminLine } from "@/lib/line";
 
 interface CartItemInput {
   sku: string;
@@ -94,6 +95,13 @@ export async function POST(req: NextRequest) {
   if (itemsError) {
     return NextResponse.json({ error: itemsError.message }, { status: 400 });
   }
+
+  const itemLines = items.map((i) => `• ${i.name_snapshot} x${i.quantity}`).join("\n");
+  await notifyAdminLine(
+    `🛒 มีออเดอร์ใหม่! #${order_number}\nลูกค้า: ${name}\nโทร: ${phone}\n${itemLines}${
+      total != null ? `\nยอดรวม: ${total.toLocaleString()} บาท` : ""
+    }`
+  );
 
   return NextResponse.json({ order });
 }

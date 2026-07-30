@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { notifyAdminLine } from "@/lib/line";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -40,5 +41,10 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await notifyAdminLine(
+    `📩 มีคำขอใบเสนอราคาใหม่!\nสินค้า: ${product.name_th}\nจำนวน: ${data.quantity}\nลูกค้า: ${name}\nโทร: ${phone}`
+  );
+
   return NextResponse.json({ quote: data });
 }

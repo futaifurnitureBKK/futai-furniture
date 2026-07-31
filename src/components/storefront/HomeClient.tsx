@@ -8,6 +8,7 @@ import { ProductCard } from "@/components/storefront/ProductCard";
 import { CategoryTile } from "@/components/storefront/CategoryTile";
 import { VideoHero } from "@/components/storefront/VideoHero";
 import { InstallationGallery } from "@/components/storefront/InstallationGallery";
+import { SofaStation } from "@/components/storefront/SofaStation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/store/cart";
@@ -102,9 +103,11 @@ function StaggerGrid({
 export function HomeClient({
   featuredProducts,
   categories,
+  sofaProducts,
 }: {
   featuredProducts: Product[];
   categories: Category[];
+  sofaProducts: Product[];
 }) {
   const { t } = useLanguage();
   const { totalItems } = useCart();
@@ -293,6 +296,9 @@ export function HomeClient({
           ))}
         </StaggerGrid>
       </section>
+
+      {/* ── Sofa Station ─────────────────────────────────────────────── */}
+      <SofaStation products={sofaProducts} />
 
       {/* ── Split feature section ─────────────────────────────────────── */}
       <section className="bg-[#F5F5F5]">

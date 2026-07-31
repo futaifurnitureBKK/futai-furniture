@@ -23,23 +23,21 @@ export function SofaStation({ products }: { products: Product[] }) {
     },
     [total]
   );
-  const jump = useCallback(
-    (i: number) => {
-      setSlide(([cur]) => [i, i > cur ? 1 : -1]);
-    },
-    []
-  );
+  const jump = useCallback((i: number) => {
+    setSlide(([cur]) => [i, i > cur ? 1 : -1]);
+  }, []);
 
   if (total === 0) return null;
 
   const p = products[index];
   const name = t(p.name_th, p.name_en, p.name_zh);
+  const description = t(p.description_th, p.description_en, p.description_zh);
 
   return (
-    <section ref={sectionRef} className="bg-white py-16 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section ref={sectionRef} className="bg-[#EDEBE6] py-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
-          className="flex items-end justify-between mb-8"
+          className="flex items-end justify-between mb-6 sm:mb-8"
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: EASE }}
@@ -59,94 +57,126 @@ export function SofaStation({ products }: { products: Product[] }) {
             {t("ดูทั้งหมด", "View all", "查看全部")} <ArrowRight size={15} />
           </Link>
         </motion.div>
-      </div>
 
-      {/* ── Full-bleed slide ─────────────────────────────────────────── */}
-      <div className="relative w-full bg-[#F5F5F5]">
-        <div className="relative h-[52vh] sm:h-[64vh] min-h-[360px] max-h-[640px] overflow-hidden">
+        {/* ── Catalog sheet ────────────────────────────────────────────── */}
+        <div className="relative">
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
               key={p.sku}
               custom={direction}
-              initial={{ opacity: 0, x: direction >= 0 ? 60 : -60 }}
+              initial={{ opacity: 0, x: direction >= 0 ? 50 : -50 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: direction >= 0 ? -60 : 60 }}
-              transition={{ duration: 0.5, ease: EASE }}
-              className="absolute inset-0"
+              exit={{ opacity: 0, x: direction >= 0 ? -50 : 50 }}
+              transition={{ duration: 0.45, ease: EASE }}
+              className="border border-[#1A1A1A]/15 bg-[#F5F3EE] p-5 sm:p-8 lg:p-10"
             >
-              <Link href={`/product/${p.sku}`} className="block relative w-full h-full">
+              {/* header row */}
+              <div className="flex items-center justify-between mb-5 sm:mb-8">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#1A1A1A] shrink-0" />
+                  <span className="text-[11px] sm:text-xs font-semibold tracking-[0.25em] uppercase text-[#1A1A1A]">
+                    Futai Furniture
+                  </span>
+                </div>
+                <span className="text-[11px] sm:text-xs tracking-[0.15em] text-[#999] uppercase">
+                  {String(index + 1).padStart(2, "0")} — {t("โซฟา", "SOFAS", "沙发")}
+                </span>
+              </div>
+
+              {/* photo */}
+              <Link
+                href={`/product/${p.sku}`}
+                className="relative block w-full aspect-[16/11] sm:aspect-[16/9] bg-white mb-6 sm:mb-10 overflow-hidden"
+              >
                 <Image
                   src={p.images[0]}
                   alt={name}
                   fill
                   className="object-contain"
-                  sizes="100vw"
+                  sizes="(max-width: 1024px) 100vw, 1024px"
                   priority={index === 0}
                 />
               </Link>
+
+              {/* name / desc left, model right */}
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+                <div className="min-w-0 lg:max-w-lg">
+                  <h3 className="text-xl sm:text-2xl font-medium text-[#1A1A1A] mb-1.5">{name}</h3>
+                  <p className="text-[#8a8a8a] text-sm mb-2">{p.dimensions}</p>
+                  {description && (
+                    <p className="text-[#8a8a8a] text-sm leading-relaxed line-clamp-2">{description}</p>
+                  )}
+                </div>
+
+                <div className="shrink-0 flex items-end gap-6">
+                  <div className="text-right">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-[#999] mb-0.5">
+                      {t("รุ่น", "Model", "型号")}
+                    </p>
+                    <p className="font-semibold text-lg text-[#1A1A1A]">{p.sku}</p>
+                  </div>
+                  <Link
+                    href={`/product/${p.sku}`}
+                    className="inline-flex items-center gap-1.5 text-[#C8102E] text-sm font-semibold hover:underline whitespace-nowrap pb-1"
+                  >
+                    {t("ดูรายละเอียด", "View Product", "查看详情")} <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* footer contact line, matches the source catalog sheet */}
+              <div className="mt-6 sm:mt-8 pt-4 border-t border-[#1A1A1A]/10 text-[11px] text-[#999]">
+                Futai Furniture Co.,Ltd | Tel : 063 826 1333 | LINE : Futai08 | WeChat : Futai_02
+              </div>
             </motion.div>
           </AnimatePresence>
 
-          {/* page-number badge, echoes the catalog sheet this collection is drawn from */}
-          <div className="pointer-events-none absolute top-4 right-4 sm:top-6 sm:right-6 text-xs sm:text-sm tracking-[0.2em] text-[#1A1A1A]/50 font-mono">
-            {String(index + 1).padStart(2, "0")} — {t("โซฟา", "SOFAS", "沙发")} — {String(total).padStart(2, "0")}
-          </div>
-
-          {/* prev / next */}
+          {/* prev / next — flank the sheet */}
           <button
             type="button"
             onClick={() => go(-1)}
             aria-label={t("ก่อนหน้า", "Previous", "上一张")}
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#1A1A1A] transition-colors z-10"
+            className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={20} />
           </button>
           <button
             type="button"
             onClick={() => go(1)}
             aria-label={t("ถัดไป", "Next", "下一张")}
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#1A1A1A] transition-colors z-10"
+            className="hidden md:flex absolute -right-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
           >
-            <ChevronRight size={22} />
+            <ChevronRight size={20} />
           </button>
         </div>
 
-        {/* ── Info bar — name/desc left, model/spec + CTA right, catalog-sheet style ── */}
-        <div className="border-t border-[#E8E5E0] bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={p.sku}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: EASE }}
-                className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
-              >
-                <div className="min-w-0">
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] leading-tight">{name}</h3>
-                  <p className="text-[#999] text-sm mt-1 max-w-xl line-clamp-1">{p.dimensions}</p>
-                </div>
-                <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                  <div className="text-right">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-[#999]">{t("รุ่น", "Model", "型号")}</p>
-                    <p className="font-mono font-semibold text-[#1A1A1A]">{p.sku}</p>
-                  </div>
-                  <Link
-                    href={`/product/${p.sku}`}
-                    className="inline-flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#C8102E] text-white text-sm font-bold px-6 h-11 transition-colors whitespace-nowrap"
-                  >
-                    {t("ดูรายละเอียด", "View Product", "查看详情")}
-                    <ArrowRight size={15} />
-                  </Link>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+        {/* mobile prev/next + view all */}
+        <div className="flex items-center justify-between mt-5 md:hidden">
+          <Link href="/category/sofa" className="text-[#C8102E] text-sm font-semibold flex items-center gap-1">
+            {t("ดูทั้งหมด", "View all", "查看全部")} <ArrowRight size={15} />
+          </Link>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              aria-label={t("ก่อนหน้า", "Previous", "上一张")}
+              className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              aria-label={t("ถัดไป", "Next", "下一张")}
+              className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
 
-        {/* ── Page ticks ───────────────────────────────────────────────── */}
-        <div className="flex items-center justify-center gap-1.5 py-5 bg-white">
+        {/* page ticks */}
+        <div className="flex items-center justify-center gap-1.5 mt-6">
           {products.map((sp, i) => (
             <button
               key={sp.sku}
@@ -154,17 +184,11 @@ export function SofaStation({ products }: { products: Product[] }) {
               onClick={() => jump(i)}
               aria-label={`${i + 1}`}
               className={`h-1.5 rounded-full transition-all ${
-                i === index ? "w-6 bg-[#C8102E]" : "w-1.5 bg-[#E8E5E0] hover:bg-[#C9A876]"
+                i === index ? "w-6 bg-[#C8102E]" : "w-1.5 bg-[#1A1A1A]/15 hover:bg-[#C9A876]"
               }`}
             />
           ))}
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 sm:hidden">
-        <Link href="/category/sofa" className="text-[#C8102E] text-sm font-semibold flex items-center gap-1">
-          {t("ดูทั้งหมด", "View all", "查看全部")} <ArrowRight size={15} />
-        </Link>
       </div>
     </section>
   );

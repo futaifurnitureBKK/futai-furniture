@@ -1,12 +1,14 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
+const SLIDE_FRACTION = 0.8; // active slide width as a fraction of the viewport
+const GAP = 20; // px between slides
 
 // Curated straight from SOFA.pdf — shown as the real catalog page image,
 // not a re-built layout. Kept separate from the rest of the sofa category.
@@ -19,20 +21,32 @@ const SLIDES = [
 
 export function SofaStation() {
   const { t } = useLanguage();
-  const [[index, direction], setSlide] = useState<[number, number]>([0, 0]);
+  const [index, setIndex] = useState(0);
   const total = SLIDES.length;
 
-  const go = useCallback((delta: 1 | -1) => {
-    setSlide(([i]) => [(i + delta + total) % total, delta]);
-  }, []);
-  const jump = useCallback((i: number) => {
-    setSlide(([cur]) => [i, i > cur ? 1 : -1]);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => setViewportWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  const s = SLIDES[index];
+  const go = useCallback((delta: 1 | -1) => {
+    setIndex((i) => (i + delta + total) % total);
+  }, []);
+
+  const slideWidth = viewportWidth * SLIDE_FRACTION;
+  const step = slideWidth + GAP;
+  const trackX = viewportWidth / 2 - slideWidth / 2 - index * step;
 
   return (
-    <section className="bg-[#EDEBE6] py-16">
+    <section className="bg-[#EDEBE6] py-16 overflow-hidden">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           className="flex items-end justify-between mb-6 sm:mb-8"
@@ -57,36 +71,64 @@ export function SofaStation() {
           </Link>
         </motion.div>
 
-        {/* ── Full catalog page, one at a time ────────────────────────── */}
+        {/* ── Peek carousel — active slide centered, neighbors visible & faded ── */}
         <div className="relative">
-          <AnimatePresence initial={false} custom={direction} mode="wait">
+          <div ref={viewportRef} className="overflow-hidden">
             <motion.div
-              key={s.sku}
-              custom={direction}
-              initial={{ opacity: 0, x: direction >= 0 ? 50 : -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: direction >= 0 ? -50 : 50 }}
-              transition={{ duration: 0.45, ease: EASE }}
+              className="flex items-center"
+              style={{ gap: GAP }}
+              animate={{ x: trackX }}
+              transition={{ type: "spring", stiffness: 260, damping: 32 }}
             >
-              <Link href={`/product/${s.sku}`} className="relative block w-full aspect-[3510/2482] shadow-sm">
-                <Image
-                  src={s.image}
-                  alt={s.name}
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 1024px) 100vw, 1024px"
-                  priority={index === 0}
-                />
-              </Link>
+              {SLIDES.map((s, i) => {
+                const isActive = i === index;
+                return (
+                  <motion.div
+                    key={s.sku}
+                    className="relative shrink-0 aspect-[3510/2482] shadow-sm"
+                    style={{ width: slideWidth || `${SLIDE_FRACTION * 100}%` }}
+                    animate={{ opacity: isActive ? 1 : 0.35, scale: isActive ? 1 : 0.94 }}
+                    transition={{ duration: 0.4, ease: EASE }}
+                  >
+                    {isActive ? (
+                      <Link href={`/product/${s.sku}`} className="relative block w-full h-full">
+                        <Image
+                          src={s.image}
+                          alt={s.name}
+                          fill
+                          className="object-contain"
+                          sizes="(max-width: 1024px) 90vw, 900px"
+                          priority={i === 0}
+                        />
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIndex(i)}
+                        aria-label={s.name}
+                        className="relative block w-full h-full cursor-pointer"
+                      >
+                        <Image
+                          src={s.image}
+                          alt={s.name}
+                          fill
+                          className="object-contain"
+                          sizes="(max-width: 1024px) 90vw, 900px"
+                        />
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              })}
             </motion.div>
-          </AnimatePresence>
+          </div>
 
-          {/* prev / next — flank the sheet */}
+          {/* prev / next — flank the viewport */}
           <button
             type="button"
             onClick={() => go(-1)}
             aria-label={t("ก่อนหน้า", "Previous", "上一张")}
-            className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
+            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
           >
             <ChevronLeft size={20} />
           </button>
@@ -94,7 +136,7 @@ export function SofaStation() {
             type="button"
             onClick={() => go(1)}
             aria-label={t("ถัดไป", "Next", "下一张")}
-            className="hidden md:flex absolute -right-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
+            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white shadow-md border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] items-center justify-center text-[#1A1A1A] transition-colors z-10"
           >
             <ChevronRight size={20} />
           </button>
@@ -131,7 +173,7 @@ export function SofaStation() {
             <button
               key={sp.sku}
               type="button"
-              onClick={() => jump(i)}
+              onClick={() => setIndex(i)}
               aria-label={sp.name}
               className={`h-1.5 rounded-full transition-all ${
                 i === index ? "w-6 bg-[#C8102E]" : "w-1.5 bg-[#1A1A1A]/15 hover:bg-[#C9A876]"

@@ -103,11 +103,9 @@ function StaggerGrid({
 export function HomeClient({
   featuredProducts,
   categories,
-  sofaProducts,
 }: {
   featuredProducts: Product[];
   categories: Category[];
-  sofaProducts: Product[];
 }) {
   const { t } = useLanguage();
   const { totalItems } = useCart();
@@ -298,7 +296,7 @@ export function HomeClient({
       </section>
 
       {/* ── Sofa Station ─────────────────────────────────────────────── */}
-      <SofaStation products={sofaProducts} />
+      <SofaStation />
 
       {/* ── Split feature section ─────────────────────────────────────── */}
       <section className="bg-[#F5F5F5]">

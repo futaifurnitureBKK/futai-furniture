@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Plus, Eye, EyeOff } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +53,50 @@ export default function ProductsPage() {
     });
     if (!res.ok) {
       setProducts((prev) => prev.map((p) => (p.sku === product.sku ? { ...p, is_active: !next } : p)));
+    }
+  }
+
+  function toggleSelect(sku: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.sku))));
+  }
+
+  async function deleteProducts(skus: string[]) {
+    if (skus.length === 0) return;
+    const confirmMsg =
+      skus.length === 1
+        ? `ลบสินค้า ${skus[0]} ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`
+        : `ลบสินค้าที่เลือกทั้งหมด ${skus.length} รายการ ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`;
+    if (!confirm(confirmMsg)) return;
+
+    setDeleting(true);
+    const results = await Promise.all(
+      skus.map(async (sku) => {
+        const res = await fetch(`/api/admin/products/${encodeURIComponent(sku)}`, { method: "DELETE" });
+        return { sku, ok: res.ok };
+      })
+    );
+    setDeleting(false);
+
+    const succeeded = new Set(results.filter((r) => r.ok).map((r) => r.sku));
+    setProducts((prev) => prev.filter((p) => !succeeded.has(p.sku)));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      succeeded.forEach((sku) => next.delete(sku));
+      return next;
+    });
+
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      alert(`ลบไม่สำเร็จ ${failed.length} รายการ: ${failed.map((f) => f.sku).join(", ")}`);
     }
   }
 
@@ -102,6 +148,29 @@ export default function ProductsPage() {
         <p className="text-xs text-[#6B6B6B] self-center">
           {loading ? "กำลังโหลด..." : `${filtered.length} รายการ`}
         </p>
+        {filtered.length > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-[#6B6B6B] self-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.size > 0 && selected.size === filtered.length}
+              onChange={toggleSelectAll}
+              className="h-3.5 w-3.5"
+            />
+            เลือกทั้งหมด
+          </label>
+        )}
+        {selected.size > 0 && (
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={deleting}
+            onClick={() => deleteProducts(Array.from(selected))}
+            className="h-9 gap-1 text-xs"
+          >
+            <Trash2 size={14} />
+            {deleting ? "กำลังลบ..." : `ลบที่เลือก (${selected.size})`}
+          </Button>
+        )}
       </div>
 
       {/* Product grid */}
@@ -114,6 +183,14 @@ export default function ProductsPage() {
             }`}
           >
             <div className="relative aspect-video bg-[#FAF7F2]">
+              <label className="absolute top-2 left-2 z-10 flex items-center justify-center h-5 w-5 rounded bg-white/90 shadow cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.has(product.sku)}
+                  onChange={() => toggleSelect(product.sku)}
+                  className="h-3.5 w-3.5"
+                />
+              </label>
               <Image
                 src={product.images[0]}
                 alt={product.name_th}
@@ -156,6 +233,16 @@ export default function ProductsPage() {
                 >
                   {product.is_active ? <EyeOff size={12} /> : <Eye size={12} />}
                   {product.is_active ? "ซ่อนสินค้า" : "แสดงสินค้า"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={() => deleteProducts([product.sku])}
+                  className="h-7 w-7 p-0 shrink-0"
+                  title="ลบสินค้า"
+                >
+                  <Trash2 size={12} />
                 </Button>
               </div>
               {product.is_active && (

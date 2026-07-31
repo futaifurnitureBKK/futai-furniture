@@ -1,52 +1,42 @@
 "use client";
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, useInView } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 import type { Product } from "@/types";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const CARD_WIDTH = 300;
-const CARD_GAP = 20;
 
 export function SofaStation({ products }: { products: Product[] }) {
   const { t } = useLanguage();
   const sectionRef = useRef<HTMLDivElement>(null);
   const inView = useInView(sectionRef, { once: true, margin: "-80px 0px" });
 
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [atStart, setAtStart] = useState(true);
-  const [atEnd, setAtEnd] = useState(false);
+  const [[index, direction], setSlide] = useState<[number, number]>([0, 0]);
+  const total = products.length;
 
-  const updateEdges = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    setAtStart(el.scrollLeft <= 4);
-    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
-  }, []);
+  const go = useCallback(
+    (delta: 1 | -1) => {
+      setSlide(([i]) => [(i + delta + total) % total, delta]);
+    },
+    [total]
+  );
+  const jump = useCallback(
+    (i: number) => {
+      setSlide(([cur]) => [i, i > cur ? 1 : -1]);
+    },
+    []
+  );
 
-  useEffect(() => {
-    updateEdges();
-    const el = trackRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", updateEdges, { passive: true });
-    window.addEventListener("resize", updateEdges);
-    return () => {
-      el.removeEventListener("scroll", updateEdges);
-      window.removeEventListener("resize", updateEdges);
-    };
-  }, [updateEdges]);
+  if (total === 0) return null;
 
-  const scrollBy = (dir: 1 | -1) => {
-    trackRef.current?.scrollBy({ left: dir * (CARD_WIDTH + CARD_GAP) * 2, behavior: "smooth" });
-  };
-
-  if (products.length === 0) return null;
+  const p = products[index];
+  const name = t(p.name_th, p.name_en, p.name_zh);
 
   return (
-    <section ref={sectionRef} className="bg-[#FAF7F2] py-16 overflow-hidden">
+    <section ref={sectionRef} className="bg-white py-16 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           className="flex items-end justify-between mb-8"
@@ -71,79 +61,110 @@ export function SofaStation({ products }: { products: Product[] }) {
         </motion.div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative">
-          {/* edge fades */}
-          <div className={`pointer-events-none absolute left-0 top-0 bottom-4 w-12 z-10 bg-gradient-to-r from-[#FAF7F2] to-transparent transition-opacity ${atStart ? "opacity-0" : "opacity-100"}`} />
-          <div className={`pointer-events-none absolute right-0 top-0 bottom-4 w-12 z-10 bg-gradient-to-l from-[#FAF7F2] to-transparent transition-opacity ${atEnd ? "opacity-0" : "opacity-100"}`} />
+      {/* ── Full-bleed slide ─────────────────────────────────────────── */}
+      <div className="relative w-full bg-[#F5F5F5]">
+        <div className="relative h-[52vh] sm:h-[64vh] min-h-[360px] max-h-[640px] overflow-hidden">
+          <AnimatePresence initial={false} custom={direction} mode="wait">
+            <motion.div
+              key={p.sku}
+              custom={direction}
+              initial={{ opacity: 0, x: direction >= 0 ? 60 : -60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction >= 0 ? -60 : 60 }}
+              transition={{ duration: 0.5, ease: EASE }}
+              className="absolute inset-0"
+            >
+              <Link href={`/product/${p.sku}`} className="block relative w-full h-full">
+                <Image
+                  src={p.images[0]}
+                  alt={name}
+                  fill
+                  className="object-contain"
+                  sizes="100vw"
+                  priority={index === 0}
+                />
+              </Link>
+            </motion.div>
+          </AnimatePresence>
 
-          <div
-            ref={trackRef}
-            className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
-            style={{ scrollbarWidth: "none" }}
+          {/* page-number badge, echoes the catalog sheet this collection is drawn from */}
+          <div className="pointer-events-none absolute top-4 right-4 sm:top-6 sm:right-6 text-xs sm:text-sm tracking-[0.2em] text-[#1A1A1A]/50 font-mono">
+            {String(index + 1).padStart(2, "0")} — {t("โซฟา", "SOFAS", "沙发")} — {String(total).padStart(2, "0")}
+          </div>
+
+          {/* prev / next */}
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            aria-label={t("ก่อนหน้า", "Previous", "上一张")}
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#1A1A1A] transition-colors z-10"
           >
-            {products.map((p, i) => (
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            aria-label={t("ถัดไป", "Next", "下一张")}
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#1A1A1A] transition-colors z-10"
+          >
+            <ChevronRight size={22} />
+          </button>
+        </div>
+
+        {/* ── Info bar — name/desc left, model/spec + CTA right, catalog-sheet style ── */}
+        <div className="border-t border-[#E8E5E0] bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <AnimatePresence mode="wait">
               <motion.div
                 key={p.sku}
-                className="snap-start shrink-0"
-                style={{ width: CARD_WIDTH }}
-                initial={{ opacity: 0, y: 24 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.5, delay: Math.min(i, 6) * 0.06, ease: EASE }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: EASE }}
+                className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
               >
-                <Link href={`/product/${p.sku}`} className="group block">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-white border border-[#E8E5E0] group-hover:border-[#C8102E] transition-colors">
-                    <Image
-                      src={p.images[0]}
-                      alt={t(p.name_th, p.name_en, p.name_zh)}
-                      fill
-                      className="object-contain p-4 group-hover:scale-105 transition-transform duration-400"
-                      sizes="300px"
-                    />
-                    <p className="absolute top-2 left-2 text-[10px] font-mono tracking-wide bg-white/90 text-[#6B6B6B] px-2 py-1">
-                      {p.sku}
-                    </p>
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] leading-tight">{name}</h3>
+                  <p className="text-[#999] text-sm mt-1 max-w-xl line-clamp-1">{p.dimensions}</p>
+                </div>
+                <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+                  <div className="text-right">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-[#999]">{t("รุ่น", "Model", "型号")}</p>
+                    <p className="font-mono font-semibold text-[#1A1A1A]">{p.sku}</p>
                   </div>
-                  <div className="pt-3">
-                    <h3 className="text-sm font-semibold text-[#1A1A1A] leading-snug line-clamp-1 group-hover:text-[#C8102E] transition-colors">
-                      {t(p.name_th, p.name_en, p.name_zh)}
-                    </h3>
-                    <p className="text-xs text-[#999] mt-1 line-clamp-1">{p.dimensions}</p>
-                  </div>
-                </Link>
+                  <Link
+                    href={`/product/${p.sku}`}
+                    className="inline-flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#C8102E] text-white text-sm font-bold px-6 h-11 transition-colors whitespace-nowrap"
+                  >
+                    {t("ดูรายละเอียด", "View Product", "查看详情")}
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
               </motion.div>
-            ))}
+            </AnimatePresence>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-6">
-          <Link
-            href="/category/sofa"
-            className="sm:hidden text-[#C8102E] text-sm font-semibold flex items-center gap-1"
-          >
-            {t("ดูทั้งหมด", "View all", "查看全部")} <ArrowRight size={15} />
-          </Link>
-          <div className="flex gap-2 ml-auto">
+        {/* ── Page ticks ───────────────────────────────────────────────── */}
+        <div className="flex items-center justify-center gap-1.5 py-5 bg-white">
+          {products.map((sp, i) => (
             <button
+              key={sp.sku}
               type="button"
-              onClick={() => scrollBy(-1)}
-              disabled={atStart}
-              aria-label={t("เลื่อนไปทางซ้าย", "Scroll left", "向左滚动")}
-              className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] disabled:opacity-30 disabled:hover:border-[#E8E5E0] disabled:hover:text-[#999] text-[#999] flex items-center justify-center transition-colors"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollBy(1)}
-              disabled={atEnd}
-              aria-label={t("เลื่อนไปทางขวา", "Scroll right", "向右滚动")}
-              className="w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] disabled:opacity-30 disabled:hover:border-[#E8E5E0] disabled:hover:text-[#999] text-[#999] flex items-center justify-center transition-colors"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+              onClick={() => jump(i)}
+              aria-label={`${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === index ? "w-6 bg-[#C8102E]" : "w-1.5 bg-[#E8E5E0] hover:bg-[#C9A876]"
+              }`}
+            />
+          ))}
         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 sm:hidden">
+        <Link href="/category/sofa" className="text-[#C8102E] text-sm font-semibold flex items-center gap-1">
+          {t("ดูทั้งหมด", "View all", "查看全部")} <ArrowRight size={15} />
+        </Link>
       </div>
     </section>
   );

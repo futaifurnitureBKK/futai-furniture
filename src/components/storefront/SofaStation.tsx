@@ -9,10 +9,10 @@ import { useLanguage } from "@/store/language";
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 // Position as % of the image, hand-placed against /sofa-station/shop-the-room.png
-const HOTSPOTS: { id: string; x: number; y: number; th: string; en: string; zh: string }[] = [
+const HOTSPOTS: { id: string; x: number; y: number; th: string; en: string; zh: string; sku?: string }[] = [
   { id: "cream-sofa",    x: 17.5, y: 50, th: "โซฟา 2 ที่นั่ง ผ้าครีม",      en: "2-Seater Sofa, Cream",      zh: "米色双人沙发" },
-  { id: "cream-lounge",  x: 13,   y: 74, th: "เก้าอี้เลานจ์ผ้ากำมะหยี่",   en: "Velvet Lounge Chair",       zh: "天鹅绒躺椅" },
-  { id: "rust-daybed",   x: 47.5, y: 52, th: "โซฟาเดย์เบด สีสนิม",         en: "Daybed Sofa, Rust",         zh: "锈橙色贵妃沙发" },
+  { id: "cream-lounge",  x: 13,   y: 74, th: "เก้าอี้เลานจ์ผ้ากำมะหยี่",   en: "Velvet Lounge Chair",       zh: "天鹅绒躺椅",   sku: "T-902" },
+  { id: "rust-daybed",   x: 47.5, y: 52, th: "โซฟาเดย์เบด สีสนิม",         en: "Daybed Sofa, Rust",         zh: "锈橙色贵妃沙发", sku: "T-901" },
   { id: "rust-sofa",     x: 79,   y: 53, th: "โซฟา 3 ที่นั่ง สีสนิม",      en: "3-Seater Sofa, Rust",       zh: "锈橙色三人沙发" },
   { id: "rust-armchair", x: 94,   y: 68, th: "เก้าอี้อาร์มแชร์ สีสนิม",    en: "Armchair, Rust",            zh: "锈橙色扶手椅" },
 ];
@@ -105,10 +105,10 @@ export function SofaStation() {
                       {t(h.th, h.en, h.zh)}
                     </p>
                     <Link
-                      href="/category/sofa"
+                      href={h.sku ? `/product/${h.sku}` : "/category/sofa"}
                       className="inline-flex items-center gap-1.5 text-[#C8102E] text-xs font-bold hover:underline"
                     >
-                      {t("ดูหมวดโซฟา", "Shop Sofas", "查看沙发")}
+                      {h.sku ? t("ดูสินค้านี้", "Shop This Item", "查看此产品") : t("ดูหมวดโซฟา", "Shop Sofas", "查看沙发")}
                       <ArrowRight size={12} />
                     </Link>
                   </motion.div>

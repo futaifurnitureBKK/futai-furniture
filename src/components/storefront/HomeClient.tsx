@@ -9,6 +9,7 @@ import { CategoryTile } from "@/components/storefront/CategoryTile";
 import { VideoHero } from "@/components/storefront/VideoHero";
 import { InstallationGallery } from "@/components/storefront/InstallationGallery";
 import { SofaStation } from "@/components/storefront/SofaStation";
+import { SofaCarousel } from "@/components/storefront/SofaCarousel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/store/cart";
@@ -297,6 +298,9 @@ export function HomeClient({
 
       {/* ── Sofa Station ─────────────────────────────────────────────── */}
       <SofaStation />
+
+      {/* ── Sofa Carousel (original sliding version) ────────────────── */}
+      <SofaCarousel />
 
       {/* ── Split feature section ─────────────────────────────────────── */}
       <section className="bg-[#F5F5F5]">

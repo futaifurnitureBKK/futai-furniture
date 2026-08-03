@@ -45,7 +45,11 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   };
 
   const handleAddToCart = () => {
-    addItem(product);
+    const variant = activeVariant >= 0 ? colorVariants[activeVariant] : undefined;
+    const color = variant
+      ? { label_th: variant.label_th, label_en: variant.label_en, label_zh: variant.label_zh, hex: variant.hex }
+      : undefined;
+    addItem(product, 1, color);
     toast.success(t("เพิ่มลงตะกร้าแล้ว", "Added to cart", "已加入购物车"));
   };
 
@@ -169,13 +173,16 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </Button>
               <Button
                 onClick={handleAddToCart}
-                disabled={product.stock_status === "out_of_stock"}
+                disabled={product.stock_status === "out_of_stock" || (colorVariants.length > 0 && activeVariant < 0)}
                 variant="outline"
                 className="w-full h-11 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
               >
                 <ShoppingCart size={16} className="mr-2" />
                 {t("เพิ่มลงตะกร้า", "Add to Cart", "加入购物车")}
               </Button>
+              {colorVariants.length > 0 && activeVariant < 0 && (
+                <p className="text-xs text-[#C8102E]">{t("กรุณาเลือกสีก่อนเพิ่มลงตะกร้า", "Please pick a color before adding to cart", "请先选择颜色再加入购物车")}</p>
+              )}
             </div>
 
             {/* Tags */}

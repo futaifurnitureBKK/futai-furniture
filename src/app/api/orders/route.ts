@@ -5,6 +5,7 @@ import { notifyAdminLine } from "@/lib/line";
 interface CartItemInput {
   sku: string;
   quantity: number;
+  color_th?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -38,7 +39,9 @@ export async function POST(req: NextRequest) {
     .filter((i) => productBySku.has(i.sku) && Number.isInteger(i.quantity) && i.quantity > 0)
     .map((i) => {
       const p = productBySku.get(i.sku)!;
-      return { sku: i.sku, name_snapshot: p.name_th, quantity: i.quantity, price_snapshot: p.price };
+      const colorTh = typeof i.color_th === "string" ? i.color_th.trim() : "";
+      const name_snapshot = colorTh ? `${p.name_th} (สี: ${colorTh})` : p.name_th;
+      return { sku: i.sku, name_snapshot, quantity: i.quantity, price_snapshot: p.price };
     });
 
   if (items.length === 0) {

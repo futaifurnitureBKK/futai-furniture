@@ -48,6 +48,7 @@ export default function CheckoutPage() {
         items: items.map((i) => ({
           sku: i.product.sku,
           quantity: i.quantity,
+          color_th: i.color?.label_th,
         })),
       }),
     });

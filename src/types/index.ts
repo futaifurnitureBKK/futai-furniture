@@ -105,9 +105,17 @@ export interface QuoteRequest {
   created_at: string;
 }
 
+export interface CartItemColor {
+  label_th: string;
+  label_en: string;
+  label_zh: string;
+  hex: string;
+}
+
 export interface CartItem {
   product: Product;
   quantity: number;
+  color?: CartItemColor;
 }
 
 export interface QuoteFormValues {

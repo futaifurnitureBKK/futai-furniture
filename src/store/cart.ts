@@ -1,12 +1,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { CartItem, Product } from "@/types";
+import type { CartItem, CartItemColor, Product } from "@/types";
+
+// A cart line is identified by SKU + chosen color (no color = base product),
+// so picking two different colors of the same product yields two separate lines.
+function sameLine(item: CartItem, sku: string, colorLabelTh?: string) {
+  return item.product.sku === sku && item.color?.label_th === colorLabelTh;
+}
 
 interface CartStore {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (sku: string) => void;
-  updateQuantity: (sku: string, quantity: number) => void;
+  addItem: (product: Product, quantity?: number, color?: CartItemColor) => void;
+  removeItem: (sku: string, colorLabelTh?: string) => void;
+  updateQuantity: (sku: string, quantity: number, colorLabelTh?: string) => void;
   clearCart: () => void;
   totalItems: () => number;
   subtotal: () => number | null;
@@ -18,37 +24,33 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       items: [],
 
-      addItem: (product, quantity = 1) => {
+      addItem: (product, quantity = 1, color) => {
         set((state) => {
-          const existing = state.items.find(
-            (i) => i.product.sku === product.sku
-          );
+          const existing = state.items.find((i) => sameLine(i, product.sku, color?.label_th));
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.product.sku === product.sku
-                  ? { ...i, quantity: i.quantity + quantity }
-                  : i
+                i === existing ? { ...i, quantity: i.quantity + quantity } : i
               ),
             };
           }
-          return { items: [...state.items, { product, quantity }] };
+          return { items: [...state.items, { product, quantity, color }] };
         });
       },
 
-      removeItem: (sku) =>
+      removeItem: (sku, colorLabelTh) =>
         set((state) => ({
-          items: state.items.filter((i) => i.product.sku !== sku),
+          items: state.items.filter((i) => !sameLine(i, sku, colorLabelTh)),
         })),
 
-      updateQuantity: (sku, quantity) => {
+      updateQuantity: (sku, quantity, colorLabelTh) => {
         if (quantity <= 0) {
-          get().removeItem(sku);
+          get().removeItem(sku, colorLabelTh);
           return;
         }
         set((state) => ({
           items: state.items.map((i) =>
-            i.product.sku === sku ? { ...i, quantity } : i
+            sameLine(i, sku, colorLabelTh) ? { ...i, quantity } : i
           ),
         }));
       },

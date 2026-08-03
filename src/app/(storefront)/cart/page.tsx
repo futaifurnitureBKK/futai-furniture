@@ -44,12 +44,16 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
-              <FadeIn key={item.product.sku}>
+            {items.map((item) => {
+              const variantImage = item.color
+                ? item.product.color_variants?.find((v) => v.label_th === item.color!.label_th)?.images[0]
+                : undefined;
+              return (
+              <FadeIn key={item.product.sku + (item.color?.label_th ?? "")}>
                 <div className="bg-white rounded-xl p-4 flex gap-4 shadow-sm">
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#FAF7F2] shrink-0">
                     <Image
-                      src={item.product.images[0]}
+                      src={variantImage ?? item.product.images[0]}
                       alt={t(item.product.name_th, item.product.name_en, item.product.name_zh)}
                       fill
                       sizes="80px"
@@ -61,13 +65,22 @@ export default function CartPage() {
                     <p className="font-medium text-[#1A1A1A] text-sm leading-snug line-clamp-2">
                       {t(item.product.name_th, item.product.name_en, item.product.name_zh)}
                     </p>
+                    {item.color && (
+                      <p className="flex items-center gap-1.5 text-xs text-[#6B6B6B] mt-1">
+                        <span
+                          className="inline-block w-3 h-3 rounded-full border border-[#E8E5E0]"
+                          style={{ backgroundColor: item.color.hex }}
+                        />
+                        {t(item.color.label_th, item.color.label_en, item.color.label_zh)}
+                      </p>
+                    )}
                     <p className="text-xs text-[#C8102E] mt-1">
                       {t("ราคาตามใบเสนอราคา", "Price on quote", "价格以报价单为准")}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-3 shrink-0">
                     <button
-                      onClick={() => removeItem(item.product.sku)}
+                      onClick={() => removeItem(item.product.sku, item.color?.label_th)}
                       className="text-[#6B6B6B] hover:text-red-500 transition-colors"
                       aria-label="Remove item"
                     >
@@ -75,14 +88,14 @@ export default function CartPage() {
                     </button>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateQuantity(item.product.sku, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.product.sku, item.quantity - 1, item.color?.label_th)}
                         className="w-7 h-7 rounded border border-[#E8E5E0] flex items-center justify-center hover:bg-[#E8E5E0] transition-colors"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.product.sku, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product.sku, item.quantity + 1, item.color?.label_th)}
                         className="w-7 h-7 rounded border border-[#E8E5E0] flex items-center justify-center hover:bg-[#E8E5E0] transition-colors"
                       >
                         <Plus size={12} />
@@ -91,7 +104,8 @@ export default function CartPage() {
                   </div>
                 </div>
               </FadeIn>
-            ))}
+              );
+            })}
           </div>
 
           {/* Summary */}

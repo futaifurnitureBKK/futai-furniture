@@ -110,6 +110,23 @@ export default function ProductsPage() {
     return matchCat && matchSearch;
   });
 
+  // Grouped by category (in CATEGORIES order) when no single category is picked,
+  // so chairs sit with chairs, sofas with sofas, etc. instead of one flat dump.
+  const groups: { slug: string; name_th: string; products: Product[] }[] =
+    catFilter === "all"
+      ? [...CATEGORIES]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((c) => ({ slug: c.slug, name_th: c.name_th, products: filtered.filter((p) => p.category_slug === c.slug) }))
+          .filter((g) => g.products.length > 0)
+          .concat([
+            {
+              slug: "__uncategorized",
+              name_th: "ไม่มีหมวดหมู่",
+              products: filtered.filter((p) => !CATEGORIES.some((c) => c.slug === p.category_slug)),
+            },
+          ].filter((g) => g.products.length > 0))
+      : [{ slug: catFilter, name_th: "", products: filtered }];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -173,10 +190,18 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Product grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((product) => (
-          <div
+      {/* Product grid — grouped by category when viewing all categories */}
+      {groups.map((group) => (
+        <div key={group.slug} className="space-y-4">
+          {group.name_th && (
+            <h2 className="text-sm font-bold text-[#1A1A1A] flex items-center gap-2 pt-2">
+              {group.name_th}
+              <span className="text-xs font-normal text-[#9B9B9B]">({group.products.length})</span>
+            </h2>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {group.products.map((product) => (
+              <div
             key={product.sku}
             className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
               !product.is_active ? "opacity-60" : ""
@@ -257,10 +282,12 @@ export default function ProductsPage() {
                   </Button>
                 </a>
               )}
-            </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -226,6 +226,10 @@ export function ProductForm({
             <div className="space-y-4">
               {values.colorVariants.map((v, i) => (
                 <div key={i} className="rounded-lg border border-[#E8E5E0] p-3 space-y-3">
+                  <ImageUploader
+                    images={v.images}
+                    onChange={(images) => updateColorVariant(i, { images })}
+                  />
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -249,10 +253,6 @@ export function ProductForm({
                       ลบสีนี้
                     </Button>
                   </div>
-                  <ImageUploader
-                    images={v.images}
-                    onChange={(images) => updateColorVariant(i, { images })}
-                  />
                 </div>
               ))}
             </div>

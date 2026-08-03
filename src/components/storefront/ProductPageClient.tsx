@@ -22,14 +22,17 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   const [activeVariant, setActiveVariant] = useState(-1); // -1 = base product images
   const colorVariants = product.color_variants ?? [];
 
+  // Keep the cover photo in the gallery even when a color is picked, so the
+  // clean/main shot never disappears — the color's own photos are appended
+  // after it instead of replacing the gallery outright.
   const galleryImages =
     activeVariant >= 0 && colorVariants[activeVariant]?.images.length
-      ? colorVariants[activeVariant].images
+      ? [product.images[0], ...colorVariants[activeVariant].images]
       : product.images;
 
   function selectVariant(idx: number) {
     setActiveVariant(idx);
-    setActiveImg(0);
+    setActiveImg(colorVariants[idx]?.images.length ? 1 : 0); // jump to that color's photo, cover stays one click away
   }
 
   const stockLabel: Record<string, string> = {

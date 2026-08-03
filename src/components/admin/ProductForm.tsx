@@ -14,6 +14,12 @@ const STOCK_OPTIONS: { value: StockStatus; label: string }[] = [
   { value: "on_order", label: "สั่งจอง" },
 ];
 
+interface ColorVariantInput {
+  label_th: string;
+  hex: string;
+  images: string[];
+}
+
 export interface ProductFormValues {
   sku: string;
   name_th: string;
@@ -24,6 +30,7 @@ export interface ProductFormValues {
   stock_status: StockStatus;
   images: string[];
   tags: string;
+  colorVariants: ColorVariantInput[];
   is_featured: boolean;
   is_active: boolean;
 }
@@ -39,6 +46,7 @@ function toFormValues(p?: Product): ProductFormValues {
     stock_status: p?.stock_status ?? "in_stock",
     images: p?.images ?? [],
     tags: p?.tags?.join(", ") ?? "",
+    colorVariants: p?.color_variants?.map((v) => ({ label_th: v.label_th, hex: v.hex, images: v.images })) ?? [],
     is_featured: p?.is_featured ?? false,
     is_active: p?.is_active ?? true,
   };
@@ -61,6 +69,24 @@ export function ProductForm({
     setValues((v) => ({ ...v, [key]: value }));
   }
 
+  function addColorVariant() {
+    set("colorVariants", [...values.colorVariants, { label_th: "", hex: "#C8102E", images: [] }]);
+  }
+
+  function updateColorVariant(idx: number, patch: Partial<ColorVariantInput>) {
+    set(
+      "colorVariants",
+      values.colorVariants.map((v, i) => (i === idx ? { ...v, ...patch } : v))
+    );
+  }
+
+  function removeColorVariant(idx: number) {
+    set(
+      "colorVariants",
+      values.colorVariants.filter((_, i) => i !== idx)
+    );
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -79,6 +105,9 @@ export function ProductForm({
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
+      color_variants: values.colorVariants
+        .filter((v) => v.label_th.trim())
+        .map((v) => ({ label_th: v.label_th.trim(), hex: v.hex, images: v.images })),
       is_featured: values.is_featured,
       is_active: values.is_active,
     };
@@ -182,6 +211,53 @@ export function ProductForm({
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">รูปภาพสินค้า</label>
           <ImageUploader images={values.images} onChange={(images) => set("images", images)} />
+        </div>
+
+        <div className="sm:col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-sm font-medium text-[#1A1A1A]">ตัวเลือกสี (ถ้ามี)</label>
+            <Button type="button" variant="outline" size="sm" onClick={addColorVariant}>
+              + เพิ่มสี
+            </Button>
+          </div>
+          {values.colorVariants.length === 0 ? (
+            <p className="text-xs text-[#9B9B9B]">ยังไม่มีตัวเลือกสี — สินค้านี้จะแสดงแค่รูปหลักด้านบน</p>
+          ) : (
+            <div className="space-y-4">
+              {values.colorVariants.map((v, i) => (
+                <div key={i} className="rounded-lg border border-[#E8E5E0] p-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={v.hex}
+                      onChange={(e) => updateColorVariant(i, { hex: e.target.value })}
+                      className="h-9 w-9 shrink-0 rounded border border-[#E8E5E0] cursor-pointer"
+                    />
+                    <Input
+                      value={v.label_th}
+                      onChange={(e) => updateColorVariant(i, { label_th: e.target.value })}
+                      placeholder="ชื่อสี เช่น เขียวเซจ"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeColorVariant(i)}
+                      className="shrink-0 text-[#C8102E] border-[#C8102E]/30 hover:bg-[#C8102E]/5"
+                    >
+                      ลบสีนี้
+                    </Button>
+                  </div>
+                  <ImageUploader
+                    images={v.images}
+                    onChange={(images) => updateColorVariant(i, { images })}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-[#9B9B9B] mt-1">ระบบจะแปลชื่อสีเป็นอังกฤษและจีนให้อัตโนมัติตอนบันทึก</p>
         </div>
 
         <div className="sm:col-span-2">

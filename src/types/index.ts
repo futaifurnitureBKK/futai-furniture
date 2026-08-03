@@ -23,6 +23,14 @@ export interface Category {
   product_count?: number;
 }
 
+export interface ColorVariant {
+  label_th: string;
+  label_en: string;
+  label_zh: string;
+  hex: string;
+  images: string[];
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -39,6 +47,7 @@ export interface Product {
   stock_status: StockStatus;
   images: string[];
   tags: string[];
+  color_variants?: ColorVariant[];
   is_featured: boolean;
   is_active: boolean;
   view_count: number;

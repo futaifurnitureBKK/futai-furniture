@@ -19,6 +19,18 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   const { addItem } = useCart();
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
+  const [activeVariant, setActiveVariant] = useState(-1); // -1 = base product images
+  const colorVariants = product.color_variants ?? [];
+
+  const galleryImages =
+    activeVariant >= 0 && colorVariants[activeVariant]?.images.length
+      ? colorVariants[activeVariant].images
+      : product.images;
+
+  function selectVariant(idx: number) {
+    setActiveVariant(idx);
+    setActiveImg(0);
+  }
 
   const stockLabel: Record<string, string> = {
     in_stock: t("มีสินค้า", "In Stock", "有货"),
@@ -56,7 +68,7 @@ export function ProductPageClient({ product, related }: { product: Product; rela
           <FadeIn className="space-y-4">
             <div className="relative aspect-square overflow-hidden rounded-xl bg-white">
               <Image
-                src={product.images[activeImg] ?? product.images[0]}
+                src={galleryImages[activeImg] ?? galleryImages[0]}
                 alt={t(product.name_th, product.name_en, product.name_zh)}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
@@ -64,9 +76,9 @@ export function ProductPageClient({ product, related }: { product: Product; rela
                 priority
               />
             </div>
-            {product.images.length > 1 && (
+            {galleryImages.length > 1 && (
               <div className="flex gap-3 overflow-x-auto pb-2">
-                {product.images.map((img, i) => (
+                {galleryImages.map((img, i) => (
                   <button
                     key={i}
                     onClick={() => setActiveImg(i)}
@@ -106,6 +118,39 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               <p className="text-xs text-[#6B6B6B] mb-1">{t("ขนาด", "Dimensions", "尺寸")}</p>
               <p className="font-mono text-[#1A1A1A] font-medium">{product.dimensions}</p>
             </div>
+
+            {/* Color variants */}
+            {colorVariants.length > 0 && (
+              <div className="mb-6">
+                <p className="text-xs text-[#6B6B6B] mb-2">
+                  {t("สี", "Color", "颜色")}
+                  {activeVariant >= 0 && (
+                    <span className="text-[#1A1A1A] font-medium ml-1">
+                      : {t(
+                          colorVariants[activeVariant].label_th,
+                          colorVariants[activeVariant].label_en,
+                          colorVariants[activeVariant].label_zh
+                        )}
+                    </span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {colorVariants.map((v, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => selectVariant(i)}
+                      aria-label={t(v.label_th, v.label_en, v.label_zh)}
+                      title={t(v.label_th, v.label_en, v.label_zh)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${
+                        activeVariant === i ? "border-[#C8102E] scale-110" : "border-white shadow-sm hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: v.hex, outline: activeVariant === i ? "none" : "1px solid #E8E5E0" }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Price / CTA — pricing is hidden storefront-wide (quote-only model) */}
             <div className="space-y-3 mb-8">

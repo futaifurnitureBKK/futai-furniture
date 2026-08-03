@@ -48,6 +48,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
       update.description_en = en;
       update.description_zh = zh;
     }
+    if ("color_variants" in body) {
+      const colorVariantsIn: { label_th: string; hex: string; images: string[] }[] = body.color_variants ?? [];
+      const labels = await Promise.all(colorVariantsIn.map((v) => translateToEnZh(v.label_th, false)));
+      update.color_variants = colorVariantsIn.map((v, i) => ({
+        label_th: v.label_th,
+        label_en: labels[i].en,
+        label_zh: labels[i].zh,
+        hex: v.hex,
+        images: v.images,
+      }));
+    }
   } catch (err) {
     return NextResponse.json({ error: `Translation failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
   }

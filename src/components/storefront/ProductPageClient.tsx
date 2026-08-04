@@ -32,7 +32,7 @@ export function ProductPageClient({ product, related }: { product: Product; rela
 
   function selectVariant(idx: number) {
     setActiveVariant(idx);
-    setActiveImg(colorVariants[idx]?.images.length ? 1 : 0); // jump to that color's photo, cover stays one click away
+    setActiveImg(0); // main photo stays on the cover shot; the color's photo is just an extra thumbnail to click through to
   }
 
   const stockLabel: Record<string, string> = {

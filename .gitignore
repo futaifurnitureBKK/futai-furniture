@@ -44,6 +44,10 @@ next-env.d.ts
 *-preview.json
 scripts/*.json
 
+# raw source catalogs (PDFs etc.) — images get extracted into public/products,
+# the originals stay local only, not published or committed
+/catalog-sources
+
 .vercel
 
 .env*

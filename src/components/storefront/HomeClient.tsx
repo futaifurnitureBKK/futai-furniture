@@ -10,6 +10,7 @@ import { VideoHero } from "@/components/storefront/VideoHero";
 import { InstallationGallery } from "@/components/storefront/InstallationGallery";
 import { SofaStation } from "@/components/storefront/SofaStation";
 import { SofaCarousel } from "@/components/storefront/SofaCarousel";
+import { TeaTableStation } from "@/components/storefront/TeaTableStation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/store/cart";
@@ -104,9 +105,11 @@ function StaggerGrid({
 export function HomeClient({
   featuredProducts,
   categories,
+  teaTableProducts,
 }: {
   featuredProducts: Product[];
   categories: Category[];
+  teaTableProducts: Product[];
 }) {
   const { t } = useLanguage();
   const { totalItems } = useCart();
@@ -295,6 +298,9 @@ export function HomeClient({
           ))}
         </StaggerGrid>
       </section>
+
+      {/* ── Tea Table Station ────────────────────────────────────────── */}
+      <TeaTableStation products={teaTableProducts} />
 
       {/* ── Sofa Station ─────────────────────────────────────────────── */}
       <SofaStation />

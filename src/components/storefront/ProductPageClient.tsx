@@ -19,20 +19,28 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   const { addItem } = useCart();
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
-  const [activeVariant, setActiveVariant] = useState(-1); // -1 = base product images
+  const [activeVariant, setActiveVariant] = useState(-1); // -1 = no color picked yet
   const colorVariants = product.color_variants ?? [];
 
-  // Keep the cover photo in the gallery even when a color is picked, so the
-  // clean/main shot never disappears — the color's own photos are appended
-  // after it instead of replacing the gallery outright.
-  const galleryImages =
-    activeVariant >= 0 && colorVariants[activeVariant]?.images.length
-      ? [product.images[0], ...colorVariants[activeVariant].images]
-      : product.images;
+  // One combined strip: cover photo first, then every color's photos —
+  // all always visible, regardless of which color is currently picked.
+  // Each entry remembers which color (if any) it belongs to, so picking a
+  // thumbnail also syncs the color swatch/label, and vice versa.
+  const galleryEntries = [
+    { src: product.images[0], variantIndex: -1 },
+    ...colorVariants.flatMap((v, vi) => v.images.map((src) => ({ src, variantIndex: vi }))),
+  ];
+  const galleryImages = galleryEntries.map((e) => e.src);
+
+  function selectImage(i: number) {
+    setActiveImg(i);
+    setActiveVariant(galleryEntries[i].variantIndex);
+  }
 
   function selectVariant(idx: number) {
+    const i = galleryEntries.findIndex((e) => e.variantIndex === idx);
     setActiveVariant(idx);
-    setActiveImg(colorVariants[idx]?.images.length ? 1 : 0); // jump straight to that color's photo; cover is still one click away as the first thumbnail
+    setActiveImg(i >= 0 ? i : 0);
   }
 
   const stockLabel: Record<string, string> = {
@@ -88,7 +96,7 @@ export function ProductPageClient({ product, related }: { product: Product; rela
                 {galleryImages.map((img, i) => (
                   <button
                     key={i}
-                    onClick={() => setActiveImg(i)}
+                    onClick={() => selectImage(i)}
                     className={`relative w-20 h-20 rounded-lg overflow-hidden shrink-0 border-2 transition-colors ${
                       activeImg === i ? "border-[#C8102E]" : "border-transparent"
                     }`}

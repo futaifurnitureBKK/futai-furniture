@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/browser";
@@ -7,14 +7,23 @@ import { ProductCard } from "@/components/storefront/ProductCard";
 import { StaggerChildren, StaggerItem } from "@/components/animations/StaggerChildren";
 import { FadeIn } from "@/components/animations/FadeIn";
 import { useLanguage } from "@/store/language";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
 
 export default function SearchPage() {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const q = query.trim();
+
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => setCategories((data as Category[]) ?? []));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +45,24 @@ export default function SearchPage() {
       clearTimeout(timer);
     };
   }, [q]);
+
+  const groupedResults = useMemo(() => {
+    const sortOrder = new Map(categories.map((c) => [c.slug, c.sort_order]));
+    const byCategory = new Map<string, Product[]>();
+    for (const product of results) {
+      const list = byCategory.get(product.category_slug) ?? [];
+      list.push(product);
+      byCategory.set(product.category_slug, list);
+    }
+    return Array.from(byCategory.entries()).sort(
+      ([a], [b]) => (sortOrder.get(a) ?? Infinity) - (sortOrder.get(b) ?? Infinity)
+    );
+  }, [results, categories]);
+
+  const categoryName = (slug: string) => {
+    const category = categories.find((c) => c.slug === slug);
+    return category ? t(category.name_th, category.name_en, category.name_zh) : slug;
+  };
 
   return (
     <div className="bg-[#FAF7F2] min-h-screen pt-20">
@@ -66,17 +93,26 @@ export default function SearchPage() {
           </FadeIn>
         )}
 
-        {results.length > 0 ? (
-          <StaggerChildren
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-            stagger={0.05}
-          >
-            {results.map((product) => (
-              <StaggerItem key={product.sku}>
-                <ProductCard product={product} />
-              </StaggerItem>
+        {groupedResults.length > 0 ? (
+          <div className="space-y-12">
+            {groupedResults.map(([slug, products]) => (
+              <div key={slug}>
+                <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4 pb-2 border-b border-[#E8E5E0]">
+                  {categoryName(slug)}
+                </h2>
+                <StaggerChildren
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+                  stagger={0.05}
+                >
+                  {products.map((product) => (
+                    <StaggerItem key={product.sku}>
+                      <ProductCard product={product} />
+                    </StaggerItem>
+                  ))}
+                </StaggerChildren>
+              </div>
             ))}
-          </StaggerChildren>
+          </div>
         ) : !loading ? (
           <div className="text-center py-16 text-[#6B6B6B]">
             <p className="text-lg mb-2">{t("ไม่พบสินค้าที่ค้นหา", "No products found", "未找到相关产品")}</p>

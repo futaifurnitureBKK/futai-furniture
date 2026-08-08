@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -49,6 +50,17 @@ export default function QuotesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+  }
+
+  async function deleteQuote(id: string) {
+    if (!confirm("ลบคำขอใบเสนอราคานี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)")) return;
+    const prev = allQuotes;
+    setAllQuotes((p) => p.filter((q) => q.id !== id));
+    const res = await fetch(`/api/admin/quotes/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setAllQuotes(prev);
+      alert("ลบไม่สำเร็จ กรุณาลองใหม่");
+    }
   }
 
   const quotes = allQuotes.filter((q) => filter === "all" || q.status === filter);
@@ -144,6 +156,14 @@ export default function QuotesPage() {
                           ตอบกลับแล้ว
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteQuote(quote.id)}
+                        className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 size={12} />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

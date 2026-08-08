@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { ChevronLeft, Phone, Mail, MessageCircle } from "lucide-react";
+import { ChevronLeft, Phone, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/browser";
 import type { QuoteRequest, QuoteStatus } from "@/types";
 
@@ -58,6 +58,16 @@ export default function QuoteDetailPage() {
     if (!res.ok) setQuote((q) => (q ? { ...q, status: prev } : q));
   }
 
+  async function deleteQuote() {
+    if (!confirm("ลบคำขอใบเสนอราคานี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)")) return;
+    const res = await fetch(`/api/admin/quotes/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/admin/quotes");
+    } else {
+      alert("ลบไม่สำเร็จ กรุณาลองใหม่");
+    }
+  }
+
   if (loading) return <p className="text-sm text-[#6B6B6B]">กำลังโหลด...</p>;
   if (error || !quote) {
     return (
@@ -84,9 +94,17 @@ export default function QuoteDetailPage() {
         </button>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[#1A1A1A]">คำขอใบเสนอราคา</h1>
-          <p className="text-xs text-[#6B6B6B]">
-            {new Date(quote.created_at).toLocaleString("th-TH")}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-[#6B6B6B]">
+              {new Date(quote.created_at).toLocaleString("th-TH")}
+            </p>
+            <button
+              onClick={deleteQuote}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-red-600 border border-red-200 hover:bg-red-50"
+            >
+              <Trash2 size={12} /> ลบ
+            </button>
+          </div>
         </div>
       </div>
 

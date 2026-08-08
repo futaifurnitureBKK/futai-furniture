@@ -1,12 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShoppingBag, Package, Users, AlertCircle, Eye } from "lucide-react";
+import { ShoppingBag, Package, Users, AlertCircle, Eye, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/browser";
 import type { Order, Customer, QuoteRequest, Product } from "@/types";
+
+interface VisitStats {
+  totalViews: number;
+  totalVisitors: number;
+  todayViews: number;
+  todayVisitors: number;
+}
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "รอดำเนินการ",
@@ -31,24 +38,28 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [visits, setVisits] = useState<VisitStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [ordersRes, customersRes, quotesRes, productsRes] = await Promise.all([
+      const [ordersRes, customersRes, quotesRes, productsRes, visitsRes] = await Promise.all([
         fetch("/api/admin/orders"),
         fetch("/api/admin/customers"),
         fetch("/api/admin/quotes"),
         supabase.from("products").select("*"),
+        fetch("/api/admin/visits"),
       ]);
       const ordersData = await ordersRes.json();
       const customersData = await customersRes.json();
       const quotesData = await quotesRes.json();
+      const visitsData = await visitsRes.json();
       if (!cancelled) {
         setOrders(ordersRes.ok ? ordersData.orders : []);
         setCustomers(customersRes.ok ? customersData.customers : []);
         setQuotes(quotesRes.ok ? quotesData.quotes : []);
         setProducts((productsRes.data as Product[]) ?? []);
+        setVisits(visitsRes.ok ? visitsData : null);
       }
     })();
     return () => {
@@ -57,6 +68,14 @@ export default function AdminDashboard() {
   }, []);
 
   const KPI = [
+    {
+      title: "คนเข้าชมวันนี้",
+      value: visits?.todayVisitors ?? 0,
+      icon: BarChart3,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      href: "/admin",
+    },
     {
       title: "ออเดอร์รอดำเนินการ",
       value: orders.filter((o) => o.status === "pending").length,
@@ -121,7 +140,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {KPI.map((kpi) => (
           <Link key={kpi.title} href={kpi.href}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -241,12 +260,14 @@ export default function AdminDashboard() {
       {/* Quick stats */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 text-center">
             {[
               { label: "สินค้าทั้งหมด", value: products.length },
               { label: "หมวดหมู่", value: 15 },
               { label: "สินค้ามีสต็อก", value: products.filter((p) => p.stock_status === "in_stock").length },
               { label: "สินค้า Featured", value: products.filter((p) => p.is_featured).length },
+              { label: "คนเข้าชมทั้งหมด", value: visits?.totalVisitors ?? 0 },
+              { label: "ยอดเข้าชมทั้งหมด", value: visits?.totalViews ?? 0 },
             ].map((s) => (
               <div key={s.label}>
                 <p className="text-2xl font-bold text-[#1A1A1A]">{s.value}</p>

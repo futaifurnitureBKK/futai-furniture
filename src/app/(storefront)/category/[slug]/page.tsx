@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { CategoryPageClient } from "@/components/storefront/CategoryPageClient";
 import { getCategoryBySlug, getProductsByCategory } from "@/lib/products";
+import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -20,6 +21,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    alternates: {
+      canonical: `${SITE_URL}/category/${category.slug}`,
+    },
     openGraph: {
       title,
       description,
@@ -36,5 +40,27 @@ export default async function CategoryPage({ params }: PageProps) {
 
   const products = await getProductsByCategory(slug);
 
-  return <CategoryPageClient category={category} products={products} />;
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "หน้าแรก", item: SITE_URL },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: category.name_th,
+        item: `${SITE_URL}/category/${category.slug}`,
+      },
+    ],
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <CategoryPageClient category={category} products={products} />
+    </>
+  );
 }

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ProductPageClient } from "@/components/storefront/ProductPageClient";
-import { getProductBySku, getProductsByCategory } from "@/lib/products";
+import { getProductBySku, getProductsByCategory, getCategoryBySlug } from "@/lib/products";
 import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
@@ -20,6 +20,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    alternates: {
+      canonical: `${SITE_URL}/product/${product.sku}`,
+    },
     openGraph: {
       title,
       description,
@@ -34,9 +37,36 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProductBySku(sku);
   if (!product || !product.is_active) notFound();
 
-  const related = (await getProductsByCategory(product.category_slug))
-    .filter((p) => p.sku !== sku)
-    .slice(0, 4);
+  const [related, category] = await Promise.all([
+    getProductsByCategory(product.category_slug).then((products) =>
+      products.filter((p) => p.sku !== sku).slice(0, 4)
+    ),
+    getCategoryBySlug(product.category_slug),
+  ]);
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "หน้าแรก", item: SITE_URL },
+      ...(category
+        ? [
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: category.name_th,
+              item: `${SITE_URL}/category/${category.slug}`,
+            },
+          ]
+        : []),
+      {
+        "@type": "ListItem",
+        position: category ? 3 : 2,
+        name: product.name_th,
+        item: `${SITE_URL}/product/${product.sku}`,
+      },
+    ],
+  };
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -64,6 +94,10 @@ export default async function ProductPage({ params }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <ProductPageClient product={product} related={related} />
     </>

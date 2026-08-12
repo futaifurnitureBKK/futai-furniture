@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/admin-auth";
 
 // Parse Shopee image export: rows with product_id, sku, image1, image2, ...
 export async function POST(req: NextRequest) {
+  if (!(await isAdminRequest(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { rows } = await req.json() as { rows: string[][] };
 
   if (!rows || rows.length < 2) {

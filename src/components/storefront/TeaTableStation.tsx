@@ -33,7 +33,7 @@ export function TeaTableStation({ products }: { products: Product[] }) {
 
   return (
     <section className="bg-[#F3EEE4] py-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           className="flex items-end justify-between mb-6 sm:mb-8"
           initial={{ opacity: 0, y: 30 }}

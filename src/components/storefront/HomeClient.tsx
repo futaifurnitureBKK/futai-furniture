@@ -121,9 +121,6 @@ export function HomeClient({
       {/* ── Category nav strip (homepage's single header row) ──────────── */}
       <div className="border-b border-[#E8E5E0] bg-white sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-4">
-          <Link href="/" className="flex-none flex items-center py-2">
-            <Image src="/logo.png" alt="Futai Furniture" width={100} height={40} className="h-8 w-auto object-contain" />
-          </Link>
           <div className="flex overflow-x-auto gap-0 flex-1" style={{ scrollbarWidth: "none" }}>
             {NAV_CATS.map((c) => (
               <Link
@@ -135,7 +132,7 @@ export function HomeClient({
               </Link>
             ))}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <Link href="/search" aria-label={t("ค้นหา", "Search", "搜索")}>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-[#1A1A1A]">
                 <Search size={18} />
@@ -152,6 +149,9 @@ export function HomeClient({
               </Button>
             </Link>
             <LanguageSwitcher variant="dark" className="ml-1" />
+            <Link href="/" className="flex-none flex items-center py-2 ml-1">
+              <Image src="/logo-banner.png" alt="Futai Furniture" width={367} height={103} className="h-8 w-auto object-contain" />
+            </Link>
           </div>
         </div>
       </div>

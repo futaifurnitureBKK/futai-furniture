@@ -156,6 +156,20 @@ export function HomeClient({
         </div>
       </div>
 
+      {/* ── 8.8 Promotion banner ─────────────────────────────────────── */}
+      <Link href="/product/WG-2485" className="block bg-[#C8102E] hover:bg-[#a30d25] transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-center gap-2 text-center">
+          <span className="text-white text-xs sm:text-sm font-semibold">
+            {t(
+              "🔥 โปรโมชั่น 8.8 ชุดโต๊ะน้ำชา Serenity ราคา 9,900 บาท ถึง 15 ส.ค. นี้เท่านั้น",
+              "🔥 8.8 Sale — Serenity Tea Table Set at 9,900 THB, until Aug 15 only",
+              "🔥 8.8大促 — Serenity茶桌套装 9,900泰铢，仅至8月15日"
+            )}
+          </span>
+          <ArrowRight size={14} className="text-white shrink-0" />
+        </div>
+      </Link>
+
       {/* ── Video Hero ───────────────────────────────────────────────── */}
       <section className="relative h-[92vh] min-h-[600px] overflow-hidden bg-[#111]">
         {/* Video loop carousel */}

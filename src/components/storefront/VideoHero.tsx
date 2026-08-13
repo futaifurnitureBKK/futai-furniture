@@ -54,8 +54,8 @@ export function VideoHero() {
     <div className="absolute inset-0">
       <video
         ref={videoRef}
-        className="w-full h-full object-cover"
-        style={{ opacity, transition: "opacity 0.6s ease" }}
+        className="w-full h-full object-cover pointer-events-none"
+        style={{ opacity, transition: "opacity 0.6s ease", touchAction: "pan-y" }}
         autoPlay
         muted
         playsInline

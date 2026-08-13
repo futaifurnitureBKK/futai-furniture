@@ -50,6 +50,26 @@ export function VideoHero() {
     };
   }, [current, goNext]);
 
+  // pause decoding once the hero scrolls out of view — an autoplaying video
+  // left running behind the rest of the page competes with scroll compositing
+  // for CPU/GPU the whole way down, making scrolling feel janky everywhere.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0 }
+    );
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="absolute inset-0">
       <video

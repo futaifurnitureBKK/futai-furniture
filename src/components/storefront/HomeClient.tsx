@@ -254,6 +254,9 @@ export function HomeClient({
                 >
                   {t("โชว์รูม", "Showroom", "展厅")}
                 </Link>
+                <Link href="/" className="shrink-0 h-12 w-12 overflow-hidden rounded-md">
+                  <Image src="/icon.png" alt="Futai Furniture" width={512} height={512} className="h-full w-full object-cover" />
+                </Link>
               </motion.div>
             </div>
           </div>

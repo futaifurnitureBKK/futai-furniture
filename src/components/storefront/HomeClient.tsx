@@ -470,7 +470,10 @@ export function HomeClient({
         <div className="bg-white border-t border-[#E8E5E0]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div>
-              <p className="text-[#1A1A1A] font-bold text-base mb-0.5">{t("โชว์รูม ฟูไท่ เฟอร์นิเจอร์", "Futai Furniture Showroom", "富泰家具展厅")}</p>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-[#1A1A1A] font-bold text-base">{t("โชว์รูม ฟูไท่ เฟอร์นิเจอร์", "Futai Furniture Showroom", "富泰家具展厅")}</p>
+                <Image src="/logo-banner.png" alt="Futai Furniture" width={367} height={103} className="h-6 w-auto object-contain" />
+              </div>
               <p className="text-[#999] text-sm">{t("ลำลูกกา ปทุมธานี · จ–ส 9:00–18:00", "Lam Luk Ka, Pathum Thani · Mon–Sat 9:00–18:00", "兰鲁卡，巴吞他尼 · 周一至周六 9:00–18:00")}</p>
             </div>
             <div className="flex gap-3 flex-wrap">

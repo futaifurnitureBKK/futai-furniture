@@ -80,7 +80,7 @@ export function CatalogFlipbook() {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div ref={containerRef} className="w-full max-w-5xl">
+      <div ref={containerRef} className="w-full max-w-[1400px]">
         {containerWidth > 0 && (
           <Document
             file="/catalog.pdf"
@@ -106,9 +106,9 @@ export function CatalogFlipbook() {
                 height={pageHeight}
                 size="stretch"
                 minWidth={200}
-                maxWidth={1000}
+                maxWidth={1400}
                 minHeight={280}
-                maxHeight={1400}
+                maxHeight={1980}
                 showCover
                 mobileScrollSupport
                 usePortrait

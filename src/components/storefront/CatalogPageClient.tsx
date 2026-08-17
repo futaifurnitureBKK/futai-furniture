@@ -23,7 +23,7 @@ export function CatalogPageClient() {
 
   return (
     <div className="bg-[#FAF7F2] min-h-screen pt-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
         <div className="text-center mb-8">
           <p className="text-[#C8102E] text-xs tracking-[0.3em] uppercase font-semibold mb-3">
             {t("แคตตาล็อกสินค้า", "Product Catalog", "产品目录")}

@@ -18,6 +18,7 @@ const HTMLFlipBook = HTMLFlipBookImport as unknown as ComponentType<Record<strin
 // plain placeholder instead of running pdf.js — keeps a 100+ page catalog
 // light on mobile since only a handful of canvases exist at once.
 const RENDER_WINDOW = 2;
+const PORTRAIT_BREAKPOINT = 820;
 
 const CatalogPage = forwardRef<
   HTMLDivElement,
@@ -44,7 +45,7 @@ export function CatalogFlipbook() {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<{ pageFlip?: () => { flipPrev: () => void; flipNext: () => void } } | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [aspect, setAspect] = useState(0.707); // width/height, refined once page 1 loads
@@ -53,18 +54,27 @@ export function CatalogFlipbook() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setContainerWidth(el.clientWidth);
+    const update = () => setContainerSize({ width: el.clientWidth, height: el.clientHeight });
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const isPortraitLayout = containerWidth > 0 && containerWidth < 820;
-  const pageWidth = containerWidth > 0
-    ? Math.floor((isPortraitLayout ? containerWidth : containerWidth / 2) - 4)
-    : 0;
-  const pageHeight = Math.floor(pageWidth / aspect);
+  const { width: containerWidth, height: containerHeight } = containerSize;
+  const isPortraitLayout = containerWidth > 0 && containerWidth < PORTRAIT_BREAKPOINT;
+
+  // Fit inside the available box on both axes — whichever dimension is
+  // tighter (width or height) decides the final page size, so the whole
+  // spread is always visible without scrolling.
+  let pageWidth = 0;
+  let pageHeight = 0;
+  if (containerWidth > 0 && containerHeight > 0) {
+    const widthBudget = (isPortraitLayout ? containerWidth : containerWidth / 2) - 4;
+    const heightBudget = containerHeight * aspect;
+    pageWidth = Math.floor(Math.min(widthBudget, heightBudget));
+    pageHeight = Math.floor(pageWidth / aspect);
+  }
 
   const handleFirstPageLoad = useCallback(
     (page: { originalWidth?: number; originalHeight?: number; width: number; height: number }) => {
@@ -79,21 +89,21 @@ export function CatalogFlipbook() {
   const goNext = () => bookRef.current?.pageFlip?.().flipNext();
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div ref={containerRef} className="w-full max-w-[1400px]">
+    <div className="flex flex-col h-full">
+      <div ref={containerRef} className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
         {containerWidth > 0 && (
           <Document
             file="/catalog.pdf"
             onLoadSuccess={({ numPages }) => setNumPages(numPages)}
             onLoadProgress={({ loaded, total }) => setLoadProgress(total ? loaded / total : 0)}
             loading={
-              <div className="flex flex-col items-center justify-center h-[60vh] gap-3 text-[#999]">
+              <div className="flex flex-col items-center justify-center gap-3 text-[#999]">
                 <Loader2 className="animate-spin" size={28} />
                 <p className="text-sm">{Math.round(loadProgress * 100)}%</p>
               </div>
             }
             error={
-              <div className="flex items-center justify-center h-[60vh] text-[#999] text-sm">
+              <div className="flex items-center justify-center text-[#999] text-sm">
                 {t("โหลดแคตตาล็อกไม่สำเร็จ", "Failed to load catalog", "加载目录失败")}
               </div>
             }
@@ -104,11 +114,11 @@ export function CatalogFlipbook() {
                 ref={bookRef}
                 width={pageWidth}
                 height={pageHeight}
-                size="stretch"
+                size="fixed"
                 minWidth={200}
-                maxWidth={1400}
+                maxWidth={3000}
                 minHeight={280}
-                maxHeight={1980}
+                maxHeight={4000}
                 showCover
                 mobileScrollSupport
                 usePortrait
@@ -146,7 +156,7 @@ export function CatalogFlipbook() {
       </div>
 
       {numPages > 0 && (
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-center gap-4 py-3 shrink-0">
           <button
             type="button"
             onClick={goPrev}

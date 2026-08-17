@@ -41,7 +41,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>โทรศัพท์</Label>
-            <Input className="mt-1" defaultValue="063 826 1333" />
+            <Input className="mt-1" defaultValue="061 898 0412" />
           </div>
           <div>
             <Label>LINE OA ID</Label>

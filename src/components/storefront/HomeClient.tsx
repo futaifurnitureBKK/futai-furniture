@@ -480,8 +480,8 @@ export function HomeClient({
               <Link href="/showroom" className="bg-[#1A1A1A] hover:bg-[#C8102E] text-white text-sm font-bold px-6 h-10 flex items-center transition-colors">
                 {t("ดูแผนที่", "View Map", "查看地图")}
               </Link>
-              <a href="tel:0638261333" className="border border-[#E8E5E0] hover:border-[#C8102E] text-[#444] hover:text-[#C8102E] text-sm px-6 h-10 flex items-center transition-colors">
-                063-826-1333
+              <a href="tel:0618980412" className="border border-[#E8E5E0] hover:border-[#C8102E] text-[#444] hover:text-[#C8102E] text-sm px-6 h-10 flex items-center transition-colors">
+                061-898-0412
               </a>
               <a href="https://line.me/ti/p/KJFKqUTMk-" target="_blank" rel="noopener noreferrer" className="bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-bold px-6 h-10 flex items-center transition-colors">
                 LINE OA

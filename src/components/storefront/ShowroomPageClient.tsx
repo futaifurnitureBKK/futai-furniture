@@ -72,8 +72,8 @@ export function ShowroomPageClient() {
                 </h2>
                 <ul className="space-y-3 text-sm">
                   <li>
-                    <a href="tel:0638261333" className="text-[#C8102E] hover:underline font-medium">
-                      063 826 1333
+                    <a href="tel:0618980412" className="text-[#C8102E] hover:underline font-medium">
+                      061 898 0412
                     </a>
                   </li>
                   <li>

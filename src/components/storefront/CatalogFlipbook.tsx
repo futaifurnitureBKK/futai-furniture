@@ -4,7 +4,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import HTMLFlipBookImport from "react-pageflip";
-import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -176,14 +176,6 @@ export function CatalogFlipbook() {
           >
             <ChevronRight size={18} />
           </button>
-          <a
-            href="/catalog.pdf"
-            download
-            className="ml-2 inline-flex items-center gap-1.5 text-[#C8102E] text-sm font-semibold hover:underline"
-          >
-            <Download size={15} />
-            {t("ดาวน์โหลด PDF", "Download PDF", "下载 PDF")}
-          </a>
         </div>
       )}
     </div>

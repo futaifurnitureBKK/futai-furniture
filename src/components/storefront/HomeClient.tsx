@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { ArrowRight, ChevronRight, Search, ShoppingCart } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, Search, ShoppingCart } from "lucide-react";
 import { ProductCard } from "@/components/storefront/ProductCard";
 import { CategoryTile } from "@/components/storefront/CategoryTile";
 import { VideoHero } from "@/components/storefront/VideoHero";
@@ -265,6 +265,13 @@ export function HomeClient({
                     <path d="M12 2C6.48 2 2 5.66 2 10.17c0 4.05 3.55 7.44 8.35 8.08.33.07.77.22.88.5.1.26.07.66.03.92l-.14.86c-.04.26-.2 1 .87.55 1.07-.46 5.77-3.4 7.87-5.82C21.3 13.6 22 12 22 10.17 22 5.66 17.52 2 12 2Zm-3.5 10.7H7.02a.35.35 0 0 1-.35-.35V8.03c0-.19.16-.35.35-.35s.35.16.35.35v3.97h1.13c.2 0 .35.16.35.35s-.15.35-.35.35Zm1.68-.35c0 .19-.16.35-.35.35s-.35-.16-.35-.35V8.03c0-.19.16-.35.35-.35s.35.16.35.35v4.32Zm4.28 0c0 .15-.1.28-.24.33a.35.35 0 0 1-.39-.12l-2-2.71v2.5c0 .19-.15.35-.35.35a.35.35 0 0 1-.35-.35V8.03c0-.15.1-.28.24-.33a.32.32 0 0 1 .11-.02c.11 0 .22.05.28.14l2 2.71v-2.5c0-.19.16-.35.35-.35s.35.16.35.35v4.32Zm2.79-2.51c.2 0 .35.16.35.35s-.15.35-.35.35h-1.48v1.11h1.48c.2 0 .35.16.35.35s-.15.35-.35.35h-1.83a.35.35 0 0 1-.35-.35V8.03c0-.19.16-.35.35-.35h1.83c.2 0 .35.16.35.35s-.15.35-.35.35h-1.48v1.11h1.48Z" />
                   </svg>
                 </a>
+                <Link
+                  href="/catalog"
+                  className="inline-flex items-center gap-2 border border-white/40 hover:border-white hover:bg-white/10 text-white text-sm px-6 h-12 transition-all"
+                >
+                  <BookOpen size={18} />
+                  {t("แคตตาล็อก", "Catalog", "产品目录")}
+                </Link>
               </motion.div>
             </div>
           </div>

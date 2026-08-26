@@ -18,7 +18,6 @@ const HTMLFlipBook = HTMLFlipBookImport as unknown as ComponentType<Record<strin
 // plain placeholder instead of running pdf.js — keeps a 100+ page catalog
 // light on mobile since only a handful of canvases exist at once.
 const RENDER_WINDOW = 2;
-const PORTRAIT_BREAKPOINT = 820;
 
 const CatalogPage = forwardRef<
   HTMLDivElement,
@@ -62,15 +61,14 @@ export function CatalogFlipbook() {
   }, []);
 
   const { width: containerWidth, height: containerHeight } = containerSize;
-  const isPortraitLayout = containerWidth > 0 && containerWidth < PORTRAIT_BREAKPOINT;
 
-  // Fit inside the available box on both axes — whichever dimension is
-  // tighter (width or height) decides the final page size, so the whole
-  // spread is always visible without scrolling.
+  // Always show one large page at a time (never split into a two-page
+  // spread) — a single page filling the available box reads far better
+  // for a product catalog than two half-width pages side by side.
   let pageWidth = 0;
   let pageHeight = 0;
   if (containerWidth > 0 && containerHeight > 0) {
-    const widthBudget = (isPortraitLayout ? containerWidth : containerWidth / 2) - 4;
+    const widthBudget = containerWidth - 4;
     const heightBudget = containerHeight * aspect;
     pageWidth = Math.floor(Math.min(widthBudget, heightBudget));
     pageHeight = Math.floor(pageWidth / aspect);

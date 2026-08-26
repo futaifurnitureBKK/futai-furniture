@@ -95,81 +95,86 @@ export function CatalogFlipbook() {
 
   return (
     <div className="flex flex-col h-full">
-      <div
-        ref={containerRef}
-        className={
-          isZoomed
-            ? "flex-1 min-h-0 w-full overflow-auto touch-pan-x touch-pan-y"
-            : "flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden"
-        }
-      >
-        {containerWidth > 0 && (
-          <Document
-            file="/catalog.pdf"
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            onLoadProgress={({ loaded, total }) => setLoadProgress(total ? loaded / total : 0)}
-            loading={
-              <div className="flex flex-col items-center justify-center gap-3 text-[#999]">
-                <Loader2 className="animate-spin" size={28} />
-                <p className="text-sm">{Math.round(loadProgress * 100)}%</p>
-              </div>
-            }
-            error={
-              <div className="flex items-center justify-center text-[#999] text-sm">
-                {t("โหลดแคตตาล็อกไม่สำเร็จ", "Failed to load catalog", "加载目录失败")}
-              </div>
-            }
-          >
-            {numPages > 0 && pageWidth > 0 && (
-              <div
-                style={{ transform: `scale(${zoom})`, transformOrigin: isZoomed ? "top center" : "center" }}
-                className={isZoomed ? "w-fit mx-auto my-4" : undefined}
-              >
-                <HTMLFlipBook
-                  key={`${pageWidth}x${pageHeight}`}
-                  ref={bookRef}
-                  width={pageWidth}
-                  height={pageHeight}
-                  size="fixed"
-                  minWidth={200}
-                  maxWidth={3000}
-                  minHeight={280}
-                  maxHeight={4000}
-                  showCover
-                  mobileScrollSupport
-                  usePortrait
-                  drawShadow
-                  flippingTime={700}
-                  className="mx-auto"
-                  startPage={0}
-                  startZIndex={0}
-                  autoSize
-                  maxShadowOpacity={0.5}
-                  clickEventForward
-                  useMouseEvents
-                  swipeDistance={30}
-                  showPageCorners
-                  disableFlipByClick={false}
-                  onFlip={(e: { data: number }) => setCurrentPage(e.data)}
+      <div ref={containerRef} className="flex-1 min-h-0 w-full overflow-hidden">
+        {/* Kept separate from containerRef so toggling scroll/overflow for
+            zoom never changes the box the ResizeObserver measures — doing
+            that in-place fed back into pageWidth/pageHeight, which remounted
+            the flipbook and could loop into a crash. */}
+        <div
+          className={
+            isZoomed
+              ? "w-full h-full overflow-auto touch-pan-x touch-pan-y"
+              : "w-full h-full flex items-center justify-center"
+          }
+        >
+          {containerWidth > 0 && (
+            <Document
+              file="/catalog.pdf"
+              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              onLoadProgress={({ loaded, total }) => setLoadProgress(total ? loaded / total : 0)}
+              loading={
+                <div className="flex flex-col items-center justify-center gap-3 text-[#999]">
+                  <Loader2 className="animate-spin" size={28} />
+                  <p className="text-sm">{Math.round(loadProgress * 100)}%</p>
+                </div>
+              }
+              error={
+                <div className="flex items-center justify-center text-[#999] text-sm">
+                  {t("โหลดแคตตาล็อกไม่สำเร็จ", "Failed to load catalog", "加载目录失败")}
+                </div>
+              }
+            >
+              {numPages > 0 && pageWidth > 0 && (
+                <div
+                  style={{ transform: `scale(${zoom})`, transformOrigin: isZoomed ? "top center" : "center" }}
+                  className={isZoomed ? "w-fit mx-auto my-4" : undefined}
                 >
-                  {Array.from({ length: numPages }, (_, i) => {
-                    const pageNumber = i + 1;
-                    const active = Math.abs(i - currentPage) <= RENDER_WINDOW;
-                    return (
-                      <CatalogPage
-                        key={pageNumber}
-                        pageNumber={pageNumber}
-                        width={pageWidth}
-                        active={active}
-                        onFirstLoad={i === 0 ? handleFirstPageLoad : undefined}
-                      />
-                    );
-                  })}
-                </HTMLFlipBook>
-              </div>
-            )}
-          </Document>
-        )}
+                  <HTMLFlipBook
+                    key={`${pageWidth}x${pageHeight}`}
+                    ref={bookRef}
+                    width={pageWidth}
+                    height={pageHeight}
+                    size="fixed"
+                    minWidth={200}
+                    maxWidth={3000}
+                    minHeight={280}
+                    maxHeight={4000}
+                    showCover
+                    mobileScrollSupport
+                    usePortrait
+                    drawShadow
+                    flippingTime={700}
+                    className="mx-auto"
+                    startPage={0}
+                    startZIndex={0}
+                    autoSize
+                    maxShadowOpacity={0.5}
+                    clickEventForward
+                    useMouseEvents
+                    swipeDistance={30}
+                    showPageCorners
+                    disableFlipByClick={false}
+                    onFlip={(e: { data: number }) => setCurrentPage(e.data)}
+                  >
+                    {Array.from({ length: numPages }, (_, i) => {
+                      const pageNumber = i + 1;
+                      const active = Math.abs(i - currentPage) <= RENDER_WINDOW;
+                      return (
+                        <CatalogPage
+                          key={pageNumber}
+                          pageNumber={pageNumber}
+                          width={pageWidth}
+                          active={active}
+                          onFirstLoad={i === 0 ? handleFirstPageLoad : undefined}
+                        />
+                      );
+                    })}
+                  </HTMLFlipBook>
+                </div>
+              )}
+            </Document>
+          )}
+        </div>
       </div>
 
       {numPages > 0 && (

@@ -78,6 +78,15 @@ export function CatalogFlipbook() {
     pageHeight = Math.floor(pageWidth / aspect);
   }
 
+  // Zoom resizes the book for real (new width/height fed straight into
+  // react-pageflip and pdf.js) instead of a CSS transform: scale() —
+  // react-pageflip runs its own ResizeObserver internally, and scaling an
+  // ancestor changed the box it measured, fighting our own sizing logic
+  // and crashing the page. Real dimensions sidestep that entirely, and
+  // pdf.js re-rendering at the larger size is sharper than a CSS upscale.
+  const displayWidth = Math.floor(pageWidth * zoom);
+  const displayHeight = Math.floor(pageHeight * zoom);
+
   const handleFirstPageLoad = useCallback(
     (page: { originalWidth?: number; originalHeight?: number; width: number; height: number }) => {
       const w = page.originalWidth || page.width;
@@ -124,16 +133,13 @@ export function CatalogFlipbook() {
                 </div>
               }
             >
-              {numPages > 0 && pageWidth > 0 && (
-                <div
-                  style={{ transform: `scale(${zoom})`, transformOrigin: isZoomed ? "top center" : "center" }}
-                  className={isZoomed ? "w-fit mx-auto my-4" : undefined}
-                >
+              {numPages > 0 && displayWidth > 0 && (
+                <div className={isZoomed ? "w-fit mx-auto my-4" : undefined}>
                   <HTMLFlipBook
-                    key={`${pageWidth}x${pageHeight}`}
+                    key={`${displayWidth}x${displayHeight}`}
                     ref={bookRef}
-                    width={pageWidth}
-                    height={pageHeight}
+                    width={displayWidth}
+                    height={displayHeight}
                     size="fixed"
                     minWidth={200}
                     maxWidth={3000}
@@ -145,9 +151,8 @@ export function CatalogFlipbook() {
                     drawShadow
                     flippingTime={700}
                     className="mx-auto"
-                    startPage={0}
+                    startPage={currentPage}
                     startZIndex={0}
-                    autoSize
                     maxShadowOpacity={0.5}
                     clickEventForward
                     useMouseEvents
@@ -163,7 +168,7 @@ export function CatalogFlipbook() {
                         <CatalogPage
                           key={pageNumber}
                           pageNumber={pageNumber}
-                          width={pageWidth}
+                          width={displayWidth}
                           active={active}
                           onFirstLoad={i === 0 ? handleFirstPageLoad : undefined}
                         />

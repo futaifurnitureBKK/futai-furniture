@@ -4,7 +4,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import HTMLFlipBookImport from "react-pageflip";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -18,6 +18,9 @@ const HTMLFlipBook = HTMLFlipBookImport as unknown as ComponentType<Record<strin
 // plain placeholder instead of running pdf.js — keeps a 100+ page catalog
 // light on mobile since only a handful of canvases exist at once.
 const RENDER_WINDOW = 2;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.25;
 
 const CatalogPage = forwardRef<
   HTMLDivElement,
@@ -49,6 +52,7 @@ export function CatalogFlipbook() {
   const [currentPage, setCurrentPage] = useState(0);
   const [aspect, setAspect] = useState(0.707); // width/height, refined once page 1 loads
   const [loadProgress, setLoadProgress] = useState(0);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -85,10 +89,20 @@ export function CatalogFlipbook() {
 
   const goPrev = () => bookRef.current?.pageFlip?.().flipPrev();
   const goNext = () => bookRef.current?.pageFlip?.().flipNext();
+  const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(2)));
+  const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(2)));
+  const isZoomed = zoom > 1;
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={containerRef} className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+      <div
+        ref={containerRef}
+        className={
+          isZoomed
+            ? "flex-1 min-h-0 w-full overflow-auto touch-pan-x touch-pan-y"
+            : "flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden"
+        }
+      >
         {containerWidth > 0 && (
           <Document
             file="/catalog.pdf"
@@ -107,54 +121,59 @@ export function CatalogFlipbook() {
             }
           >
             {numPages > 0 && pageWidth > 0 && (
-              <HTMLFlipBook
-                key={`${pageWidth}x${pageHeight}`}
-                ref={bookRef}
-                width={pageWidth}
-                height={pageHeight}
-                size="fixed"
-                minWidth={200}
-                maxWidth={3000}
-                minHeight={280}
-                maxHeight={4000}
-                showCover
-                mobileScrollSupport
-                usePortrait
-                drawShadow
-                flippingTime={700}
-                className="mx-auto"
-                startPage={0}
-                startZIndex={0}
-                autoSize
-                maxShadowOpacity={0.5}
-                clickEventForward
-                useMouseEvents
-                swipeDistance={30}
-                showPageCorners
-                disableFlipByClick={false}
-                onFlip={(e: { data: number }) => setCurrentPage(e.data)}
+              <div
+                style={{ transform: `scale(${zoom})`, transformOrigin: isZoomed ? "top center" : "center" }}
+                className={isZoomed ? "w-fit mx-auto my-4" : undefined}
               >
-                {Array.from({ length: numPages }, (_, i) => {
-                  const pageNumber = i + 1;
-                  const active = Math.abs(i - currentPage) <= RENDER_WINDOW;
-                  return (
-                    <CatalogPage
-                      key={pageNumber}
-                      pageNumber={pageNumber}
-                      width={pageWidth}
-                      active={active}
-                      onFirstLoad={i === 0 ? handleFirstPageLoad : undefined}
-                    />
-                  );
-                })}
-              </HTMLFlipBook>
+                <HTMLFlipBook
+                  key={`${pageWidth}x${pageHeight}`}
+                  ref={bookRef}
+                  width={pageWidth}
+                  height={pageHeight}
+                  size="fixed"
+                  minWidth={200}
+                  maxWidth={3000}
+                  minHeight={280}
+                  maxHeight={4000}
+                  showCover
+                  mobileScrollSupport
+                  usePortrait
+                  drawShadow
+                  flippingTime={700}
+                  className="mx-auto"
+                  startPage={0}
+                  startZIndex={0}
+                  autoSize
+                  maxShadowOpacity={0.5}
+                  clickEventForward
+                  useMouseEvents
+                  swipeDistance={30}
+                  showPageCorners
+                  disableFlipByClick={false}
+                  onFlip={(e: { data: number }) => setCurrentPage(e.data)}
+                >
+                  {Array.from({ length: numPages }, (_, i) => {
+                    const pageNumber = i + 1;
+                    const active = Math.abs(i - currentPage) <= RENDER_WINDOW;
+                    return (
+                      <CatalogPage
+                        key={pageNumber}
+                        pageNumber={pageNumber}
+                        width={pageWidth}
+                        active={active}
+                        onFirstLoad={i === 0 ? handleFirstPageLoad : undefined}
+                      />
+                    );
+                  })}
+                </HTMLFlipBook>
+              </div>
             )}
           </Document>
         )}
       </div>
 
       {numPages > 0 && (
-        <div className="flex items-center justify-center gap-4 py-3 shrink-0">
+        <div className="flex items-center justify-center gap-4 py-3 shrink-0 flex-wrap">
           <button
             type="button"
             onClick={goPrev}
@@ -174,6 +193,30 @@ export function CatalogFlipbook() {
           >
             <ChevronRight size={18} />
           </button>
+
+          <div className="flex items-center gap-2 pl-4 ml-1 border-l border-[#E8E5E0]">
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              aria-label={t("ซูมออก", "Zoom out", "缩小")}
+              className="w-10 h-10 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#444] flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:border-[#E8E5E0] disabled:hover:text-[#444]"
+            >
+              <ZoomOut size={18} />
+            </button>
+            <span className="text-sm text-[#666] font-mono min-w-12 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              aria-label={t("ซูมเข้า", "Zoom in", "放大")}
+              className="w-10 h-10 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#444] flex items-center justify-center transition-colors disabled:opacity-30 disabled:hover:border-[#E8E5E0] disabled:hover:text-[#444]"
+            >
+              <ZoomIn size={18} />
+            </button>
+          </div>
         </div>
       )}
     </div>

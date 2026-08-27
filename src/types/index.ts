@@ -9,6 +9,36 @@ export type OrderStatus =
 export type QuoteStatus = "pending" | "quoted" | "converted" | "archived";
 export type DeliveryMethod = "pickup" | "delivery";
 
+export type LeadChannel = "facebook" | "shopee" | "tiktok" | "line" | "other";
+export type LeadSegment = "b2b" | "b2c";
+export type LeadStatus =
+  | "new"
+  | "followed_1"
+  | "followed_2plus"
+  | "engaged"
+  | "quoted"
+  | "converted"
+  | "lost";
+export type LeadContactMethod = "line" | "phone" | "email" | "messenger";
+
+export interface Lead {
+  id: number;
+  lead_date: string;
+  customer_name: string;
+  channel: LeadChannel;
+  segment: LeadSegment;
+  sku: string | null;
+  status: LeadStatus;
+  contact_method: LeadContactMethod | null;
+  notes: string;
+  next_followup_date: string | null;
+  deal_value: number | null;
+  lost_reason: string | null;
+  converted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Category {
   id: string;
   slug: string;

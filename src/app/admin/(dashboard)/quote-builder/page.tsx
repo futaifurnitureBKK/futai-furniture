@@ -19,6 +19,7 @@ interface LineItem {
   unit: string;
   unitPrice: number;
   remark: string;
+  image: string | null;
 }
 
 const DOC_LABELS: Record<DocType, { th: string; en: string; zh: string; prefix: string }> = {
@@ -47,6 +48,7 @@ function newLine(): LineItem {
     unit: "ชุด",
     unitPrice: 0,
     remark: "",
+    image: null,
   };
 }
 
@@ -98,11 +100,16 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
                 setQuery("");
                 setOpen(false);
               }}
-              className="block w-full text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
+              className="w-full flex items-center gap-2 text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
             >
-              <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{m.sku}</p>
-              <p className="text-[11px] text-[#6B6B6B] truncate">{m.category} · {m.size}</p>
-              <p className="text-[11px] text-[#C8102E] font-medium">{m.priceLabel}</p>
+              <div className="relative w-9 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
+                {m.image && <Image src={m.image} alt="" fill sizes="36px" className="object-cover" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{m.sku}</p>
+                <p className="text-[11px] text-[#6B6B6B] truncate">{m.category} · {m.size}</p>
+                <p className="text-[11px] text-[#C8102E] font-medium">{m.priceLabel}</p>
+              </div>
             </button>
           ))}
         </div>
@@ -147,6 +154,7 @@ export default function QuoteBuilderPage() {
       sku: entry.sku,
       size: entry.size,
       unitPrice: entry.price ?? 0,
+      image: entry.image,
     });
   }
 
@@ -251,7 +259,16 @@ export default function QuoteBuilderPage() {
                   </button>
                 </div>
 
-                <ProductPicker onPick={(entry) => pickProduct(it.id, entry)} />
+                <div className="flex gap-2">
+                  {it.image && (
+                    <div className="relative w-12 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                      <Image src={it.image} alt="" fill sizes="48px" className="object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <ProductPicker onPick={(entry) => pickProduct(it.id, entry)} />
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <Input
@@ -409,7 +426,15 @@ export default function QuoteBuilderPage() {
                     <td className="border border-[#E8E5E0] p-1">{idx + 1}</td>
                     <td className="border border-[#E8E5E0] p-1 text-left">{it.name || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1 font-mono">{it.sku || "-"}</td>
-                    <td className="border border-[#E8E5E0] p-1 text-[#C8C5BE]">-</td>
+                    <td className="border border-[#E8E5E0] p-1">
+                      {it.image ? (
+                        <div className="relative w-12 h-12 mx-auto">
+                          <Image src={it.image} alt="" fill sizes="48px" className="object-cover" />
+                        </div>
+                      ) : (
+                        <span className="text-[#C8C5BE]">-</span>
+                      )}
+                    </td>
                     <td className="border border-[#E8E5E0] p-1">{it.size || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1">{it.qty}</td>
                     <td className="border border-[#E8E5E0] p-1">{it.unit}</td>

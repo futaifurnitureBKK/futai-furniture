@@ -9,6 +9,8 @@ export interface PriceCatalogEntry {
   priceLabel: string;
   /** Best-effort numeric price (first amount found in priceLabel), or null if it couldn't be parsed cleanly. */
   price: number | null;
+  /** Public path to a compressed product photo, or null if the sheet had none for this row. */
+  image: string | null;
 }
 
 export const PRICE_CATALOG: PriceCatalogEntry[] = [
@@ -17,1203 +19,1375 @@ export const PRICE_CATALOG: PriceCatalogEntry[] = [
     "category": "老板桌 Boss Office Desk",
     "size": "W1800*D1600*H750",
     "priceLabel": "฿13,500",
-    "price": 13500
+    "price": 13500,
+    "image": null
   },
   {
     "sku": "FL-ZZ-104",
     "category": "老板桌 Boss Office Desk",
     "size": "W2000*D1800*H750",
     "priceLabel": "฿25,200",
-    "price": 25200
+    "price": 25200,
+    "image": "/catalog-images/fl-zz-104.webp"
   },
   {
     "sku": "QS-02",
     "category": "老板桌 Boss Office Desk",
     "size": "2800*2100*768",
     "priceLabel": "฿41,325",
-    "price": 41325
+    "price": 41325,
+    "image": "/catalog-images/qs-02.webp"
   },
   {
     "sku": "FL-ZZ-70B",
     "category": "老板桌 Boss Office Desk",
     "size": "W2000/2200*D1600*H750",
     "priceLabel": "฿14,250",
-    "price": 14250
+    "price": 14250,
+    "image": null
   },
   {
     "sku": "FL-ZZ-104",
     "category": "老板桌 Boss Office Desk",
     "size": "W2200*D1800*H750",
     "priceLabel": "฿25,980",
-    "price": 25980
+    "price": 25980,
+    "image": "/catalog-images/fl-zz-104-4.webp"
   },
   {
     "sku": "FL-ZZ-70B",
     "category": "老板桌 Boss Office Desk",
     "size": "W2400/2600*D1800*H750",
     "priceLabel": "฿15,000",
-    "price": 15000
+    "price": 15000,
+    "image": null
   },
   {
     "sku": "FL-ZZ-104",
     "category": "老板桌 Boss Office Desk",
     "size": "W2400*D1800*H750",
     "priceLabel": "฿26,760",
-    "price": 26760
+    "price": 26760,
+    "image": "/catalog-images/fl-zz-104-6.webp"
   },
   {
     "sku": "FL-RG-T10A",
     "category": "老板桌 Boss Office Desk",
     "size": "2400*1825*760",
     "priceLabel": "฿29,925",
-    "price": 29925
+    "price": 29925,
+    "image": "/catalog-images/fl-rg-t10a.webp"
   },
   {
     "sku": "FL-ZZ-70B",
     "category": "老板桌 Boss Office Desk",
     "size": "W3000*D1800*H750",
     "priceLabel": "฿20,250",
-    "price": 20250
+    "price": 20250,
+    "image": null
   },
   {
     "sku": "FL-ZZ-104",
     "category": "老板桌 Boss Office Desk",
     "size": "W3000*D1800*H750",
     "priceLabel": "฿31,500",
-    "price": 31500
+    "price": 31500,
+    "image": "/catalog-images/fl-zz-104-9.webp"
   },
   {
     "sku": "日规-T02主管桌",
     "category": "老板桌 Boss Office Desk",
     "size": "2000*1600*750",
     "priceLabel": "฿10,500",
-    "price": 10500
+    "price": 10500,
+    "image": "/catalog-images/t02.webp"
   },
   {
     "sku": "QC-D1801",
     "category": "老板桌 Boss Office Desk",
     "size": "1800*1600*750",
     "priceLabel": "฿10,500",
-    "price": 10500
+    "price": 10500,
+    "image": "/catalog-images/qc-d1801.webp"
   },
   {
     "sku": "FL-MD-T02 （右）",
     "category": "老板桌 Boss Office Desk",
     "size": "1800*1550*750",
     "priceLabel": "฿15,750",
-    "price": 15750
+    "price": 15750,
+    "image": "/catalog-images/fl-md-t02.webp"
   },
   {
     "sku": "日规-T02主管桌",
     "category": "老板桌 Boss Office Desk",
     "size": "1800*1600*750",
     "priceLabel": "฿9,525",
-    "price": 9525
+    "price": 9525,
+    "image": "/catalog-images/t02-13.webp"
   },
   {
     "sku": "wy63d1808",
     "category": "老板桌 Boss Office Desk",
     "size": "1800*1600*750",
     "priceLabel": "฿8,985",
-    "price": 8985
+    "price": 8985,
+    "image": "/catalog-images/wy63d1808.webp"
   },
   {
     "sku": "日规-C02 书柜",
     "category": "背景柜",
     "size": "W2000*D400*H2000",
     "priceLabel": "฿15,675",
-    "price": 15675
+    "price": 15675,
+    "image": "/catalog-images/c02.webp"
   },
   {
     "sku": "FLGZ-71C",
     "category": "背景柜",
     "size": "W2400*D400*H2000",
     "priceLabel": "฿18,000",
-    "price": 18000
+    "price": 18000,
+    "image": "/catalog-images/flgz-71c.webp"
   },
   {
     "sku": "QC-S2001",
     "category": "背景柜",
     "size": "2000*400*2000",
     "priceLabel": "฿11,070",
-    "price": 11070
+    "price": 11070,
+    "image": "/catalog-images/qc-s2001.webp"
   },
   {
     "sku": "KY-SG2-801",
     "category": "背景柜",
     "size": "800*400*2000",
     "priceLabel": "฿7,200",
-    "price": 7200
+    "price": 7200,
+    "image": "/catalog-images/ky-sg2-801.webp"
   },
   {
     "sku": "FL-MD-MT02",
     "category": "会议桌 Meeting /Conference Table",
     "size": "3600W*1400D*750H",
     "priceLabel": "฿32,100",
-    "price": 32100
+    "price": 32100,
+    "image": "/catalog-images/fl-md-mt02.webp"
   },
   {
     "sku": "NXLH66A-36",
     "category": "会议桌 Meeting /Conference Table",
     "size": "3600*1500*750",
     "priceLabel": "฿16,200",
-    "price": 16200
+    "price": 16200,
+    "image": "/catalog-images/nxlh66a-36.webp"
   },
   {
     "sku": "Y2505220",
     "category": "会议桌 Meeting /Conference Table",
     "size": "2400*1200*750",
     "priceLabel": "฿7,995",
-    "price": 7995
+    "price": 7995,
+    "image": "/catalog-images/y2505220.webp"
   },
   {
     "sku": "日规-MT02 会议桌",
     "category": "会议桌 Meeting /Conference Table",
     "size": "2800*1200*750",
     "priceLabel": "฿10,920",
-    "price": 10920
+    "price": 10920,
+    "image": "/catalog-images/mt02.webp"
   },
   {
     "sku": "NXLH66A-42",
     "category": "会议桌 Meeting /Conference Table",
     "size": "4200*1500*750",
     "priceLabel": "฿19,200",
-    "price": 19200
+    "price": 19200,
+    "image": "/catalog-images/nxlh66a-42.webp"
   },
   {
     "sku": "KY-M2401",
     "category": "会议桌 Meeting /Conference Table",
     "size": "2400*1200*750",
     "priceLabel": "฿9,000",
-    "price": 9000
+    "price": 9000,
+    "image": "/catalog-images/ky-m2401.webp"
   },
   {
     "sku": "日规-MT02 会议桌",
     "category": "会议桌 Meeting /Conference Table",
     "size": "3200*1200*750",
     "priceLabel": "฿13,305",
-    "price": 13305
+    "price": 13305,
+    "image": "/catalog-images/mt02-25.webp"
   },
   {
     "sku": "NXLH66A-48",
     "category": "会议桌 Meeting /Conference Table",
     "size": "4800*1600*750",
     "priceLabel": "฿22,200",
-    "price": 22200
+    "price": 22200,
+    "image": "/catalog-images/nxlh66a-48.webp"
   },
   {
     "sku": "FT-M4801",
     "category": "会议桌 Meeting /Conference Table",
     "size": "4800*1500*750",
     "priceLabel": "฿23,700",
-    "price": 23700
+    "price": 23700,
+    "image": "/catalog-images/ft-m4801.webp"
   },
   {
     "sku": "日规-MT02 会议桌",
     "category": "会议桌 Meeting /Conference Table",
     "size": "2200*1050*750",
     "priceLabel": "฿8,700",
-    "price": 8700
+    "price": 8700,
+    "image": "/catalog-images/mt02-28.webp"
   },
   {
     "sku": "NXLH66A-60",
     "category": "会议桌 Meeting /Conference Table",
     "size": "6000*1700*750",
     "priceLabel": "฿29,700",
-    "price": 29700
+    "price": 29700,
+    "image": "/catalog-images/nxlh66a-60.webp"
   },
   {
     "sku": "F611-P13",
     "category": "会议桌 Meeting /Conference Table",
     "size": "1200*460*1700",
     "priceLabel": "34500",
-    "price": 34500
+    "price": 34500,
+    "image": "/catalog-images/f611-p13.webp"
   },
   {
     "sku": "NXLH66A-80",
     "category": "会议桌 Meeting /Conference Table",
     "size": "8000*2000*750",
     "priceLabel": "฿46,200",
-    "price": 46200
+    "price": 46200,
+    "image": "/catalog-images/nxlh66a-80.webp"
   },
   {
     "sku": "YN-01-4",
     "category": "普通员工桌 Task office desk",
     "size": "2400*1200*750",
     "priceLabel": "฿9,000",
-    "price": 9000
+    "price": 9000,
+    "image": "/catalog-images/yn-01-4.webp"
   },
   {
     "sku": "YN-01-1",
     "category": "普通员工桌 Task office desk",
     "size": "1200*600*750",
     "priceLabel": "฿3,900",
-    "price": 3900
+    "price": 3900,
+    "image": "/catalog-images/yn-01-1.webp"
   },
   {
     "sku": "YN-QC -A1202",
     "category": "普通员工桌 Task office desk",
     "size": "1200*600*1050",
     "priceLabel": "฿5,400",
-    "price": 5400
+    "price": 5400,
+    "image": "/catalog-images/yn-qc-a1202.webp"
   },
   {
     "sku": "QC-A2401",
     "category": "普通员工桌 Task office desk",
     "size": "2400*1200*750",
     "priceLabel": "฿12,450",
-    "price": 12450
+    "price": 12450,
+    "image": "/catalog-images/qc-a2401.webp"
   },
   {
     "sku": "KY-D201",
     "category": "普通员工桌 Task office desk",
     "size": "1200*600*750",
     "priceLabel": "฿3,300",
-    "price": 3300
+    "price": 3300,
+    "image": "/catalog-images/ky-d201.webp"
   },
   {
     "sku": "FL-TS-PO5",
     "category": "普通员工桌 Task office desk",
     "size": "1200W*600D*1000H",
     "priceLabel": "฿6,525",
-    "price": 6525
+    "price": 6525,
+    "image": "/catalog-images/fl-ts-po5.webp"
   },
   {
     "sku": "KY-T01",
     "category": "普通员工桌 Task office desk",
     "size": "2400*1200*750",
     "priceLabel": "฿12,000",
-    "price": 12000
+    "price": 12000,
+    "image": "/catalog-images/ky-t01.webp"
   },
   {
     "sku": "JQ-D1200",
     "category": "普通员工桌 Task office desk",
     "size": "1200*600*750",
     "priceLabel": "฿1,875",
-    "price": 1875
+    "price": 1875,
+    "image": "/catalog-images/jq-d1200.webp"
   },
   {
     "sku": "Y2505217",
     "category": "普通员工桌 Task office desk",
     "size": "1200*500*750",
     "priceLabel": "฿4,500",
-    "price": 4500
+    "price": 4500,
+    "image": "/catalog-images/y2505217.webp"
   },
   {
     "sku": "YN-05",
     "category": "普通员工桌 Task office desk",
     "size": "2400*1200*1050",
     "priceLabel": "฿10,500",
-    "price": 10500
+    "price": 10500,
+    "image": "/catalog-images/yn-05.webp"
   },
   {
     "sku": "JQ-D1400",
     "category": "普通员工桌 Task office desk",
     "size": "1400*600*750",
     "priceLabel": "฿2,475",
-    "price": 2475
+    "price": 2475,
+    "image": "/catalog-images/jq-d1400.webp"
   },
   {
     "sku": "FL-MD-P01-2",
     "category": "普通员工桌 Task office desk",
     "size": "1200*1200*1050",
     "priceLabel": "฿12,900",
-    "price": 12900
+    "price": 12900,
+    "image": "/catalog-images/fl-md-p01-2.webp"
   },
   {
     "sku": "QC-A1503",
     "category": "员工办公卡位 Task Office Partition",
     "size": "1500*1400*1100",
     "priceLabel": "฿8,985",
-    "price": 8985
+    "price": 8985,
+    "image": "/catalog-images/qc-a1503.webp"
   },
   {
     "sku": "DZ2802",
     "category": "员工办公卡位 Task Office Partition",
     "size": "2820*1420*1100",
     "priceLabel": "฿14,500",
-    "price": 14500
+    "price": 14500,
+    "image": "/catalog-images/dz2802.webp"
   },
   {
     "sku": "YN-K620-4",
     "category": "员工办公卡位 Task Office Partition",
     "size": "2460*1220*1100",
     "priceLabel": "฿23,042.0",
-    "price": 23042
+    "price": 23042,
+    "image": "/catalog-images/yn-k620-4.webp"
   },
   {
     "sku": "63b1608b",
     "category": "员工办公卡位 Task Office Partition",
     "size": "1600*2200*1100",
     "priceLabel": "฿18,180",
-    "price": 18180
+    "price": 18180,
+    "image": "/catalog-images/63b1608b.webp"
   },
   {
     "sku": "DZ2404",
     "category": "员工办公卡位 Task Office Partition",
     "size": "2460*1220*1100",
     "priceLabel": "฿19,200",
-    "price": 19200
+    "price": 19200,
+    "image": "/catalog-images/dz2404.webp"
   },
   {
     "sku": "GC-P05S-4",
     "category": "员工办公卡位 Task Office Partition",
     "size": "2800*1290*750",
     "priceLabel": "฿80,950",
-    "price": 80950
+    "price": 80950,
+    "image": "/catalog-images/gc-p05s-4.webp"
   },
   {
     "sku": "MZ513",
     "category": "员工办公卡位 Task Office Partition",
     "size": "1500*2400*1100",
     "priceLabel": "฿19,500",
-    "price": 19500
+    "price": 19500,
+    "image": "/catalog-images/mz513.webp"
   },
   {
     "sku": "Y2505214",
     "category": "员工办公卡位 Task Office Partition",
     "size": "1200*600*1100",
     "priceLabel": "฿7,992",
-    "price": 7992
+    "price": 7992,
+    "image": "/catalog-images/y2505214.webp"
   },
   {
     "sku": "BJ-8407",
     "category": "办公桌 Office Chair",
     "size": "720*720*1170",
     "priceLabel": "฿7,200",
-    "price": 7200
+    "price": 7200,
+    "image": "/catalog-images/bj-8407.webp"
   },
   {
     "sku": "TSL-A391",
     "category": "办公桌 Office Chair",
     "size": "750*750*1220",
     "priceLabel": "฿8,370",
-    "price": 8370
+    "price": 8370,
+    "image": "/catalog-images/tsl-a391.webp"
   },
   {
     "sku": "TSL-A055-3",
     "category": "办公桌 Office Chair",
     "size": "680*680*1280",
     "priceLabel": "฿7,450",
-    "price": 7450
+    "price": 7450,
+    "image": "/catalog-images/tsl-a055-3.webp"
   },
   {
     "sku": "TSL-A399-3",
     "category": "办公桌 Office Chair",
     "size": "1240*510*730",
     "priceLabel": "฿6,975",
-    "price": 6975
+    "price": 6975,
+    "image": "/catalog-images/tsl-a399-3.webp"
   },
   {
     "sku": "A8070",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿12,750",
-    "price": 12750
+    "price": 12750,
+    "image": "/catalog-images/a8070.webp"
   },
   {
     "sku": "BJ-8442",
     "category": "办公桌 Office Chair",
     "size": "610*480*1210",
     "priceLabel": "฿8,550",
-    "price": 8550
+    "price": 8550,
+    "image": "/catalog-images/bj-8442.webp"
   },
   {
     "sku": "GS-G1901",
     "category": "办公桌 Office Chair",
     "size": "660*610*1000",
     "priceLabel": "฿10,965",
-    "price": 10965
+    "price": 10965,
+    "image": "/catalog-images/gs-g1901.webp"
   },
   {
     "sku": "A326",
     "category": "办公桌 Office Chair",
     "size": "575*595*865",
     "priceLabel": "฿7,200",
-    "price": 7200
+    "price": 7200,
+    "image": "/catalog-images/a326.webp"
   },
   {
     "sku": "BJ-3116",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿6,120",
-    "price": 6120
+    "price": 6120,
+    "image": "/catalog-images/bj-3116.webp"
   },
   {
     "sku": "HJ-350A",
     "category": "办公桌 Office Chair",
     "size": "600*600*1140",
     "priceLabel": "฿4,200",
-    "price": 4200
+    "price": 4200,
+    "image": "/catalog-images/hj-350a.webp"
   },
   {
     "sku": "816AB",
     "category": "办公桌 Office Chair",
     "size": "550*550*1290",
     "priceLabel": "฿4,620",
-    "price": 4620
+    "price": 4620,
+    "image": "/catalog-images/816ab.webp"
   },
   {
     "sku": "A2501",
     "category": "办公桌 Office Chair",
     "size": "500*500*1160",
     "priceLabel": "฿2,820",
-    "price": 2820
+    "price": 2820,
+    "image": "/catalog-images/a2501.webp"
   },
   {
     "sku": "HJ-111B",
     "category": "办公桌 Office Chair",
     "size": "545*590*885 670*590*1075",
     "priceLabel": "1500 带头枕 1800",
-    "price": 1500
+    "price": 1500,
+    "image": "/catalog-images/hj-111b.webp"
   },
   {
     "sku": "HJ-111C",
     "category": "办公桌 Office Chair",
     "size": "580*660*960",
     "priceLabel": "฿1,380",
-    "price": 1380
+    "price": 1380,
+    "image": "/catalog-images/hj-111c.webp"
   },
   {
     "sku": "C2193",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿1,380",
-    "price": 1380
+    "price": 1380,
+    "image": "/catalog-images/c2193.webp"
   },
   {
     "sku": "BL-BX05",
     "category": "办公桌 Office Chair",
     "size": "490*595*840",
     "priceLabel": "฿1,230",
-    "price": 1230
+    "price": 1230,
+    "image": "/catalog-images/bl-bx05.webp"
   },
   {
     "sku": "MC-M206",
     "category": "办公桌 Office Chair",
     "size": "575*595*865",
     "priceLabel": "฿2,970",
-    "price": 2970
+    "price": 2970,
+    "image": "/catalog-images/mc-m206.webp"
   },
   {
     "sku": "BJ-3148C",
     "category": "办公桌 Office Chair",
     "size": "575*595*1020",
     "priceLabel": "฿3,570",
-    "price": 3570
+    "price": 3570,
+    "image": "/catalog-images/bj-3148c.webp"
   },
   {
     "sku": "DHX-BK-BG",
     "category": "办公桌 Office Chair",
     "size": "740*500*610",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-bk-bg.webp"
   },
   {
     "sku": "DHX-BK-AG",
     "category": "办公桌 Office Chair",
     "size": "740*500*610",
     "priceLabel": "฿3,570",
-    "price": 3570
+    "price": 3570,
+    "image": "/catalog-images/dhx-bk-ag.webp"
   },
   {
     "sku": "DHX-BK-BG 黑色",
     "category": "办公桌 Office Chair",
     "size": "740*500*610",
     "priceLabel": "฿2,970",
-    "price": 2970
+    "price": 2970,
+    "image": "/catalog-images/dhx-bk-bg-72.webp"
   },
   {
     "sku": "GS-GT1 -WTY-C",
     "category": "办公桌 Office Chair",
     "size": "725*650*1190",
     "priceLabel": "฿17,730",
-    "price": 17730
+    "price": 17730,
+    "image": "/catalog-images/gs-gt1-wty-c.webp"
   },
   {
     "sku": "166A",
     "category": "办公桌 Office Chair",
     "size": "680*610*770",
     "priceLabel": "฿12,375",
-    "price": 12375
+    "price": 12375,
+    "image": "/catalog-images/166a.webp"
   },
   {
     "sku": "166B",
     "category": "办公桌 Office Chair",
     "size": "680*610*770",
     "priceLabel": "฿11,370",
-    "price": 11370
+    "price": 11370,
+    "image": "/catalog-images/166b.webp"
   },
   {
     "sku": "TSL-TB128",
     "category": "办公桌 Office Chair",
     "size": "1070*600*650",
     "priceLabel": "฿1,920",
-    "price": 1920
+    "price": 1920,
+    "image": "/catalog-images/tsl-tb128.webp"
   },
   {
     "sku": "DHX-TE-BG",
     "category": "办公桌 Office Chair",
     "size": "680*660*1080",
     "priceLabel": "3120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-te-bg.webp"
   },
   {
     "sku": "HJ-211A-LP-G",
     "category": "办公桌 Office Chair",
     "size": "700*750*1140",
     "priceLabel": "฿3,255",
-    "price": 3255
+    "price": 3255,
+    "image": "/catalog-images/hj-211a-lp-g.webp"
   },
   {
     "sku": "GS-GT3A",
     "category": "办公桌 Office Chair",
     "size": "570*625*870",
     "priceLabel": "฿5,475",
-    "price": 5475
+    "price": 5475,
+    "image": "/catalog-images/gs-gt3a.webp"
   },
   {
     "sku": "B2193W",
     "category": "办公桌 Office Chair",
     "size": "570*510*1080",
     "priceLabel": "฿1,770",
-    "price": 1770
+    "price": 1770,
+    "image": "/catalog-images/b2193w.webp"
   },
   {
     "sku": "HJ-211A-LP",
     "category": "办公桌 Office Chair",
     "size": "700*750*1140",
     "priceLabel": "฿2,970",
-    "price": 2970
+    "price": 2970,
+    "image": "/catalog-images/hj-211a-lp.webp"
   },
   {
     "sku": "DHX-301BR",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301br.webp"
   },
   {
     "sku": "DHX-S-AW",
     "category": "办公桌 Office Chair",
     "size": "740*380*640",
     "priceLabel": "฿6,420",
-    "price": 6420
+    "price": 6420,
+    "image": "/catalog-images/dhx-s-aw.webp"
   },
   {
     "sku": "GS-GT2-A",
     "category": "办公桌 Office Chair",
     "size": "595*625*870",
     "priceLabel": "฿6,300",
-    "price": 6300
+    "price": 6300,
+    "image": "/catalog-images/gs-gt2-a.webp"
   },
   {
     "sku": "DHX-301BW-1",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301bw-1.webp"
   },
   {
     "sku": "DHX-301BW-1",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301bw-1-86.webp"
   },
   {
     "sku": "A1267 四脚带轮",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿5,400",
-    "price": 5400
+    "price": 5400,
+    "image": "/catalog-images/a1267.webp"
   },
   {
     "sku": "DHX-301BW-1",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301bw-1-88.webp"
   },
   {
     "sku": "DHX-301BGR",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301bgr.webp"
   },
   {
     "sku": "DHX-301BM",
     "category": "办公桌 Office Chair",
     "size": "630*470*625",
     "priceLabel": "฿3,120",
-    "price": 3120
+    "price": 3120,
+    "image": "/catalog-images/dhx-301bm.webp"
   },
   {
     "sku": "B279",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿975",
-    "price": 975
+    "price": 975,
+    "image": "/catalog-images/b279.webp"
   },
   {
     "sku": "2041B",
     "category": "办公桌 Office Chair",
     "size": "640*560*860",
     "priceLabel": "฿2,265",
-    "price": 2265
+    "price": 2265,
+    "image": "/catalog-images/2041b.webp"
   },
   {
     "sku": "2042B",
     "category": "办公桌 Office Chair",
     "size": "640*540*860",
     "priceLabel": "฿1,980",
-    "price": 1980
+    "price": 1980,
+    "image": "/catalog-images/2042b.webp"
   },
   {
     "sku": "GS-1830F",
     "category": "办公桌 Office Chair",
     "size": "510*450*1070",
     "priceLabel": "฿4,890",
-    "price": 4890
+    "price": 4890,
+    "image": "/catalog-images/gs-1830f.webp"
   },
   {
     "sku": "KP11-071",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿5,085",
-    "price": 5085
+    "price": 5085,
+    "image": "/catalog-images/kp11-071.webp"
   },
   {
     "sku": "F611- D-2359",
     "category": "办公桌 Office Chair",
     "size": "615*380*665",
     "priceLabel": "฿6,750",
-    "price": 6750
+    "price": 6750,
+    "image": "/catalog-images/f611-d-2359.webp"
   },
   {
     "sku": "A602A-1 四爪脚带轮",
     "category": "办公桌 Office Chair",
     "size": "常规带褶皱",
     "priceLabel": "฿5,910",
-    "price": 5910
+    "price": 5910,
+    "image": "/catalog-images/a602a-1.webp"
   },
   {
     "sku": "A602A-1 铁架脚",
     "category": "办公桌 Office Chair",
     "size": "常规带褶皱",
     "priceLabel": "฿5,700",
-    "price": 5700
+    "price": 5700,
+    "image": "/catalog-images/a602a-1-98.webp"
   },
   {
     "sku": "A1178-1 雪橇架",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿10,800",
-    "price": 10800
+    "price": 10800,
+    "image": "/catalog-images/a1178-1.webp"
   },
   {
     "sku": "A1255 中背",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿9,795",
-    "price": 9795
+    "price": 9795,
+    "image": "/catalog-images/a1255.webp"
   },
   {
     "sku": "A1411 四爪脚",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿4,770",
-    "price": 4770
+    "price": 4770,
+    "image": "/catalog-images/a1411.webp"
   },
   {
     "sku": "A1267 雪橇架",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿5,280",
-    "price": 5280
+    "price": 5280,
+    "image": "/catalog-images/a1267-102.webp"
   },
   {
     "sku": "球凳2 带写字板",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿13,020",
-    "price": 13020
+    "price": 13020,
+    "image": "/catalog-images/2.webp"
   },
   {
     "sku": "A1411 四脚",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿4,620",
-    "price": 4620
+    "price": 4620,
+    "image": "/catalog-images/a1411-104.webp"
   },
   {
     "sku": "A1267 铝合金 带升降功能",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿6,075",
-    "price": 6075
+    "price": 6075,
+    "image": "/catalog-images/a1267-105.webp"
   },
   {
     "sku": "A1277C吧椅四爪固定",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿5,100",
-    "price": 5100
+    "price": 5100,
+    "image": "/catalog-images/a1277c.webp"
   },
   {
     "sku": "球凳1",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿9,900",
-    "price": 9900
+    "price": 9900,
+    "image": "/catalog-images/1.webp"
   },
   {
     "sku": "S618",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿8,325",
-    "price": 8325
+    "price": 8325,
+    "image": "/catalog-images/s618.webp"
   },
   {
     "sku": "A1277C吧椅雪橇架",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿4,980",
-    "price": 4980
+    "price": 4980,
+    "image": "/catalog-images/a1277c-109.webp"
   },
   {
     "sku": "A1255 中背",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿9,165",
-    "price": 9165
+    "price": 9165,
+    "image": "/catalog-images/a1255-110.webp"
   },
   {
     "sku": "A1178-1 雪橇架",
     "category": "办公桌 Office Chair",
     "size": "常规",
     "priceLabel": "฿10,800",
-    "price": 10800
+    "price": 10800,
+    "image": "/catalog-images/a1178-1-111.webp"
   },
   {
     "sku": "BJ-6344",
     "category": "办公沙发 Office Sofa",
     "size": "970*830*830 1880*830*830",
     "priceLabel": "฿28,500",
-    "price": 28500
+    "price": 28500,
+    "image": "/catalog-images/bj-6344.webp"
   },
   {
     "sku": "B0954",
     "category": "办公沙发 Office Sofa",
     "size": "800*750*830 1800*750*830",
     "priceLabel": "฿25,980",
-    "price": 25980
+    "price": 25980,
+    "image": "/catalog-images/b0954.webp"
   },
   {
     "sku": "BJ-6427",
     "category": "办公沙发 Office Sofa",
     "size": "1950*800*760 790*800*760",
     "priceLabel": "฿23,700",
-    "price": 23700
+    "price": 23700,
+    "image": "/catalog-images/bj-6427.webp"
   },
   {
     "sku": "F611-T11",
     "category": "办公沙发 Office Sofa",
     "size": "1320*600*430/650",
     "priceLabel": "฿26,800",
-    "price": 26800
+    "price": 26800,
+    "image": "/catalog-images/f611-t11.webp"
   },
   {
     "sku": "F611-T12",
     "category": "办公沙发 Office Sofa",
     "size": "1300*640*690",
     "priceLabel": "฿25,350",
-    "price": 25350
+    "price": 25350,
+    "image": "/catalog-images/f611-t12.webp"
   },
   {
     "sku": "F611-T7-air",
     "category": "办公沙发 Office Sofa",
     "size": "680*565*420",
     "priceLabel": "฿15,900",
-    "price": 15900
+    "price": 15900,
+    "image": "/catalog-images/f611-t7-air.webp"
   },
   {
     "sku": "T-836",
     "category": "办公沙发 Office Sofa",
     "size": "2000*1000*700",
     "priceLabel": "฿17,250",
-    "price": 17250
+    "price": 17250,
+    "image": "/catalog-images/t-836.webp"
   },
   {
     "sku": "T-010",
     "category": "办公沙发 Office Sofa",
     "size": "850*1000*730",
     "priceLabel": "฿11,730",
-    "price": 11730
+    "price": 11730,
+    "image": "/catalog-images/t-010.webp"
   },
   {
     "sku": "T-007",
     "category": "办公沙发 Office Sofa",
     "size": "1800*1000*700",
     "priceLabel": "฿23,060",
-    "price": 23060
+    "price": 23060,
+    "image": "/catalog-images/t-007.webp"
   },
   {
     "sku": "T-802",
     "category": "办公沙发 Office Sofa",
     "size": "1400*1000*760",
     "priceLabel": "฿14,850",
-    "price": 14850
+    "price": 14850,
+    "image": "/catalog-images/t-802.webp"
   },
   {
     "sku": "T-205",
     "category": "办公沙发 Office Sofa",
     "size": "880*1000*710",
     "priceLabel": "฿9,660",
-    "price": 9660
+    "price": 9660,
+    "image": "/catalog-images/t-205.webp"
   },
   {
     "sku": "F720",
     "category": "办公沙发 Office Sofa",
     "size": "常规",
     "priceLabel": "฿72,000",
-    "price": 72000
+    "price": 72000,
+    "image": "/catalog-images/f720.webp"
   },
   {
     "sku": "JHY-DB",
     "category": "茶桌 Tea Table Set",
     "size": "茶台 2.2米    （一桌五椅 一边几）",
     "priceLabel": "฿29,700",
-    "price": 29700
+    "price": 29700,
+    "image": "/catalog-images/jhy-db.webp"
   },
   {
     "sku": "WG-2482  (1 table 5 chairs)",
     "category": "茶桌 Tea Table Set",
     "size": "Table :1800*800*750  Chair-1 :680*585*960  Chair-4 :550*570*760",
     "priceLabel": "桌子1฿11100 主椅1฿2250 副椅4฿8100 总฿21450",
-    "price": 1
+    "price": 1,
+    "image": "/catalog-images/wg-2482-1-table-5-chairs.webp"
   },
   {
     "sku": "2522#1801",
     "category": "茶桌 Tea Table Set",
     "size": "茶台  （1桌5椅） 1800*800*750",
     "priceLabel": "฿23,250",
-    "price": 23250
+    "price": 23250,
+    "image": "/catalog-images/2522-1801.webp"
   },
   {
     "sku": "WG-2485",
     "category": "茶桌 Tea Table Set",
     "size": "2000*800*740",
     "priceLabel": "桌子1฿17100 主椅1฿2250 副椅4฿8100 总价฿27450",
-    "price": 1
+    "price": 1,
+    "image": "/catalog-images/wg-2485.webp"
   },
   {
     "sku": "2522#2001",
     "category": "茶桌 Tea Table Set",
     "size": "茶台  （1桌5椅） 2000*800*750",
     "priceLabel": "฿26,250",
-    "price": 26250
+    "price": 26250,
+    "image": "/catalog-images/2522-2001.webp"
   },
   {
     "sku": "2553#2001",
     "category": "茶桌 Tea Table Set",
     "size": "茶台  （1桌5椅） 2000*800*750",
     "priceLabel": "฿30,900",
-    "price": 30900
+    "price": 30900,
+    "image": "/catalog-images/2553-2001.webp"
   },
   {
     "sku": "JHY-JX",
     "category": "茶桌 Tea Table Set",
     "size": "1.8米茶台  （1桌5椅）",
     "priceLabel": "฿27,750",
-    "price": 27750
+    "price": 27750,
+    "image": "/catalog-images/jhy-jx.webp"
   },
   {
     "sku": "WG-2278",
     "category": "茶桌 Tea Table Set",
     "size": "Table :1800*800*730  Chair-1 :590*530*995  Chair-4 :510*470*750",
     "priceLabel": "฿31,200",
-    "price": 31200
+    "price": 31200,
+    "image": "/catalog-images/wg-2278.webp"
   },
   {
     "sku": "WG-1706-Y-1.3",
     "category": "茶桌 Tea Table Set",
     "size": "1300*700*550",
     "priceLabel": "฿5,925",
-    "price": 5925
+    "price": 5925,
+    "image": "/catalog-images/wg-1706-y-1-3.webp"
   },
   {
     "sku": "VC-2219 (卡塔金)",
     "category": "茶桌 Tea Table Set",
     "size": "Φ700*740",
     "priceLabel": "฿2,700",
-    "price": 2700
+    "price": 2700,
+    "image": "/catalog-images/vc-2219.webp"
   },
   {
     "sku": "OZ-BS00",
     "category": "茶桌 Tea Table Set",
     "size": "φ602*440 φ402*380",
     "priceLabel": "฿2,580",
-    "price": 2580
+    "price": 2580,
+    "image": "/catalog-images/oz-bs00.webp"
   },
   {
     "sku": "CX-C2027",
     "category": "茶桌 Tea Table Set",
     "size": "1300*700*450",
     "priceLabel": "฿4,950",
-    "price": 4950
+    "price": 4950,
+    "image": "/catalog-images/cx-c2027.webp"
   },
   {
     "sku": "F611-C18",
     "category": "茶桌 Tea Table Set",
     "size": "1125*590*380 直径400*高470",
     "priceLabel": "฿15,000",
-    "price": 15000
+    "price": 15000,
+    "image": "/catalog-images/f611-c18.webp"
   },
   {
     "sku": "VC-25301",
     "category": "茶桌 Tea Table Set",
     "size": "590*630*840   坐高470",
     "priceLabel": "฿3,900",
-    "price": 3900
+    "price": 3900,
+    "image": "/catalog-images/vc-25301.webp"
   },
   {
     "sku": "CY-032",
     "category": "茶桌 Tea Table Set",
     "size": "480*550*820",
     "priceLabel": "฿1,350",
-    "price": 1350
+    "price": 1350,
+    "image": "/catalog-images/cy-032.webp"
   },
   {
     "sku": "AFT-112",
     "category": "文件柜 Cabinet",
     "size": "1800*900*350",
     "priceLabel": "฿6,000",
-    "price": 6000
+    "price": 6000,
+    "image": "/catalog-images/aft-112.webp"
   },
   {
     "sku": "AFT-018",
     "category": "文件柜 Cabinet",
     "size": "1800*850*390",
     "priceLabel": "฿3,750",
-    "price": 3750
+    "price": 3750,
+    "image": "/catalog-images/aft-018.webp"
   },
   {
     "sku": "DM-W045",
     "category": "文件柜 Cabinet",
     "size": "1800*850*390",
     "priceLabel": "฿4,200",
-    "price": 4200
+    "price": 4200,
+    "image": "/catalog-images/dm-w045.webp"
   },
   {
     "sku": "DM-W073",
     "category": "文件柜 Cabinet",
     "size": "1800*900*350",
     "priceLabel": "฿6,300",
-    "price": 6300
+    "price": 6300,
+    "image": "/catalog-images/dm-w073.webp"
   },
   {
     "sku": "DM-W038",
     "category": "文件柜 Cabinet",
     "size": "1850*900*500",
     "priceLabel": "฿5,250",
-    "price": 5250
+    "price": 5250,
+    "image": "/catalog-images/dm-w038.webp"
   },
   {
     "sku": "AFT-093",
     "category": "文件柜 Cabinet",
     "size": "1800*850*390",
     "priceLabel": "฿4,035",
-    "price": 4035
+    "price": 4035,
+    "image": "/catalog-images/aft-093.webp"
   },
   {
     "sku": "KY-CSG1201",
     "category": "文件柜 Cabinet",
     "size": "1200*400*800",
     "priceLabel": "฿6,300",
-    "price": 6300
+    "price": 6300,
+    "image": "/catalog-images/ky-csg1201.webp"
   },
   {
     "sku": "AFT-034",
     "category": "文件柜 Cabinet",
     "size": "730*460*620 1030*460*620 1330*460*620",
     "priceLabel": "฿14,250",
-    "price": 14250
+    "price": 14250,
+    "image": "/catalog-images/aft-034.webp"
   },
   {
     "sku": "F611-SG",
     "category": "文件柜 Cabinet",
     "size": "1800*350*2000",
     "priceLabel": "฿20,700",
-    "price": 20700
+    "price": 20700,
+    "image": "/catalog-images/f611-sg.webp"
   },
   {
     "sku": "JQ-H200",
     "category": "文件柜 Cabinet",
     "size": "2000*600*2000",
     "priceLabel": "฿2925",
-    "price": 2925
+    "price": 2925,
+    "image": "/catalog-images/jq-h200.webp"
   },
   {
     "sku": "FT-AG801",
     "category": "文件柜 Cabinet",
     "size": "800*400*860",
     "priceLabel": "฿3,900",
-    "price": 3900
+    "price": 3900,
+    "image": "/catalog-images/ft-ag801.webp"
   },
   {
     "sku": "YN-ECG",
     "category": "文件柜 Cabinet",
     "size": "400*400*620",
     "priceLabel": "฿2,025",
-    "price": 2025
+    "price": 2025,
+    "image": "/catalog-images/yn-ecg.webp"
   },
   {
     "sku": "HF-178",
     "category": "文件柜 Cabinet",
     "size": "1000*580*760",
     "priceLabel": "฿4,500",
-    "price": 4500
+    "price": 4500,
+    "image": "/catalog-images/hf-178.webp"
   },
   {
     "sku": "HF-317",
     "category": "文件柜 Cabinet",
     "size": "760*600*400",
     "priceLabel": "฿2,475",
-    "price": 2475
+    "price": 2475,
+    "image": "/catalog-images/hf-317.webp"
   },
   {
     "sku": "HF-808",
     "category": "文件柜 Cabinet",
     "size": "920*520*900",
     "priceLabel": "฿3,525",
-    "price": 3525
+    "price": 3525,
+    "image": "/catalog-images/hf-808.webp"
   },
   {
     "sku": "JQ-B198",
     "category": "公寓家具 Apartment Furniture",
     "size": "1980*980*1800",
     "priceLabel": "฿4,755",
-    "price": 4755
+    "price": 4755,
+    "image": "/catalog-images/jq-b198.webp"
   },
   {
     "sku": "MC-LY 1608",
     "category": "公寓家具 Apartment Furniture",
     "size": "800*500*2000",
     "priceLabel": "฿9,000",
-    "price": 9000
+    "price": 9000,
+    "image": "/catalog-images/mc-ly-1608.webp"
   },
   {
     "sku": "JQ-G901",
     "category": "公寓家具 Apartment Furniture",
     "size": "900*1900*50",
     "priceLabel": "฿1,275",
-    "price": 1275
+    "price": 1275,
+    "image": "/catalog-images/jq-g901.webp"
   },
   {
     "sku": "JQ-C1201",
     "category": "公寓家具 Apartment Furniture",
     "size": "常规1.2米",
     "priceLabel": "฿2,865",
-    "price": 2865
+    "price": 2865,
+    "image": "/catalog-images/jq-c1201.webp"
   },
   {
     "sku": "MM-001",
     "category": "公寓家具 Apartment Furniture",
     "size": "900*1900*30",
     "priceLabel": "฿900",
-    "price": 900
+    "price": 900,
+    "image": "/catalog-images/mm-001.webp"
   },
   {
     "sku": "JQ-G1201",
     "category": "公寓家具 Apartment Furniture",
     "size": "1200*1900*50",
     "priceLabel": "฿1,450",
-    "price": 1450
+    "price": 1450,
+    "image": "/catalog-images/jq-g1201.webp"
   },
   {
     "sku": "FT-B1201 FT-B1501 FT-B1801",
     "category": "公寓家具 Apartment Furniture",
     "size": "1200*2000 1500*2000 1800*2000",
     "priceLabel": "฿5250 ฿5700 ฿6525",
-    "price": 5250
+    "price": 5250,
+    "image": "/catalog-images/ft-b1201-ft-b1501-ft-b1801.webp"
   },
   {
     "sku": "FT-B1502 FT-B1802",
     "category": "公寓家具 Apartment Furniture",
     "size": "1500*2000 1800*2000",
     "priceLabel": "฿8550 ฿8700",
-    "price": 8550
+    "price": 8550,
+    "image": "/catalog-images/ft-b1502-ft-b1802.webp"
   },
   {
     "sku": "JXH",
     "category": "公寓家具 Apartment Furniture",
     "size": "1000*1000*770",
     "priceLabel": "฿22,500",
-    "price": 22500
+    "price": 22500,
+    "image": "/catalog-images/jxh.webp"
   },
   {
     "sku": "LX-1203 LX-1503 LX-1803",
     "category": "公寓家具 Apartment Furniture",
     "size": "1200*1900 1500*1900 1800*1900",
     "priceLabel": "฿4800 ฿5700 ฿8700",
-    "price": 4800
+    "price": 4800,
+    "image": "/catalog-images/lx-1203-lx-1503-lx-1803.webp"
   },
   {
     "sku": "MC-LC2504",
     "category": "公寓家具 Apartment Furniture",
     "size": "400*400*430",
     "priceLabel": "฿1,725",
-    "price": 1725
+    "price": 1725,
+    "image": "/catalog-images/mc-lc2504.webp"
   },
   {
     "sku": "ML06016",
     "category": "公寓家具 Apartment Furniture",
     "size": "Ø1200*750",
     "priceLabel": "฿4,050",
-    "price": 4050
+    "price": 4050,
+    "image": "/catalog-images/ml06016.webp"
   },
   {
     "sku": "ML02048",
     "category": "公寓家具 Apartment Furniture",
     "size": "1200*600*750",
     "priceLabel": "฿3,150",
-    "price": 3150
+    "price": 3150,
+    "image": "/catalog-images/ml02048.webp"
   },
   {
     "sku": "FT-B1203",
     "category": "公寓家具 Apartment Furniture",
     "size": "常规",
     "priceLabel": "฿1,650",
-    "price": 1650
+    "price": 1650,
+    "image": "/catalog-images/ft-b1203.webp"
   },
   {
     "sku": "ML06016",
     "category": "公寓家具 Apartment Furniture",
     "size": "Ø1500*750",
     "priceLabel": "฿5,550",
-    "price": 5550
+    "price": 5550,
+    "image": "/catalog-images/ml06016-168.webp"
   },
   {
     "sku": "ML02085",
     "category": "公寓家具 Apartment Furniture",
     "size": "350*350*800",
     "priceLabel": "฿750",
-    "price": 750
+    "price": 750,
+    "image": "/catalog-images/ml02085.webp"
   },
   {
     "sku": "ML02072",
     "category": "公寓家具 Apartment Furniture",
     "size": "600*600*750",
     "priceLabel": "฿2,250",
-    "price": 2250
+    "price": 2250,
+    "image": "/catalog-images/ml02072.webp"
   },
   {
     "sku": "CX-C2023",
     "category": "公寓家具 Apartment Furniture",
     "size": "1600*800*750",
     "priceLabel": "฿5,250",
-    "price": 5250
+    "price": 5250,
+    "image": "/catalog-images/cx-c2023.webp"
   }
 ];

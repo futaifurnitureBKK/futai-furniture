@@ -9,6 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 
 type DocType = "quotation" | "invoice";
+type LangMode = "th-en-zh" | "th-en" | "th-zh";
+
+interface TriText {
+  th: string;
+  en: string;
+  zh: string;
+}
 
 interface LineItem {
   id: string;
@@ -22,21 +29,87 @@ interface LineItem {
   image: string | null;
 }
 
-const DOC_LABELS: Record<DocType, { th: string; en: string; zh: string; prefix: string }> = {
+const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation: { th: "ใบเสนอราคา", en: "QUOTATION", zh: "报价单", prefix: "QT" },
   invoice:   { th: "ใบแจ้งหนี้", en: "INVOICE",   zh: "发票",   prefix: "IV" },
 };
+
+const DOC_NO_LABELS: Record<DocType, TriText> = {
+  quotation: { th: "เลขที่ใบเสนอราคา", en: "Quotation No", zh: "报价单号" },
+  invoice:   { th: "เลขที่ใบแจ้งหนี้", en: "Invoice No",   zh: "发票号码" },
+};
+
+const LANG_OPTIONS: { value: LangMode; label: string }[] = [
+  { value: "th-en-zh", label: "ไทย / Eng / 中文" },
+  { value: "th-en",    label: "ไทย / Eng" },
+  { value: "th-zh",    label: "ไทย / 中文" },
+];
 
 const COMPANY = {
   nameEn: "FUTAI FURNITURE CO.,LTD.",
   nameZh: "富泰家具有限公司（泰国）",
   nameTh: "บริษัท ฟูไท่ เฟอร์นิเจอร์ จำกัด",
-  addressTh: "99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา อำเภอลำลูกกา จ.ปทุมธานี 12150",
   taxId: "0135568015065",
   tel: "061 898 0412",
   web: "www.futaifurniture.com",
   email: "futai.furniture@gmail.com",
 };
+
+const TXT = {
+  address:        { th: "ที่อยู่",           en: "Address",     zh: "地址" },
+  tel:            { th: "โทรศัพท์",         en: "Tel",          zh: "电话" },
+  web:            { th: "เว็บไซต์",         en: "Website",      zh: "网站" },
+  email:          { th: "อีเมล",            en: "Email",        zh: "邮箱" },
+  taxId:          { th: "เลขผู้เสียภาษี",   en: "Tax ID",       zh: "纳税人识别号" },
+  date:           { th: "วันที่",           en: "Date",         zh: "日期" },
+  customer:       { th: "ลูกค้า",           en: "Customer",     zh: "客户" },
+  contact:        { th: "ผู้ติดต่อ",        en: "Contact",      zh: "联系人" },
+  colNo:          { th: "ลำดับ",            en: "No.",          zh: "序号" },
+  colItem:        { th: "ชื่อสินค้า",       en: "Item",         zh: "品名" },
+  colModel:       { th: "แบบอย่าง",         en: "Model",        zh: "型号" },
+  colPhoto:       { th: "ภาพ",              en: "Photo",        zh: "图片" },
+  colSize:        { th: "ขนาด (mm)",        en: "Size (mm)",    zh: "规格" },
+  colQty:         { th: "ปริมาณ",           en: "Qty",          zh: "数量" },
+  colUnit:        { th: "หน่วย",            en: "Unit",         zh: "单位" },
+  colUnitPrice:   { th: "ราคา/หน่วย",       en: "Unit Price",   zh: "单价" },
+  colAmount:      { th: "จำนวนเงิน",        en: "Amount",       zh: "总价" },
+  colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
+  vatLabel:       { th: "VAT %",            en: "VAT %",        zh: "增值税 %" },
+  depositLabel:   { th: "มัดจำ %",          en: "Deposit %",    zh: "定金 %" },
+  subtotal:       { th: "ราคารวมก่อนภาษี", en: "Subtotal",     zh: "小计" },
+  vatAmountLabel: { th: "ภาษีมูลค่าเพิ่ม", en: "VAT",          zh: "增值税" },
+  grandTotal:     { th: "ราคารวมทั้งหมด",  en: "Grand Total",  zh: "总价" },
+  depositAmount:  { th: "เงินมัดจำ",        en: "Deposit",      zh: "定金" },
+  balance:        { th: "ยอดคงเหลือหลังจัดส่งและติดตั้ง", en: "Balance", zh: "余款" },
+  term1: {
+    th: "เวลาจัดส่ง: ภายใน 3 วันหลังจากได้รับเงินมัดจำ (สำหรับสินค้าสั่งผลิตต้องใช้เวลา 30 วัน)",
+    en: "Delivery time: within 3 days after deposit received (made-to-order items require 30 days)",
+    zh: "发货时间：收到定金3天内（定制产品需要30天）",
+  },
+  term2: {
+    th: "เงื่อนไขการชำระเงิน: มัดจำตาม % ที่ระบุ ส่วนที่เหลือชำระหลังจากจัดส่งและติดตั้ง",
+    en: "Payment terms: deposit as specified %, balance due after delivery and installation",
+    zh: "付款条款：定金，余款在完成运输和安装之后结清。",
+  },
+  term3: {
+    th: "รูปภาพและตัวอย่างสินค้าในเอกสารนี้เป็นเพียงการอ้างอิง สินค้าจริงอาจมีความแตกต่างของสีและรายละเอียดเล็กน้อย",
+    en: "Images and samples in this document are for reference only; actual products may vary slightly in color and detail.",
+    zh: "本文件中的图片和样品仅供参考，实际产品的颜色及细节可能略有不同。",
+  },
+  term4: {
+    th: "เอกสารนี้มีอายุ 30 วันนับจากวันที่ออก",
+    en: "This document is valid for 30 days from the issue date.",
+    zh: "报价有效期30天。",
+  },
+  sellerSign: { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
+  buyerSign:  { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
+} satisfies Record<string, TriText>;
+
+function joinLang(langMode: LangMode, t: TriText): string {
+  if (langMode === "th-en-zh") return `${t.th} / ${t.en} / ${t.zh}`;
+  if (langMode === "th-en") return `${t.th} / ${t.en}`;
+  return `${t.th} / ${t.zh}`;
+}
 
 function newLine(): LineItem {
   return {
@@ -120,6 +193,7 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
 
 export default function QuoteBuilderPage() {
   const [docType, setDocType] = useState<DocType>("quotation");
+  const [langMode, setLangMode] = useState<LangMode>("th-en-zh");
   const [docNo, setDocNo] = useState(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
   const [date, setDate] = useState(todayStr());
   const [customerName, setCustomerName] = useState("");
@@ -130,6 +204,8 @@ export default function QuoteBuilderPage() {
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
   const [items, setItems] = useState<LineItem[]>([newLine()]);
+
+  const L = (t: TriText) => joinLang(langMode, t);
 
   function setDocTypeAndPrefix(t: DocType) {
     setDocType(t);
@@ -165,6 +241,14 @@ export default function QuoteBuilderPage() {
   const balanceAmount = grandTotal - depositAmount;
 
   const doc = DOC_LABELS[docType];
+
+  // Company name lines, in the source template's order (EN, ZH, TH),
+  // filtered down to whichever languages are selected.
+  const companyLines = [
+    { key: "en", text: COMPANY.nameEn, show: langMode !== "th-zh" },
+    { key: "zh", text: COMPANY.nameZh, show: langMode !== "th-en" },
+    { key: "th", text: COMPANY.nameTh, show: true },
+  ].filter((l) => l.show);
 
   return (
     <div className="space-y-6">
@@ -204,6 +288,24 @@ export default function QuoteBuilderPage() {
                   {DOC_LABELS[t].th}
                 </button>
               ))}
+            </div>
+
+            <div>
+              <Label>ภาษาในเอกสาร</Label>
+              <div className="flex gap-2 mt-1">
+                {LANG_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setLangMode(o.value)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      langMode === o.value ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -346,60 +448,59 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-0">
               <tbody>
                 <tr>
-                  <td rowSpan={3} className="w-[80px] align-top pt-1">
+                  <td rowSpan={companyLines.length} className="w-[80px] align-top pt-1">
                     <Image src="/icon.png" alt="Futai" width={60} height={60} className="rounded" />
                   </td>
-                  <td colSpan={8} className="text-center font-bold text-[13px] pt-1">{COMPANY.nameEn}</td>
+                  <td colSpan={8} className="text-center font-bold text-[13px] pt-1">{companyLines[0].text}</td>
                 </tr>
-                <tr>
-                  <td colSpan={8} className="text-center text-[12px]">{COMPANY.nameZh}</td>
-                </tr>
-                <tr>
-                  <td colSpan={8} className="text-center text-[12px] pb-1">{COMPANY.nameTh}</td>
-                </tr>
+                {companyLines.slice(1).map((l, i) => (
+                  <tr key={l.key}>
+                    <td colSpan={8} className={`text-center text-[12px] ${i === companyLines.length - 2 ? "pb-1" : ""}`}>{l.text}</td>
+                  </tr>
+                ))}
                 <tr className="text-[9.5px]">
-                  <td colSpan={2} className="whitespace-nowrap pr-1">地址 (ที่อยู่) :</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
                   <td colSpan={4}>99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา</td>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">电话 (Tel) :</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.tel)} :</td>
                   <td>{COMPANY.tel}</td>
                 </tr>
                 <tr className="text-[9.5px]">
                   <td colSpan={2} />
                   <td colSpan={4}>อำเภอลำลูกกา จ.ปทุมธานี 12150</td>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">网站 (Web) :</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.web)} :</td>
                   <td>{COMPANY.web}</td>
                 </tr>
                 <tr className="text-[9.5px]">
-                  <td colSpan={2} className="whitespace-nowrap pr-1">纳税人识别号 (เลขผู้เสียภาษี):</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)} :</td>
                   <td colSpan={4}>{COMPANY.taxId}</td>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">邮箱 (Email) :</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.email)} :</td>
                   <td>{COMPANY.email}</td>
                 </tr>
               </tbody>
             </table>
 
             <div className="text-center font-bold text-[13px] py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
-              {doc.th}  /  {doc.en}  /  {doc.zh}
+              {L(doc)}
             </div>
 
             <table className="w-full border-collapse mb-2 text-[10.5px]">
               <tbody>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">日期 (วันที่)：</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.date)}：</td>
                   <td colSpan={4}>{date}</td>
-                  <td colSpan={2} className="whitespace-nowrap">{doc.en === "INVOICE" ? "Invoice No" : "Quotation No"}</td>
+                  <td colSpan={2} className="whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
                   <td className="font-mono">{docNo}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">客户 (ลูกค้า):</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.customer)}:</td>
                   <td colSpan={7}>{customerName || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">地址 (ที่อยู่) :</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
                   <td colSpan={7}>{customerAddress || "-"}{customerContact || customerPhone ? ` — ${customerContact} ${customerPhone}`.trim() : ""}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">纳税人识别号 (เลขผู้เสียภาษี):</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
                   <td colSpan={7}>{customerTaxId || "-"}</td>
                 </tr>
               </tbody>
@@ -408,16 +509,16 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-0 text-[10px]">
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>序号<br />(ลำดับ)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "18%" }}>品名<br />(ชื่อสินค้า)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "12%" }}>型号<br />(แบบอย่าง)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>图片<br />(ภาพ)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "16%" }}>规格 / ขนาด (mm)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>数量<br />(ปริมาณ)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>หน่วย<br />(Unit)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>单价<br />(ราคา/หน่วย)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>总价<br />(จำนวนเงิน)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>备注<br />(หมายเหตุ)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "18%" }}>{L(TXT.colItem)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "12%" }}>{L(TXT.colModel)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colPhoto)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "16%" }}>{L(TXT.colSize)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colQty)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colUnit)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colUnitPrice)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colAmount)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colRemark)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -449,29 +550,29 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-0 text-[10px]">
               <tbody>
                 <tr style={{ backgroundColor: "#FFFFCC" }}>
-                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">VAT %</td>
+                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">{L(TXT.vatLabel)}</td>
                   <td className="border border-[#E8E5E0] p-1 text-center">{vatPct}%</td>
-                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">มัดจำ % / Deposit %</td>
+                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">{L(TXT.depositLabel)}</td>
                   <td className="border border-[#E8E5E0] p-1 text-center" colSpan={7}>{depositPct}%</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">小计（ราคารวมก่อนภาษี） / Subtotal</td>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.subtotal)}</td>
                   <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(subtotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">增值税（ภาษีมูลค่าเพิ่ม） / VAT</td>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.vatAmountLabel)}</td>
                   <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(vatAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 font-bold">总价（ราคารวมทั้งหมด） / Grand Total</td>
+                  <td colSpan={8} className="p-1 font-bold">{L(TXT.grandTotal)}</td>
                   <td colSpan={2} className="p-1 text-right font-bold">฿{fmtMoney(grandTotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">定金（เงินมัดจำ） / Deposit</td>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.depositAmount)}</td>
                   <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(depositAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">余款（ยอดคงเหลือหลังจัดส่งและติดตั้ง） / Balance</td>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.balance)}</td>
                   <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(balanceAmount)}</td>
                 </tr>
               </tbody>
@@ -479,10 +580,10 @@ export default function QuoteBuilderPage() {
 
             <div className="pt-2 mb-3 text-[9.5px] text-[#6B6B6B] space-y-0.5">
               <p className="font-semibold text-[#1A1A1A]">TERMS OF SALE AND OTHER COMMENTS</p>
-              <p>1. เวลาจัดส่ง: ภายใน 3 วันหลังจากได้รับเงินมัดจำ (สำหรับสินค้าสั่งผลิตต้องใช้เวลา 30 วัน) / 发货时间：收到定金3天内（定制产品需要30天）</p>
-              <p>2. เงื่อนไขการชำระเงิน: มัดจำตาม % ที่ระบุ ส่วนที่เหลือชำระหลังจากจัดส่งและติดตั้ง / 付款条款：定金，余款在完成运输和安装之后结清。</p>
-              <p>3. รูปภาพและตัวอย่างสินค้าในเอกสารนี้เป็นเพียงการอ้างอิง สินค้าจริงอาจมีความแตกต่างของสีและรายละเอียดเล็กน้อย</p>
-              <p>4. เอกสารนี้มีอายุ 30 วันนับจากวันที่ออก / 报价有效期30天。</p>
+              <p>1. {L(TXT.term1)}</p>
+              <p>2. {L(TXT.term2)}</p>
+              <p>3. {L(TXT.term3)}</p>
+              <p>4. {L(TXT.term4)}</p>
             </div>
 
             <div className="pt-2 mb-2 text-[9.5px] text-[#6B6B6B]">
@@ -494,8 +595,8 @@ export default function QuoteBuilderPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-8 text-[10px] text-[#6B6B6B] pt-2">
-              <p className="whitespace-pre-line h-16">{"销售方（盖章）:\nผู้ขาย (ประทับตราบริษัท) :"}</p>
-              <p className="whitespace-pre-line h-16">{"采购方（盖章）：\nผู้ซื้อ (ประทับตราบริษัท) :"}</p>
+              <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
+              <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
             </div>
           </div>
         </div>

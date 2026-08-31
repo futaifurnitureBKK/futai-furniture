@@ -20,7 +20,7 @@ export const PRICE_CATALOG: PriceCatalogEntry[] = [
     "size": "W1800*D1600*H750",
     "priceLabel": "฿13,500",
     "price": 13500,
-    "image": null
+    "image": "https://2voda5kg7n45c9cm.public.blob.vercel-storage.com/products/0f472ede-96c3-4b08-9467-2f9ec64fd525.png"
   },
   {
     "sku": "FL-ZZ-104",
@@ -44,7 +44,7 @@ export const PRICE_CATALOG: PriceCatalogEntry[] = [
     "size": "W2000/2200*D1600*H750",
     "priceLabel": "฿14,250",
     "price": 14250,
-    "image": null
+    "image": "https://2voda5kg7n45c9cm.public.blob.vercel-storage.com/products/0f472ede-96c3-4b08-9467-2f9ec64fd525.png"
   },
   {
     "sku": "FL-ZZ-104",
@@ -60,7 +60,7 @@ export const PRICE_CATALOG: PriceCatalogEntry[] = [
     "size": "W2400/2600*D1800*H750",
     "priceLabel": "฿15,000",
     "price": 15000,
-    "image": null
+    "image": "https://2voda5kg7n45c9cm.public.blob.vercel-storage.com/products/0f472ede-96c3-4b08-9467-2f9ec64fd525.png"
   },
   {
     "sku": "FL-ZZ-104",
@@ -84,7 +84,7 @@ export const PRICE_CATALOG: PriceCatalogEntry[] = [
     "size": "W3000*D1800*H750",
     "priceLabel": "฿20,250",
     "price": 20250,
-    "image": null
+    "image": "https://2voda5kg7n45c9cm.public.blob.vercel-storage.com/products/0f472ede-96c3-4b08-9467-2f9ec64fd525.png"
   },
   {
     "sku": "FL-ZZ-104",

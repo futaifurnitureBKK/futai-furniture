@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Plus, Trash2, Printer, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -241,6 +241,17 @@ export default function QuoteBuilderPage() {
   const balanceAmount = grandTotal - depositAmount;
 
   const doc = DOC_LABELS[docType];
+
+  // If the browser's own print header/footer gets left on (Chrome shows it
+  // unless "Headers and footers" is unchecked), at least have it show the
+  // document number instead of the site's generic page title.
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = `${docNo} - ${doc.en} - Futai Furniture`;
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [docNo, doc.en]);
 
   // Company name lines, in the source template's order (EN, ZH, TH),
   // filtered down to whichever languages are selected.

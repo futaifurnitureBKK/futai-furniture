@@ -102,8 +102,8 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
               }}
               className="w-full flex items-center gap-2 text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
             >
-              <div className="relative w-9 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
-                {m.image && <Image src={m.image} alt="" fill sizes="36px" className="object-cover" />}
+              <div className="relative w-12 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
+                {m.image && <Image src={m.image} alt="" fill sizes="48px" className="object-contain" />}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{m.sku}</p>
@@ -261,8 +261,8 @@ export default function QuoteBuilderPage() {
 
                 <div className="flex gap-2">
                   {it.image && (
-                    <div className="relative w-12 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
-                      <Image src={it.image} alt="" fill sizes="48px" className="object-cover" />
+                    <div className="relative w-16 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                      <Image src={it.image} alt="" fill sizes="64px" className="object-contain" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
@@ -428,8 +428,8 @@ export default function QuoteBuilderPage() {
                     <td className="border border-[#E8E5E0] p-1 font-mono">{it.sku || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1">
                       {it.image ? (
-                        <div className="relative w-12 h-12 mx-auto">
-                          <Image src={it.image} alt="" fill sizes="48px" className="object-cover" />
+                        <div className="relative w-full h-16 mx-auto">
+                          <Image src={it.image} alt="" fill sizes="90px" className="object-contain" />
                         </div>
                       ) : (
                         <span className="text-[#C8C5BE]">-</span>

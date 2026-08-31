@@ -274,6 +274,14 @@ export default function QuoteBuilderPage() {
              auto-layout table below to different (wrong) column widths. */
           #print-area { position: absolute; top: 0; left: 0; width: 794px; margin: 0; }
           .no-print { display: none !important; }
+          /* Chrome strips background colors on print by default (the
+             peach header bar, yellow VAT row) unless the user manually
+             checks "Background graphics" in More settings — force them
+             to print regardless, matching the on-screen preview exactly. */
+          #print-area, #print-area * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
 

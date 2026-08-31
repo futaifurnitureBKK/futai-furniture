@@ -254,9 +254,14 @@ export default function QuoteBuilderPage() {
     <div className="space-y-6">
       <style>{`
         @media print {
+          @page { margin: 10mm; }
           body * { visibility: hidden; }
           #print-area, #print-area * { visibility: visible; }
-          #print-area { position: absolute; top: 0; left: 0; width: 100%; }
+          /* Explicit width, not 100% or auto: position:absolute with only
+             "left:0" set makes a block shrink-to-fit its content instead of
+             keeping the 794px it had on screen, which silently reflows every
+             auto-layout table below to different (wrong) column widths. */
+          #print-area { position: absolute; top: 0; left: 0; width: 794px; margin: 0; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -506,7 +511,7 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <table className="w-full border-collapse mb-0 text-[10px]">
+            <table className="w-full border-collapse mb-0 text-[10px]" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
                   <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>

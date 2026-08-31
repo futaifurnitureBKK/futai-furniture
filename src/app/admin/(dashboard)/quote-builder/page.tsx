@@ -325,55 +325,82 @@ export default function QuoteBuilderPage() {
         <div>
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">ตัวอย่างเอกสาร (Preview)</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
-            {/* Letterhead */}
-            <div className="flex items-start justify-between border-b-2 border-[#C8102E] pb-3 mb-3">
-              <div className="flex items-center gap-3">
-                <Image src="/icon.png" alt="Futai" width={44} height={44} className="rounded" />
-                <div>
-                  <p className="font-bold text-sm">{COMPANY.nameEn}</p>
-                  <p>{COMPANY.nameZh}</p>
-                  <p>{COMPANY.nameTh}</p>
-                </div>
-              </div>
-              <div className="text-right text-[10px] text-[#6B6B6B] max-w-[220px]">
-                <p>{COMPANY.addressTh}</p>
-                <p>เลขผู้เสียภาษี: {COMPANY.taxId}</p>
-                <p>Tel: {COMPANY.tel}</p>
-                <p>{COMPANY.web} · {COMPANY.email}</p>
-              </div>
+            {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}
+            <table className="w-full border-collapse mb-0">
+              <tbody>
+                <tr>
+                  <td rowSpan={3} className="w-[80px] align-top pt-1">
+                    <Image src="/icon.png" alt="Futai" width={60} height={60} className="rounded" />
+                  </td>
+                  <td colSpan={8} className="text-center font-bold text-[13px] pt-1">{COMPANY.nameEn}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="text-center text-[12px]">{COMPANY.nameZh}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="text-center text-[12px] pb-1">{COMPANY.nameTh}</td>
+                </tr>
+                <tr className="text-[9.5px]">
+                  <td colSpan={2} className="whitespace-nowrap pr-1">地址 (ที่อยู่) :</td>
+                  <td colSpan={4}>99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">电话 (Tel) :</td>
+                  <td>{COMPANY.tel}</td>
+                </tr>
+                <tr className="text-[9.5px]">
+                  <td colSpan={2} />
+                  <td colSpan={4}>อำเภอลำลูกกา จ.ปทุมธานี 12150</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">网站 (Web) :</td>
+                  <td>{COMPANY.web}</td>
+                </tr>
+                <tr className="text-[9.5px]">
+                  <td colSpan={2} className="whitespace-nowrap pr-1">纳税人识别号 (เลขผู้เสียภาษี):</td>
+                  <td colSpan={4}>{COMPANY.taxId}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">邮箱 (Email) :</td>
+                  <td>{COMPANY.email}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="text-center font-bold text-[13px] py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
+              {doc.th}  /  {doc.en}  /  {doc.zh}
             </div>
 
-            <div className="bg-[#C8102E] text-white text-center font-bold py-1.5 mb-3 text-sm">
-              {doc.th} / {doc.en} / {doc.zh}
-            </div>
+            <table className="w-full border-collapse mb-2 text-[10.5px]">
+              <tbody>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">日期 (วันที่)：</td>
+                  <td colSpan={4}>{date}</td>
+                  <td colSpan={2} className="whitespace-nowrap">{doc.en === "INVOICE" ? "Invoice No" : "Quotation No"}</td>
+                  <td className="font-mono">{docNo}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">客户 (ลูกค้า):</td>
+                  <td colSpan={7}>{customerName || "-"}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">地址 (ที่อยู่) :</td>
+                  <td colSpan={7}>{customerAddress || "-"}{customerContact || customerPhone ? ` — ${customerContact} ${customerPhone}`.trim() : ""}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">纳税人识别号 (เลขผู้เสียภาษี):</td>
+                  <td colSpan={7}>{customerTaxId || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
 
-            <div className="flex justify-between mb-3">
-              <div>
-                <p><span className="text-[#6B6B6B]">客户 (ลูกค้า):</span> {customerName || "-"}</p>
-                <p><span className="text-[#6B6B6B]">ที่อยู่:</span> {customerAddress || "-"}</p>
-                <p><span className="text-[#6B6B6B]">เลขผู้เสียภาษี:</span> {customerTaxId || "-"}</p>
-                {(customerContact || customerPhone) && (
-                  <p><span className="text-[#6B6B6B]">ติดต่อ:</span> {customerContact} {customerPhone}</p>
-                )}
-              </div>
-              <div className="text-right shrink-0">
-                <p><span className="text-[#6B6B6B]">日期 (วันที่):</span> {date}</p>
-                <p><span className="text-[#6B6B6B]">No:</span> {docNo}</p>
-              </div>
-            </div>
-
-            <table className="w-full border-collapse mb-3">
+            <table className="w-full border-collapse mb-0 text-[10px]">
               <thead>
-                <tr className="bg-[#FAF7F2] text-[10px]">
-                  <th className="border border-[#E8E5E0] p-1">ลำดับ</th>
-                  <th className="border border-[#E8E5E0] p-1">ชื่อสินค้า</th>
-                  <th className="border border-[#E8E5E0] p-1">รหัสรุ่น</th>
-                  <th className="border border-[#E8E5E0] p-1">ขนาด (mm)</th>
-                  <th className="border border-[#E8E5E0] p-1">จำนวน</th>
-                  <th className="border border-[#E8E5E0] p-1">หน่วย</th>
-                  <th className="border border-[#E8E5E0] p-1">ราคา/หน่วย</th>
-                  <th className="border border-[#E8E5E0] p-1">จำนวนเงิน</th>
-                  <th className="border border-[#E8E5E0] p-1">หมายเหตุ</th>
+                <tr style={{ backgroundColor: "#F8CAAC" }}>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>序号<br />(ลำดับ)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "18%" }}>品名<br />(ชื่อสินค้า)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "12%" }}>型号<br />(แบบอย่าง)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>图片<br />(ภาพ)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "16%" }}>规格 / ขนาด (mm)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>数量<br />(ปริมาณ)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>หน่วย<br />(Unit)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>单价<br />(ราคา/หน่วย)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>总价<br />(จำนวนเงิน)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>备注<br />(หมายเหตุ)</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,6 +409,7 @@ export default function QuoteBuilderPage() {
                     <td className="border border-[#E8E5E0] p-1">{idx + 1}</td>
                     <td className="border border-[#E8E5E0] p-1 text-left">{it.name || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1 font-mono">{it.sku || "-"}</td>
+                    <td className="border border-[#E8E5E0] p-1 text-[#C8C5BE]">-</td>
                     <td className="border border-[#E8E5E0] p-1">{it.size || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1">{it.qty}</td>
                     <td className="border border-[#E8E5E0] p-1">{it.unit}</td>
@@ -393,19 +421,38 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="flex justify-end mb-3">
-              <table className="text-[11px]">
-                <tbody>
-                  <tr><td className="pr-4 text-[#6B6B6B]">小计 (ราคารวมก่อนภาษี) Subtotal</td><td className="text-right font-medium">฿{fmtMoney(subtotal)}</td></tr>
-                  <tr><td className="pr-4 text-[#6B6B6B]">增值税 (ภาษีมูลค่าเพิ่ม) VAT {vatPct}%</td><td className="text-right font-medium">฿{fmtMoney(vatAmount)}</td></tr>
-                  <tr><td className="pr-4 font-bold">总价 (ราคารวมทั้งหมด) Grand Total</td><td className="text-right font-bold">฿{fmtMoney(grandTotal)}</td></tr>
-                  <tr><td className="pr-4 text-[#6B6B6B]">定金 (เงินมัดจำ) Deposit {depositPct}%</td><td className="text-right font-medium">฿{fmtMoney(depositAmount)}</td></tr>
-                  <tr><td className="pr-4 text-[#6B6B6B]">余款 (ยอดคงเหลือ) Balance</td><td className="text-right font-medium">฿{fmtMoney(balanceAmount)}</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full border-collapse mb-0 text-[10px]">
+              <tbody>
+                <tr style={{ backgroundColor: "#FFFFCC" }}>
+                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">VAT %</td>
+                  <td className="border border-[#E8E5E0] p-1 text-center">{vatPct}%</td>
+                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">มัดจำ % / Deposit %</td>
+                  <td className="border border-[#E8E5E0] p-1 text-center" colSpan={7}>{depositPct}%</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">小计（ราคารวมก่อนภาษี） / Subtotal</td>
+                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(subtotal)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">增值税（ภาษีมูลค่าเพิ่ม） / VAT</td>
+                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(vatAmount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="p-1 font-bold">总价（ราคารวมทั้งหมด） / Grand Total</td>
+                  <td colSpan={2} className="p-1 text-right font-bold">฿{fmtMoney(grandTotal)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">定金（เงินมัดจำ） / Deposit</td>
+                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(depositAmount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={8} className="p-1 text-[#6B6B6B]">余款（ยอดคงเหลือหลังจัดส่งและติดตั้ง） / Balance</td>
+                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(balanceAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
 
-            <div className="border-t border-[#E8E5E0] pt-2 mb-3 text-[9.5px] text-[#6B6B6B] space-y-0.5">
+            <div className="pt-2 mb-3 text-[9.5px] text-[#6B6B6B] space-y-0.5">
               <p className="font-semibold text-[#1A1A1A]">TERMS OF SALE AND OTHER COMMENTS</p>
               <p>1. เวลาจัดส่ง: ภายใน 3 วันหลังจากได้รับเงินมัดจำ (สำหรับสินค้าสั่งผลิตต้องใช้เวลา 30 วัน) / 发货时间：收到定金3天内（定制产品需要30天）</p>
               <p>2. เงื่อนไขการชำระเงิน: มัดจำตาม % ที่ระบุ ส่วนที่เหลือชำระหลังจากจัดส่งและติดตั้ง / 付款条款：定金，余款在完成运输和安装之后结清。</p>
@@ -413,17 +460,17 @@ export default function QuoteBuilderPage() {
               <p>4. เอกสารนี้มีอายุ 30 วันนับจากวันที่ออก / 报价有效期30天。</p>
             </div>
 
-            <div className="border-t border-[#E8E5E0] pt-2 mb-4 text-[9.5px] text-[#6B6B6B]">
+            <div className="pt-2 mb-2 text-[9.5px] text-[#6B6B6B]">
               <p className="font-semibold text-[#1A1A1A]">Bank Account (THB)</p>
               <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
-              <p>Bank : BANK OF CHINA (THAI) PCL &nbsp; Bank Code : 052</p>
-              <p>Address : 179/4 Bangkok City Tower, South Sathorn Rd, Tungmahamek, Sathorn, Bangkok 10120</p>
-              <p>SWIFT : BKCHTHBKXXX &nbsp; Correspondent Bank (For THB) : BKCHCNBJXXX</p>
+              <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
+              <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
+              <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 text-[10px] text-[#6B6B6B] pt-6">
-              <p>销售方（盖章）: ผู้ขาย (ประทับตราบริษัท) :</p>
-              <p>采购方（盖章）: ผู้ซื้อ (ประทับตราบริษัท) :</p>
+            <div className="grid grid-cols-2 gap-8 text-[10px] text-[#6B6B6B] pt-2">
+              <p className="whitespace-pre-line h-16">{"销售方（盖章）:\nผู้ขาย (ประทับตราบริษัท) :"}</p>
+              <p className="whitespace-pre-line h-16">{"采购方（盖章）：\nผู้ซื้อ (ประทับตราบริษัท) :"}</p>
             </div>
           </div>
         </div>

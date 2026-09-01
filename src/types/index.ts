@@ -65,6 +65,7 @@ export interface SavedQuote {
   shipping_date: string | null;
   contact_person: string;
   contact_phone: string;
+  discount_pct: number;
   vat_pct: number;
   deposit_pct: number;
   items: SavedQuoteItem[];

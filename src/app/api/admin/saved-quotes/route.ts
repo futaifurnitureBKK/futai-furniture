@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       shipping_date: body.shipping_date || null,
       contact_person: body.contact_person || "",
       contact_phone: body.contact_phone || "",
+      discount_pct: body.discount_pct ?? 0,
       vat_pct: body.vat_pct ?? 7,
       deposit_pct: body.deposit_pct ?? 50,
       items: body.items || [],

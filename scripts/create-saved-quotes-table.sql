@@ -14,6 +14,7 @@ create table if not exists saved_quotes (
   shipping_date date,
   contact_person text not null default '',
   contact_phone text not null default '',
+  discount_pct numeric not null default 0,
   vat_pct numeric not null default 7,
   deposit_pct numeric not null default 50,
   -- Array of { name, sku, size, qty, unitPrice, remark, image }

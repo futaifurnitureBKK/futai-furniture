@@ -84,6 +84,7 @@ const TXT = {
   colAmount:      { th: "จำนวนเงินทั้งหมด", en: "Amount",       zh: "总价" },
   colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
   subtotal:       { th: "ราคารวมก่อนภาษี", en: "Subtotal",     zh: "小计" },
+  discount:       { th: "ส่วนลด",           en: "Discount",     zh: "折扣" },
   vatAmountLabel: { th: "ภาษีมูลค่าเพิ่ม", en: "VAT",          zh: "增值税" },
   grandTotal:     { th: "ราคารวมทั้งหมด",  en: "Grand Total",  zh: "总价" },
   depositAmount:  { th: "เงินมัดจำ",        en: "Deposit",      zh: "定金" },
@@ -211,6 +212,7 @@ export default function QuoteBuilderPage() {
   const [shippingDate, setShippingDate] = useState("");
   const [customerContact, setCustomerContact] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [discountPct, setDiscountPct] = useState(0);
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
   const [items, setItems] = useState<LineItem[]>([newLine()]);
@@ -259,6 +261,7 @@ export default function QuoteBuilderPage() {
     setShippingDate("");
     setCustomerContact("");
     setCustomerPhone("");
+    setDiscountPct(0);
     setVatPct(7);
     setDepositPct(50);
     setItems([newLine()]);
@@ -278,6 +281,7 @@ export default function QuoteBuilderPage() {
       shipping_date: shippingDate || null,
       contact_person: customerContact,
       contact_phone: customerPhone,
+      discount_pct: discountPct,
       vat_pct: vatPct,
       deposit_pct: depositPct,
       items: items.map(
@@ -328,6 +332,7 @@ export default function QuoteBuilderPage() {
     setShippingDate(q.shipping_date || "");
     setCustomerContact(q.contact_person);
     setCustomerPhone(q.contact_phone);
+    setDiscountPct(q.discount_pct ?? 0);
     setVatPct(q.vat_pct);
     setDepositPct(q.deposit_pct);
     setItems(
@@ -378,8 +383,10 @@ export default function QuoteBuilderPage() {
   }
 
   const subtotal = items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
-  const vatAmount = subtotal * (vatPct / 100);
-  const grandTotal = subtotal + vatAmount;
+  const discountAmount = subtotal * (discountPct / 100);
+  const subtotalAfterDiscount = subtotal - discountAmount;
+  const vatAmount = subtotalAfterDiscount * (vatPct / 100);
+  const grandTotal = subtotalAfterDiscount + vatAmount;
   const depositAmount = grandTotal * (depositPct / 100);
   const balanceAmount = grandTotal - depositAmount;
 
@@ -684,7 +691,11 @@ export default function QuoteBuilderPage() {
             ))}
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-3 gap-3">
+            <div>
+              <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
+              <Input type="number" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
+            </div>
             <div>
               <Label>VAT %</Label>
               <Input type="number" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
@@ -810,6 +821,12 @@ export default function QuoteBuilderPage() {
                   <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                 </tr>
+                {discountPct > 0 && (
+                  <tr>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.discount)} ({discountPct}%)</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">-฿{fmtMoney(discountAmount)}</td>
+                  </tr>
+                )}
                 <tr>
                   <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)} ({vatPct}%)</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>

@@ -609,24 +609,24 @@ export default function QuoteBuilderPage() {
                   <td className="border border-[#E8E5E0] p-1 text-center" colSpan={7}>{depositPct}%</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.subtotal)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(subtotal)}</td>
+                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
+                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.vatAmountLabel)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(vatAmount)}</td>
+                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)}</td>
+                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 font-bold">{L(TXT.grandTotal)}</td>
-                  <td colSpan={2} className="p-1 text-right font-bold">฿{fmtMoney(grandTotal)}</td>
+                  <td colSpan={8} className="p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
+                  <td colSpan={2} className="p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.depositAmount)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(depositAmount)}</td>
+                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.depositAmount)}</td>
+                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.balance)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(balanceAmount)}</td>
+                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
+                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
                 </tr>
               </tbody>
             </table>
@@ -651,23 +651,23 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="pt-2 mb-3 text-[9.5px] text-[#6B6B6B] space-y-0.5">
-              <p className="font-semibold text-[#1A1A1A]">TERMS OF SALE AND OTHER COMMENTS</p>
+            <div className="pt-2 mb-3 text-[9.5px] text-[#1A1A1A] space-y-0.5">
+              <p className="font-semibold">TERMS OF SALE AND OTHER COMMENTS</p>
               <p>1. {L(TXT.term1)}</p>
               <p>2. {L(TXT.term2)}</p>
               <p>3. {L(TXT.term3)}</p>
               <p>4. {L(TXT.term4)}</p>
             </div>
 
-            <div className="pt-2 mb-2 text-[9.5px] text-[#6B6B6B]">
-              <p className="font-semibold text-[#1A1A1A]">Bank Account (THB)</p>
+            <div className="pt-2 mb-2 text-[9.5px] text-[#1A1A1A]">
+              <p className="font-semibold">Bank Account (THB)</p>
               <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
               <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
               <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
               <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 text-[10px] text-[#6B6B6B] pt-2">
+            <div className="grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
               <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
               <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
             </div>

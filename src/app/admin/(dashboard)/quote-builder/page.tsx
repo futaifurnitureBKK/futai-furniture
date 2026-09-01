@@ -541,22 +541,22 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-2 text-[10.5px]">
               <tbody>
                 <tr>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.date)}：</td>
-                  <td colSpan={4} className="border border-[#1A1A1A] p-1">{date}</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
-                  <td className="border border-[#1A1A1A] p-1 font-mono">{docNo}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.date)}：</td>
+                  <td colSpan={4}>{date}</td>
+                  <td colSpan={2} className="whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
+                  <td className="font-mono">{docNo}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.customer)}:</td>
-                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerName || "-"}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.customer)}:</td>
+                  <td colSpan={7}>{customerName || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.address)} :</td>
-                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerAddress || "-"}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
+                  <td colSpan={7}>{customerAddress || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.taxId)}:</td>
-                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerTaxId || "-"}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
+                  <td colSpan={7}>{customerTaxId || "-"}</td>
                 </tr>
               </tbody>
             </table>

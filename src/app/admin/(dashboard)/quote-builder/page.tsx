@@ -83,8 +83,6 @@ const TXT = {
   colUnitPrice:   { th: "ราคาต่อหน่วย",     en: "Unit Price",   zh: "单价" },
   colAmount:      { th: "จำนวนเงินทั้งหมด", en: "Amount",       zh: "总价" },
   colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
-  vatLabel:       { th: "VAT %",            en: "VAT %",        zh: "增值税 %" },
-  depositLabel:   { th: "มัดจำ %",          en: "Deposit %",    zh: "定金 %" },
   subtotal:       { th: "ราคารวมก่อนภาษี", en: "Subtotal",     zh: "小计" },
   vatAmountLabel: { th: "ภาษีมูลค่าเพิ่ม", en: "VAT",          zh: "增值税" },
   grandTotal:     { th: "ราคารวมทั้งหมด",  en: "Grand Total",  zh: "总价" },
@@ -806,18 +804,12 @@ export default function QuoteBuilderPage() {
 
             <table className="w-full border-collapse mb-2 text-[10px]">
               <tbody>
-                <tr style={{ backgroundColor: "#FFFFCC" }}>
-                  <td className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.vatLabel)}</td>
-                  <td className="border border-[#1A1A1A] p-1 text-center">{vatPct}%</td>
-                  <td className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.depositLabel)}</td>
-                  <td className="border border-[#1A1A1A] p-1 text-center" colSpan={7}>{depositPct}%</td>
-                </tr>
                 <tr>
                   <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)} ({vatPct}%)</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
                 </tr>
                 <tr>
@@ -825,7 +817,7 @@ export default function QuoteBuilderPage() {
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
                 </tr>
                 <tr>

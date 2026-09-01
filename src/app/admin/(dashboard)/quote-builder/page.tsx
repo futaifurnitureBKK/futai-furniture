@@ -823,8 +823,8 @@ export default function QuoteBuilderPage() {
                 </tr>
                 {discountPct > 0 && (
                   <tr>
-                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.discount)} ({discountPct}%)</td>
-                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">-฿{fmtMoney(discountAmount)}</td>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
                   </tr>
                 )}
                 <tr>

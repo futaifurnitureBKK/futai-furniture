@@ -533,7 +533,10 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="text-center font-bold py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
+            {/* Everything from the title bar down sits inside one bold frame,
+                matching the real invoice — the letterhead above stays outside it. */}
+            <div className="border-2 border-[#1A1A1A] p-2">
+            <div className="text-center font-bold py-1.5 mb-2" style={{ backgroundColor: "#F8CAAC" }}>
               <div className="text-[15px]">{doc.th}</div>
               <div className="text-[11px]">{docSubLine}</div>
             </div>
@@ -541,47 +544,47 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-2 text-[10.5px]">
               <tbody>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.date)}：</td>
-                  <td colSpan={4}>{date}</td>
-                  <td colSpan={2} className="whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
-                  <td className="font-mono">{docNo}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.date)}：</td>
+                  <td colSpan={4} className="border border-[#1A1A1A] p-1">{date}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
+                  <td className="border border-[#1A1A1A] p-1 font-mono">{docNo}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.customer)}:</td>
-                  <td colSpan={7}>{customerName || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.customer)}:</td>
+                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerName || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
-                  <td colSpan={7}>{customerAddress || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.address)} :</td>
+                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerAddress || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
-                  <td colSpan={7}>{customerTaxId || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.taxId)}:</td>
+                  <td colSpan={7} className="border border-[#1A1A1A] p-1">{customerTaxId || "-"}</td>
                 </tr>
               </tbody>
             </table>
 
-            <table className="w-full border-collapse mb-0 text-[10px]" style={{ tableLayout: "fixed" }}>
+            <table className="w-full border-collapse mb-2 text-[10px]" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "19%" }}>{L(TXT.colItem)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "13%" }}>{L(TXT.colModel)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colPhoto)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "17%" }}>{L(TXT.colSize)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "7%" }}>{L(TXT.colQty)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colRemark)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "19%" }}>{L(TXT.colItem)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "13%" }}>{L(TXT.colModel)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colPhoto)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "17%" }}>{L(TXT.colSize)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "7%" }}>{L(TXT.colQty)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colRemark)}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it, idx) => (
                   <tr key={it.id} className="text-center">
-                    <td className="border border-[#E8E5E0] p-1">{idx + 1}</td>
-                    <td className="border border-[#E8E5E0] p-1 text-left">{it.name || "-"}</td>
-                    <td className="border border-[#E8E5E0] p-1 font-mono">{it.sku || "-"}</td>
-                    <td className="border border-[#E8E5E0] p-1">
+                    <td className="border border-[#1A1A1A] p-1">{idx + 1}</td>
+                    <td className="border border-[#1A1A1A] p-1 text-left">{it.name || "-"}</td>
+                    <td className="border border-[#1A1A1A] p-1 font-mono">{it.sku || "-"}</td>
+                    <td className="border border-[#1A1A1A] p-1">
                       {it.image ? (
                         <div className="relative w-full h-16 mx-auto">
                           <Image src={it.image} alt="" fill sizes="90px" className="object-contain" />
@@ -590,43 +593,43 @@ export default function QuoteBuilderPage() {
                         <span className="text-[#C8C5BE]">-</span>
                       )}
                     </td>
-                    <td className="border border-[#E8E5E0] p-1">{it.size || "-"}</td>
-                    <td className="border border-[#E8E5E0] p-1">{it.qty}</td>
-                    <td className="border border-[#E8E5E0] p-1 text-right">{fmtMoney(it.unitPrice)}</td>
-                    <td className="border border-[#E8E5E0] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
-                    <td className="border border-[#E8E5E0] p-1 text-left">{it.remark}</td>
+                    <td className="border border-[#1A1A1A] p-1">{it.size || "-"}</td>
+                    <td className="border border-[#1A1A1A] p-1">{it.qty}</td>
+                    <td className="border border-[#1A1A1A] p-1 text-right">{fmtMoney(it.unitPrice)}</td>
+                    <td className="border border-[#1A1A1A] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
+                    <td className="border border-[#1A1A1A] p-1 text-left">{it.remark}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <table className="w-full border-collapse mb-0 text-[10px]">
+            <table className="w-full border-collapse mb-2 text-[10px]">
               <tbody>
                 <tr style={{ backgroundColor: "#FFFFCC" }}>
-                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">{L(TXT.vatLabel)}</td>
-                  <td className="border border-[#E8E5E0] p-1 text-center">{vatPct}%</td>
-                  <td className="border border-[#E8E5E0] p-1 whitespace-nowrap">{L(TXT.depositLabel)}</td>
-                  <td className="border border-[#E8E5E0] p-1 text-center" colSpan={7}>{depositPct}%</td>
+                  <td className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.vatLabel)}</td>
+                  <td className="border border-[#1A1A1A] p-1 text-center">{vatPct}%</td>
+                  <td className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.depositLabel)}</td>
+                  <td className="border border-[#1A1A1A] p-1 text-center" colSpan={7}>{depositPct}%</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
-                  <td colSpan={2} className="p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.depositAmount)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={8} className="p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
-                  <td colSpan={2} className="p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
                 </tr>
               </tbody>
             </table>
@@ -637,39 +640,44 @@ export default function QuoteBuilderPage() {
             <table className="w-full border-collapse mb-2 text-[10px]">
               <tbody>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1 align-top">{L(TXT.shipAddress)}：</td>
-                  <td colSpan={3} className="align-top">{shippingAddress || "-"}</td>
-                  <td colSpan={2} className="whitespace-nowrap pr-1 align-top">{L(TXT.shipDate)}：</td>
-                  <td colSpan={2} className="align-top">{shippingDate || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap align-top">{L(TXT.shipAddress)}：</td>
+                  <td colSpan={3} className="border border-[#1A1A1A] p-1 align-top">{shippingAddress || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap align-top">{L(TXT.shipDate)}：</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 align-top">{shippingDate || "-"}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.shipContact)}：</td>
-                  <td colSpan={3}>{customerContact || "-"}</td>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.shipPhone)}：</td>
-                  <td colSpan={2}>{customerPhone || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.shipContact)}：</td>
+                  <td colSpan={3} className="border border-[#1A1A1A] p-1">{customerContact || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.shipPhone)}：</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1">{customerPhone || "-"}</td>
                 </tr>
               </tbody>
             </table>
 
-            <div className="pt-2 mb-3 text-[9.5px] text-[#1A1A1A] space-y-0.5">
-              <p className="font-semibold">TERMS OF SALE AND OTHER COMMENTS</p>
-              <p>1. {L(TXT.term1)}</p>
-              <p>2. {L(TXT.term2)}</p>
-              <p>3. {L(TXT.term3)}</p>
-              <p>4. {L(TXT.term4)}</p>
+            <div className="mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+              <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>TERMS OF SALE AND OTHER COMMENTS</p>
+              <div className="p-1.5 space-y-0.5">
+                <p>1. {L(TXT.term1)}</p>
+                <p>2. {L(TXT.term2)}</p>
+                <p>3. {L(TXT.term3)}</p>
+                <p>4. {L(TXT.term4)}</p>
+              </div>
             </div>
 
-            <div className="pt-2 mb-2 text-[9.5px] text-[#1A1A1A]">
-              <p className="font-semibold">Bank Account (THB)</p>
-              <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
-              <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
-              <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
-              <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
+            <div className="mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+              <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>Bank Account (THB)</p>
+              <div className="p-1.5 space-y-0.5">
+                <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
+                <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
+                <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
+                <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
               <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
               <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
+            </div>
             </div>
           </div>
         </div>

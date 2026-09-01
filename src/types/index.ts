@@ -39,6 +39,39 @@ export interface Lead {
   updated_at: string;
 }
 
+export type SavedQuoteDocType = "quotation" | "invoice";
+export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
+
+export interface SavedQuoteItem {
+  name: string;
+  sku: string;
+  size: string;
+  qty: number;
+  unitPrice: number;
+  remark: string;
+  image: string | null;
+}
+
+export interface SavedQuote {
+  id: number;
+  doc_type: SavedQuoteDocType;
+  doc_no: string;
+  lang_mode: SavedQuoteLangMode;
+  doc_date: string;
+  customer_name: string;
+  customer_address: string;
+  customer_tax_id: string;
+  shipping_address: string;
+  shipping_date: string | null;
+  contact_person: string;
+  contact_phone: string;
+  vat_pct: number;
+  deposit_pct: number;
+  items: SavedQuoteItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Category {
   id: string;
   slug: string;

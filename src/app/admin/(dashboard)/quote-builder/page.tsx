@@ -1,13 +1,18 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
+import type { SavedQuote, SavedQuoteItem } from "@/types";
 
 type DocType = "quotation" | "invoice";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
@@ -28,6 +33,8 @@ interface LineItem {
   remark: string;
   image: string | null;
 }
+
+type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at">;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation: { th: "ใบเสนอราคา", en: "QUOTATION", zh: "报价单", prefix: "QT" },
@@ -210,7 +217,140 @@ export default function QuoteBuilderPage() {
   const [depositPct, setDepositPct] = useState(50);
   const [items, setItems] = useState<LineItem[]>([newLine()]);
 
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const [savedList, setSavedList] = useState<SavedListRow[]>([]);
+  const [listOpen, setListOpen] = useState(false);
+  const [loadingList, setLoadingList] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const L = (t: TriText) => joinLang(langMode, t);
+
+  async function fetchSavedList() {
+    setLoadingList(true);
+    const res = await fetch("/api/admin/saved-quotes");
+    const data = await res.json();
+    setLoadingList(false);
+    if (res.ok) setSavedList(data.quotes);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/admin/saved-quotes");
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) setSavedList(data.quotes);
+        setLoadingList(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function resetForm() {
+    setSavedId(null);
+    setDocType("quotation");
+    setLangMode("th-en-zh");
+    setDocNo(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+    setDate(todayStr());
+    setCustomerName("");
+    setCustomerAddress("");
+    setCustomerTaxId("");
+    setShippingAddress("");
+    setShippingDate("");
+    setCustomerContact("");
+    setCustomerPhone("");
+    setVatPct(7);
+    setDepositPct(50);
+    setItems([newLine()]);
+  }
+
+  async function saveQuote() {
+    setSaving(true);
+    const payload = {
+      doc_type: docType,
+      doc_no: docNo,
+      lang_mode: langMode,
+      doc_date: date,
+      customer_name: customerName,
+      customer_address: customerAddress,
+      customer_tax_id: customerTaxId,
+      shipping_address: shippingAddress,
+      shipping_date: shippingDate || null,
+      contact_person: customerContact,
+      contact_phone: customerPhone,
+      vat_pct: vatPct,
+      deposit_pct: depositPct,
+      items: items.map(
+        (it): SavedQuoteItem => ({
+          name: it.name,
+          sku: it.sku,
+          size: it.size,
+          qty: it.qty,
+          unitPrice: it.unitPrice,
+          remark: it.remark,
+          image: it.image,
+        })
+      ),
+    };
+    const res = await fetch(savedId ? `/api/admin/saved-quotes/${savedId}` : "/api/admin/saved-quotes", {
+      method: savedId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      setSavedId(data.quote.id);
+      toast.success(t("บันทึกแล้ว", "Saved", "已保存"));
+      fetchSavedList();
+    } else {
+      toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    }
+  }
+
+  async function loadQuote(id: number) {
+    const res = await fetch(`/api/admin/saved-quotes/${id}`);
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(t("โหลดไม่สำเร็จ", "Load failed", "加载失败"));
+      return;
+    }
+    const q = data.quote as SavedQuote;
+    setSavedId(q.id);
+    setDocType(q.doc_type);
+    setLangMode(q.lang_mode);
+    setDocNo(q.doc_no);
+    setDate(q.doc_date);
+    setCustomerName(q.customer_name);
+    setCustomerAddress(q.customer_address);
+    setCustomerTaxId(q.customer_tax_id);
+    setShippingAddress(q.shipping_address);
+    setShippingDate(q.shipping_date || "");
+    setCustomerContact(q.contact_person);
+    setCustomerPhone(q.contact_phone);
+    setVatPct(q.vat_pct);
+    setDepositPct(q.deposit_pct);
+    setItems(
+      q.items.length
+        ? q.items.map((it) => ({ ...it, id: Math.random().toString(36).slice(2) }))
+        : [newLine()]
+    );
+    setListOpen(false);
+  }
+
+  async function deleteQuote(id: number) {
+    if (!confirm(t("ลบใบนี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)", "Delete this document? This can't be undone.", "确定删除吗？删除后无法恢复。"))) return;
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setSavedList((prev) => prev.filter((q) => q.id !== id));
+      if (savedId === id) resetForm();
+      toast.success(t("ลบแล้ว", "Deleted", "已删除"));
+    } else {
+      toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
+    }
+  }
 
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
@@ -305,10 +445,74 @@ export default function QuoteBuilderPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => window.print()}>
-          <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" onClick={() => setListOpen((v) => !v)}>
+            <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({savedList.length})
+          </Button>
+          <Button variant="outline" onClick={resetForm}>
+            <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
+          </Button>
+          <Button variant="outline" onClick={saveQuote} disabled={saving}>
+            <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
+          </Button>
+          <Button onClick={() => window.print()}>
+            <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
+          </Button>
+        </div>
       </div>
+
+      {listOpen && (
+        <div className="bg-white rounded-xl shadow-sm p-5 no-print">
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("รายการที่บันทึกไว้", "Saved Documents", "已保存文件")}</p>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#FAF7F2]">
+                <TableHead className="text-xs">{t("เลขที่", "Doc No.", "单号")}</TableHead>
+                <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
+                <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
+                <TableHead className="text-xs">{t("วันที่", "Date", "日期")}</TableHead>
+                <TableHead className="text-xs" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingList ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-[#6B6B6B]">
+                    {t("กำลังโหลด...", "Loading...", "加载中...")}
+                  </TableCell>
+                </TableRow>
+              ) : savedList.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-[#6B6B6B]">
+                    {t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                savedList.map((q) => (
+                  <TableRow key={q.id} className="hover:bg-[#FAF7F2]/50">
+                    <TableCell className="text-sm font-mono">{q.doc_no}</TableCell>
+                    <TableCell className="text-xs">
+                      {t(DOC_LABELS[q.doc_type].th, DOC_LABELS[q.doc_type].en, DOC_LABELS[q.doc_type].zh)}
+                    </TableCell>
+                    <TableCell className="text-sm">{q.customer_name || "-"}</TableCell>
+                    <TableCell className="text-xs text-[#6B6B6B]">{q.doc_date}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => loadQuote(q.id)}>
+                          {t("เปิด", "Open", "打开")}
+                        </Button>
+                        <Button size="icon-sm" variant="ghost" onClick={() => deleteQuote(q.id)} aria-label={t("ลบ", "Delete", "删除")}>
+                          <Trash2 size={13} className="text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* ── Form ─────────────────────────────────────────────────── */}

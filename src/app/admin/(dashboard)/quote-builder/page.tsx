@@ -24,7 +24,6 @@ interface LineItem {
   sku: string;
   size: string;
   qty: number;
-  unit: string;
   unitPrice: number;
   remark: string;
   image: string | null;
@@ -64,16 +63,18 @@ const TXT = {
   taxId:          { th: "เลขผู้เสียภาษี",   en: "Tax ID",       zh: "纳税人识别号" },
   date:           { th: "วันที่",           en: "Date",         zh: "日期" },
   customer:       { th: "ลูกค้า",           en: "Customer",     zh: "客户" },
-  contact:        { th: "ผู้ติดต่อ",        en: "Contact",      zh: "联系人" },
+  shipAddress:    { th: "ที่อยู่จัดส่ง",     en: "Delivery Address", zh: "发货地址" },
+  shipDate:       { th: "วันที่จัดส่ง",     en: "Delivery Date",    zh: "发货日期" },
+  shipContact:    { th: "บุคคลที่ติดต่อ",   en: "Contact Person",   zh: "联系人" },
+  shipPhone:      { th: "หมายเลขโทรศัพท์", en: "Phone",             zh: "电话" },
   colNo:          { th: "ลำดับ",            en: "No.",          zh: "序号" },
   colItem:        { th: "ชื่อสินค้า",       en: "Item",         zh: "品名" },
   colModel:       { th: "แบบอย่าง",         en: "Model",        zh: "型号" },
   colPhoto:       { th: "ภาพ",              en: "Photo",        zh: "图片" },
   colSize:        { th: "ขนาด (mm)",        en: "Size (mm)",    zh: "规格" },
   colQty:         { th: "ปริมาณ",           en: "Qty",          zh: "数量" },
-  colUnit:        { th: "หน่วย",            en: "Unit",         zh: "单位" },
-  colUnitPrice:   { th: "ราคา/หน่วย",       en: "Unit Price",   zh: "单价" },
-  colAmount:      { th: "จำนวนเงิน",        en: "Amount",       zh: "总价" },
+  colUnitPrice:   { th: "ราคาต่อหน่วย",     en: "Unit Price",   zh: "单价" },
+  colAmount:      { th: "จำนวนเงินทั้งหมด", en: "Amount",       zh: "总价" },
   colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
   vatLabel:       { th: "VAT %",            en: "VAT %",        zh: "增值税 %" },
   depositLabel:   { th: "มัดจำ %",          en: "Deposit %",    zh: "定金 %" },
@@ -119,7 +120,6 @@ function newLine(): LineItem {
     sku: "",
     size: "",
     qty: 1,
-    unit: "ชุด",
     unitPrice: 0,
     remark: "",
     image: null,
@@ -202,6 +202,8 @@ export default function QuoteBuilderPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [customerTaxId, setCustomerTaxId] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [shippingDate, setShippingDate] = useState("");
   const [customerContact, setCustomerContact] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [vatPct, setVatPct] = useState(7);
@@ -244,6 +246,10 @@ export default function QuoteBuilderPage() {
   const balanceAmount = grandTotal - depositAmount;
 
   const doc = DOC_LABELS[docType];
+  // Second title-bar line: whichever non-Thai language(s) are selected,
+  // e.g. "QUOTATION / 报价单" — Thai stands alone on the line above it,
+  // matching the real invoice layout (not a single "TH / EN / ZH" line).
+  const docSubLine = langMode === "th-en-zh" ? `${doc.en} / ${doc.zh}` : langMode === "th-en" ? doc.en : doc.zh;
 
   // If the browser's own print header/footer gets left on (Chrome shows it
   // unless "Headers and footers" is unchecked), at least have it show the
@@ -366,17 +372,33 @@ export default function QuoteBuilderPage() {
                 <Label>{t("ที่อยู่", "Address", "地址")}</Label>
                 <Textarea className="mt-1" rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
               </div>
-              <div>
+              <div className="col-span-2">
                 <Label>{t("เลขผู้เสียภาษี", "Tax ID", "纳税人识别号")}</Label>
                 <Input className="mt-1" value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value)} />
               </div>
+            </div>
+          </div>
+
+          {/* Delivery info — separate block, matches the real invoice layout
+              (shipping address/date can differ from the billing details above) */}
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <p className="text-sm font-semibold text-[#1A1A1A]">{t("ข้อมูลจัดส่ง", "Delivery Info", "发货信息")}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label>{t("ที่อยู่จัดส่ง", "Delivery Address", "发货地址")}</Label>
+                <Textarea className="mt-1" rows={2} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} />
+              </div>
               <div>
-                <Label>{t("เบอร์ติดต่อ", "Phone", "联系电话")}</Label>
-                <Input className="mt-1" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <Label>{t("วันที่จัดส่ง", "Delivery Date", "发货日期")}</Label>
+                <Input type="date" className="mt-1" value={shippingDate} onChange={(e) => setShippingDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>{t("บุคคลที่ติดต่อ", "Contact Person", "联系人")}</Label>
+                <Input className="mt-1" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} />
               </div>
               <div className="col-span-2">
-                <Label>{t("ผู้ติดต่อ", "Contact Person", "联系人")}</Label>
-                <Input className="mt-1" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} />
+                <Label>{t("หมายเลขโทรศัพท์", "Phone", "电话")}</Label>
+                <Input className="mt-1" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
               </div>
             </div>
           </div>
@@ -431,7 +453,7 @@ export default function QuoteBuilderPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Input
                     type="number"
                     className="h-8 text-xs"
@@ -440,15 +462,9 @@ export default function QuoteBuilderPage() {
                     onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
                   />
                   <Input
-                    className="h-8 text-xs"
-                    placeholder={t("หน่วย", "Unit", "单位")}
-                    value={it.unit}
-                    onChange={(e) => updateItem(it.id, { unit: e.target.value })}
-                  />
-                  <Input
                     type="number"
-                    className="h-8 text-xs col-span-2"
-                    placeholder={t("ราคา/หน่วย", "Unit Price", "单价")}
+                    className="h-8 text-xs"
+                    placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
                     value={it.unitPrice}
                     onChange={(e) => updateItem(it.id, { unitPrice: Number(e.target.value) || 0 })}
                   />
@@ -517,8 +533,9 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="text-center font-bold text-[13px] py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
-              {L(doc)}
+            <div className="text-center font-bold py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
+              <div className="text-[15px]">{doc.th}</div>
+              <div className="text-[11px]">{docSubLine}</div>
             </div>
 
             <table className="w-full border-collapse mb-2 text-[10.5px]">
@@ -535,7 +552,7 @@ export default function QuoteBuilderPage() {
                 </tr>
                 <tr>
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
-                  <td colSpan={7}>{customerAddress || "-"}{customerContact || customerPhone ? ` — ${customerContact} ${customerPhone}`.trim() : ""}</td>
+                  <td colSpan={7}>{customerAddress || "-"}</td>
                 </tr>
                 <tr>
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
@@ -548,15 +565,14 @@ export default function QuoteBuilderPage() {
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
                   <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "18%" }}>{L(TXT.colItem)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "12%" }}>{L(TXT.colModel)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colPhoto)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "16%" }}>{L(TXT.colSize)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colQty)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "6%" }}>{L(TXT.colUnit)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colUnitPrice)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colAmount)}</th>
-                  <th className="border border-[#C8B49A] p-1" style={{ width: "10%" }}>{L(TXT.colRemark)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "19%" }}>{L(TXT.colItem)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "13%" }}>{L(TXT.colModel)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colPhoto)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "17%" }}>{L(TXT.colSize)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "7%" }}>{L(TXT.colQty)}</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
+                  <th className="border border-[#C8B49A] p-1" style={{ width: "11%" }}>{L(TXT.colRemark)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -576,7 +592,6 @@ export default function QuoteBuilderPage() {
                     </td>
                     <td className="border border-[#E8E5E0] p-1">{it.size || "-"}</td>
                     <td className="border border-[#E8E5E0] p-1">{it.qty}</td>
-                    <td className="border border-[#E8E5E0] p-1">{it.unit}</td>
                     <td className="border border-[#E8E5E0] p-1 text-right">{fmtMoney(it.unitPrice)}</td>
                     <td className="border border-[#E8E5E0] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
                     <td className="border border-[#E8E5E0] p-1 text-left">{it.remark}</td>
@@ -612,6 +627,26 @@ export default function QuoteBuilderPage() {
                 <tr>
                   <td colSpan={8} className="p-1 text-[#6B6B6B]">{L(TXT.balance)}</td>
                   <td colSpan={2} className="p-1 text-right font-medium">฿{fmtMoney(balanceAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Delivery info — separate from the customer/billing block above,
+                matches the real invoice layout exactly (shipping details go
+                here, filled in after the order is confirmed). */}
+            <table className="w-full border-collapse mb-2 text-[10px]">
+              <tbody>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1 align-top">{L(TXT.shipAddress)}：</td>
+                  <td colSpan={3} className="align-top">{shippingAddress || "-"}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1 align-top">{L(TXT.shipDate)}：</td>
+                  <td colSpan={2} className="align-top">{shippingDate || "-"}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.shipContact)}：</td>
+                  <td colSpan={3}>{customerContact || "-"}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.shipPhone)}：</td>
+                  <td colSpan={2}>{customerPhone || "-"}</td>
                 </tr>
               </tbody>
             </table>

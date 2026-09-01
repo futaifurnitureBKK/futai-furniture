@@ -533,10 +533,7 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            {/* Everything from the title bar down sits inside one bold frame,
-                matching the real invoice — the letterhead above stays outside it. */}
-            <div className="border-2 border-[#1A1A1A] p-2">
-            <div className="text-center font-bold py-1.5 mb-2" style={{ backgroundColor: "#F8CAAC" }}>
+            <div className="text-center font-bold py-1.5 my-2" style={{ backgroundColor: "#F8CAAC" }}>
               <div className="text-[15px]">{doc.th}</div>
               <div className="text-[11px]">{docSubLine}</div>
             </div>
@@ -677,7 +674,6 @@ export default function QuoteBuilderPage() {
             <div className="grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
               <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
               <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
-            </div>
             </div>
           </div>
         </div>

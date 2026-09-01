@@ -745,8 +745,8 @@ export default function QuoteBuilderPage() {
                 <tr>
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.date)}：</td>
                   <td colSpan={4}>{date}</td>
-                  <td colSpan={2} className="whitespace-nowrap">{L(DOC_NO_LABELS[docType])}</td>
-                  <td className="font-mono">{docNo}</td>
+                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(DOC_NO_LABELS[docType])}</td>
+                  <td className="font-mono pl-3">{docNo}</td>
                 </tr>
                 <tr>
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.customer)}:</td>

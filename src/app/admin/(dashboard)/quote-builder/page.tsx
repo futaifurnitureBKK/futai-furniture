@@ -707,7 +707,7 @@ export default function QuoteBuilderPage() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+        <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

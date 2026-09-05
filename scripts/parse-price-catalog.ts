@@ -16,6 +16,22 @@ import { execFileSync } from "child_process";
 import path from "path";
 import sharp from "sharp";
 
+// A few of the embedded images are 32-bit BMP variants libvips (sharp's
+// backend) can't decode ("Input file contains unsupported image format")
+// even though the file itself is fine — re-encode through .NET's own BMP
+// decoder via PowerShell first, then hand the result back to sharp.
+function convertViaSystemDrawing(srcPath: string, outPngPath: string) {
+  execFileSync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    `Add-Type -AssemblyName System.Drawing; ` +
+      `$img = [System.Drawing.Image]::FromFile('${srcPath}'); ` +
+      `$img.Save('${outPngPath}', [System.Drawing.Imaging.ImageFormat]::Png); ` +
+      `$img.Dispose()`,
+  ]);
+}
+
 const SRC = "C:\\Users\\lenovo\\Desktop\\งาน น้อง เจ\\ใบราคา\\price catalog.xlsx";
 const OUT_DATA = "src/data/price-catalog.ts";
 const OUT_IMAGES_DIR = "public/catalog-images";
@@ -175,15 +191,42 @@ async function fillMissingImagesFromLiveCatalog() {
   console.log(`Filled ${filled} of ${missingSkus.length} missing-image SKUs from the live product catalog`);
 }
 
+async function processImage(srcMedia: string, outPath: string) {
+  await sharp(srcMedia)
+    .rotate() // auto-orient from EXIF before resizing — without this, photos
+    // taken in portrait on a phone come out sideways since sharp otherwise
+    // just copies the raw (often landscape-stored) pixel grid as-is.
+    .resize(320, 320, { fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 78 })
+    .toFile(outPath);
+}
+
 async function run() {
+  const failedEntries: string[] = [];
+
   for (const job of copyJobs) {
     try {
-      await sharp(job.srcMedia)
-        .resize(320, 320, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 78 })
-        .toFile(job.outPath);
+      await processImage(job.srcMedia, job.outPath);
     } catch (err) {
-      console.warn(`  ! failed to process ${job.srcMedia}: ${(err as Error).message}`);
+      // Some embedded images are BMP variants libvips can't decode directly —
+      // re-encode through .NET's decoder first and retry once.
+      try {
+        const tmpPng = job.srcMedia + ".converted.png";
+        convertViaSystemDrawing(job.srcMedia, tmpPng);
+        await processImage(tmpPng, job.outPath);
+        console.log(`  re-encoded via System.Drawing: ${path.basename(job.srcMedia)}`);
+      } catch (retryErr) {
+        console.warn(`  ! failed to process ${job.srcMedia}: ${(err as Error).message} (retry: ${(retryErr as Error).message})`);
+        failedEntries.push(job.publicPath);
+      }
+    }
+  }
+
+  if (failedEntries.length) {
+    // Don't leave a dangling reference to a file that was never written —
+    // a broken image icon is worse than no photo at all.
+    for (const e of entries) {
+      if (e.image && failedEntries.includes(e.image)) e.image = null;
     }
   }
   console.log(`Wrote ${copyJobs.length} images to ${OUT_IMAGES_DIR}`);

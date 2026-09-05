@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("saved_quotes")
-    .select("id, doc_type, doc_no, customer_name, doc_date, status, updated_at")
+    .select("id, doc_type, doc_no, customer_name, doc_date, status, channel, updated_at")
     .order("updated_at", { ascending: false });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     .insert({
       doc_type: body.doc_type,
       doc_no: body.doc_no,
+      channel: body.channel || "other",
       lang_mode: body.lang_mode || "th-en-zh",
       doc_date: body.doc_date,
       customer_name: body.customer_name || "",

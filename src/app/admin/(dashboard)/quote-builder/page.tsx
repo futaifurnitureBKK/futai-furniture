@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
-import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus } from "@/types";
+import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
 
 type DocType = "quotation" | "invoice";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
@@ -27,6 +27,14 @@ const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string
   completed:   { th: "เสร็จสิ้น",          en: "Completed",         zh: "已完成",     color: "bg-green-100 text-green-700" },
 };
 const STATUS_ORDER: SavedQuoteStatus[] = ["pending", "in_progress", "confirmed", "completed"];
+
+const CHANNEL_META: Record<SavedQuoteChannel, { th: string; en: string; zh: string; color: string }> = {
+  facebook: { th: "Facebook", en: "Facebook", zh: "Facebook", color: "bg-blue-100 text-blue-700" },
+  shopee:   { th: "Shopee",   en: "Shopee",   zh: "Shopee",   color: "bg-orange-100 text-orange-700" },
+  tiktok:   { th: "TikTok",   en: "TikTok",   zh: "TikTok",   color: "bg-[#1A1A1A]/10 text-[#1A1A1A]" },
+  other:    { th: "อื่นๆ",    en: "Other",    zh: "其他",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
+};
+const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok", "other"];
 
 interface TriText {
   th: string;
@@ -45,7 +53,7 @@ interface LineItem {
   image: string | null;
 }
 
-type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status">;
+type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "channel">;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation: { th: "ใบเสนอราคา", en: "QUOTATION", zh: "报价单", prefix: "QT" },
@@ -277,6 +285,7 @@ export default function QuoteBuilderPage() {
   const [docType, setDocType] = useState<DocType>("quotation");
   const [langMode, setLangMode] = useState<LangMode>("th-en-zh");
   const [docNo, setDocNo] = useState(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+  const [channel, setChannel] = useState<SavedQuoteChannel>("other");
   const [date, setDate] = useState(todayStr());
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -326,6 +335,7 @@ export default function QuoteBuilderPage() {
     setDocType("quotation");
     setLangMode("th-en-zh");
     setDocNo(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+    setChannel("other");
     setDate(todayStr());
     setCustomerName("");
     setCustomerAddress("");
@@ -345,6 +355,7 @@ export default function QuoteBuilderPage() {
     const payload = {
       doc_type: docType,
       doc_no: docNo,
+      channel,
       lang_mode: langMode,
       doc_date: date,
       customer_name: customerName,
@@ -397,6 +408,7 @@ export default function QuoteBuilderPage() {
     setDocType(q.doc_type);
     setLangMode(q.lang_mode);
     setDocNo(q.doc_no);
+    setChannel(q.channel ?? "other");
     setDate(q.doc_date);
     setCustomerName(q.customer_name);
     setCustomerAddress(q.customer_address);
@@ -427,6 +439,20 @@ export default function QuoteBuilderPage() {
     if (!res.ok) {
       setSavedList(prev);
       toast.error(t("อัปเดตสถานะไม่สำเร็จ", "Status update failed", "状态更新失败"));
+    }
+  }
+
+  async function updateSavedChannel(id: number, newChannel: SavedQuoteChannel) {
+    const prev = savedList;
+    setSavedList((list) => list.map((q) => (q.id === id ? { ...q, channel: newChannel } : q)));
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: newChannel }),
+    });
+    if (!res.ok) {
+      setSavedList(prev);
+      toast.error(t("อัปเดตช่องทางไม่สำเร็จ", "Channel update failed", "更新渠道失败"));
     }
   }
 
@@ -578,6 +604,7 @@ export default function QuoteBuilderPage() {
                 <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
                 <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
                 <TableHead className="text-xs">{t("วันที่", "Date", "日期")}</TableHead>
+                <TableHead className="text-xs">{t("ช่องทาง", "Channel", "渠道")}</TableHead>
                 <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
                 <TableHead className="text-xs" />
               </TableRow>
@@ -585,13 +612,13 @@ export default function QuoteBuilderPage() {
             <TableBody>
               {loadingList ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
               ) : savedList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
                     {t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
                   </TableCell>
                 </TableRow>
@@ -604,6 +631,23 @@ export default function QuoteBuilderPage() {
                     </TableCell>
                     <TableCell className="text-sm">{q.customer_name || "-"}</TableCell>
                     <TableCell className="text-xs text-[#6B6B6B]">{q.doc_date}</TableCell>
+                    <TableCell>
+                      <Select value={q.channel} onValueChange={(v) => updateSavedChannel(q.id, v as SavedQuoteChannel)}>
+                        <SelectTrigger
+                          size="sm"
+                          className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${CHANNEL_META[q.channel].color}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CHANNEL_ORDER.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {t(CHANNEL_META[c].th, CHANNEL_META[c].en, CHANNEL_META[c].zh)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>
                       <Select value={q.status} onValueChange={(v) => updateSavedStatus(q.id, v as SavedQuoteStatus)}>
                         <SelectTrigger
@@ -656,6 +700,24 @@ export default function QuoteBuilderPage() {
                   {t(DOC_LABELS[docTypeOption].th, DOC_LABELS[docTypeOption].en, DOC_LABELS[docTypeOption].zh)}
                 </button>
               ))}
+            </div>
+
+            <div>
+              <Label>{t("ช่องทางที่มาของออเดอร์", "Order Channel", "订单渠道")}</Label>
+              <div className="flex gap-2 mt-1">
+                {CHANNEL_ORDER.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setChannel(c)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      channel === c ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
+                    }`}
+                  >
+                    {t(CHANNEL_META[c].th, CHANNEL_META[c].en, CHANNEL_META[c].zh)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

@@ -6,6 +6,7 @@ const EDITABLE_FIELDS = [
   "doc_type",
   "doc_no",
   "status",
+  "channel",
   "lang_mode",
   "doc_date",
   "customer_name",

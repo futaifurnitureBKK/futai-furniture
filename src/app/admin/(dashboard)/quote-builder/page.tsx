@@ -614,12 +614,7 @@ export default function QuoteBuilderPage() {
 
           {/* Line items */}
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[#1A1A1A]">{t("รายการสินค้า", "Line Items", "产品清单")}</p>
-              <Button size="sm" variant="outline" onClick={() => setItems((prev) => [...prev, newLine()])}>
-                <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
-              </Button>
-            </div>
+            <p className="text-sm font-semibold text-[#1A1A1A]">{t("รายการสินค้า", "Line Items", "产品清单")}</p>
 
             {items.map((it, idx) => (
               <div key={it.id} className="border border-[#E8E5E0] rounded-lg p-3 space-y-2">
@@ -689,6 +684,10 @@ export default function QuoteBuilderPage() {
                 </p>
               </div>
             ))}
+
+            <Button variant="outline" className="w-full" onClick={() => setItems((prev) => [...prev, newLine()])}>
+              <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
+            </Button>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-3 gap-3">
@@ -708,7 +707,7 @@ export default function QuoteBuilderPage() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div>
+        <div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

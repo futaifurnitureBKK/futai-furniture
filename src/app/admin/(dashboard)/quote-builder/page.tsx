@@ -10,12 +10,23 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
-import type { SavedQuote, SavedQuoteItem } from "@/types";
+import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus } from "@/types";
 
 type DocType = "quotation" | "invoice";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
+
+const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string; color: string }> = {
+  pending:     { th: "รอการตอบกลับ",       en: "Awaiting Response", zh: "待回复",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
+  in_progress: { th: "กำลังดำเนินการ",     en: "In Progress",       zh: "进行中",     color: "bg-blue-100 text-blue-700" },
+  confirmed:   { th: "คอนเฟิร์ม/รอชำระ",   en: "Confirmed / Awaiting Payment", zh: "已确认/待付款", color: "bg-yellow-100 text-yellow-700" },
+  completed:   { th: "เสร็จสิ้น",          en: "Completed",         zh: "已完成",     color: "bg-green-100 text-green-700" },
+};
+const STATUS_ORDER: SavedQuoteStatus[] = ["pending", "in_progress", "confirmed", "completed"];
 
 interface TriText {
   th: string;
@@ -34,7 +45,7 @@ interface LineItem {
   image: string | null;
 }
 
-type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at">;
+type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status">;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation: { th: "ใบเสนอราคา", en: "QUOTATION", zh: "报价单", prefix: "QT" },
@@ -405,6 +416,20 @@ export default function QuoteBuilderPage() {
     setListOpen(false);
   }
 
+  async function updateSavedStatus(id: number, status: SavedQuoteStatus) {
+    const prev = savedList;
+    setSavedList((list) => list.map((q) => (q.id === id ? { ...q, status } : q)));
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      setSavedList(prev);
+      toast.error(t("อัปเดตสถานะไม่สำเร็จ", "Status update failed", "状态更新失败"));
+    }
+  }
+
   async function deleteQuote(id: number) {
     if (!confirm(t("ลบใบนี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)", "Delete this document? This can't be undone.", "确定删除吗？删除后无法恢复。"))) return;
     const res = await fetch(`/api/admin/saved-quotes/${id}`, { method: "DELETE" });
@@ -553,19 +578,20 @@ export default function QuoteBuilderPage() {
                 <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
                 <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
                 <TableHead className="text-xs">{t("วันที่", "Date", "日期")}</TableHead>
+                <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
                 <TableHead className="text-xs" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingList ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={6} className="text-center py-8 text-[#6B6B6B]">
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
               ) : savedList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={6} className="text-center py-8 text-[#6B6B6B]">
                     {t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
                   </TableCell>
                 </TableRow>
@@ -578,6 +604,23 @@ export default function QuoteBuilderPage() {
                     </TableCell>
                     <TableCell className="text-sm">{q.customer_name || "-"}</TableCell>
                     <TableCell className="text-xs text-[#6B6B6B]">{q.doc_date}</TableCell>
+                    <TableCell>
+                      <Select value={q.status} onValueChange={(v) => updateSavedStatus(q.id, v as SavedQuoteStatus)}>
+                        <SelectTrigger
+                          size="sm"
+                          className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[q.status].color}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_ORDER.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2 justify-end">
                         <Button size="sm" variant="outline" onClick={() => loadQuote(q.id)}>

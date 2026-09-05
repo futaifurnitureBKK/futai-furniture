@@ -5,6 +5,7 @@ create table if not exists saved_quotes (
   id bigint generated always as identity primary key,
   doc_type text not null check (doc_type in ('quotation', 'invoice')),
   doc_no text not null,
+  status text not null default 'pending' check (status in ('pending', 'in_progress', 'confirmed', 'completed')),
   lang_mode text not null default 'th-en-zh' check (lang_mode in ('th-en-zh', 'th-en', 'th-zh')),
   doc_date date not null default current_date,
   customer_name text not null default '',

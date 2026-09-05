@@ -41,6 +41,7 @@ export interface Lead {
 
 export type SavedQuoteDocType = "quotation" | "invoice";
 export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
+export type SavedQuoteStatus = "pending" | "in_progress" | "confirmed" | "completed";
 
 export interface SavedQuoteItem {
   name: string;
@@ -56,6 +57,7 @@ export interface SavedQuote {
   id: number;
   doc_type: SavedQuoteDocType;
   doc_no: string;
+  status: SavedQuoteStatus;
   lang_mode: SavedQuoteLangMode;
   doc_date: string;
   customer_name: string;

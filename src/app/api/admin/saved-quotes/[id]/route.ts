@@ -5,6 +5,7 @@ import { isAdminRequest } from "@/lib/admin-auth";
 const EDITABLE_FIELDS = [
   "doc_type",
   "doc_no",
+  "status",
   "lang_mode",
   "doc_date",
   "customer_name",

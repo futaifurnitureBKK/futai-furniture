@@ -443,6 +443,14 @@ export default function QuoteBuilderPage() {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
+          /* Without this, a row that doesn't fit the remaining space on a
+             page gets sliced in half instead of moving to the next page
+             whole — force every table row and boxed section to jump to the
+             next page as a unit instead. */
+          #print-area tr, #print-area .no-break {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
         }
       `}</style>
 
@@ -872,7 +880,7 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+            <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
               <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>TERMS OF SALE AND OTHER COMMENTS</p>
               <div className="p-1.5 space-y-0.5">
                 <p>1. {L(TXT.term1)}</p>
@@ -882,7 +890,7 @@ export default function QuoteBuilderPage() {
               </div>
             </div>
 
-            <div className="mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+            <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
               <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>Bank Account (THB)</p>
               <div className="p-1.5 space-y-0.5">
                 <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
@@ -892,7 +900,7 @@ export default function QuoteBuilderPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
+            <div className="no-break grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
               <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
               <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
             </div>

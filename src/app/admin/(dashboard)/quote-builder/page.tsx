@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2 } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,6 +196,68 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
         </div>
       )}
     </div>
+  );
+}
+
+function ImageUploadTile({ image, onChange }: { image: string | null; onChange: (url: string | null) => void }) {
+  const { t } = useLanguage();
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    setUploading(true);
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch("/api/products/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      onChange(data.url);
+    } catch {
+      toast.error(t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <label className="relative w-16 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] cursor-pointer group flex items-center justify-center">
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.[0]) handleFile(e.target.files[0]);
+          e.target.value = "";
+        }}
+      />
+      {image ? (
+        <>
+          <Image src={image} alt="" fill sizes="64px" className="object-contain" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+            <Upload size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onChange(null);
+            }}
+            aria-label={t("ลบรูป", "Remove image", "删除图片")}
+            className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+          >
+            <X size={10} />
+          </button>
+        </>
+      ) : (
+        <Upload size={16} className="text-[#C8C5BE]" />
+      )}
+      {uploading && (
+        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+          <Loader2 size={16} className="animate-spin text-[#C8102E]" />
+        </div>
+      )}
+    </label>
   );
 }
 
@@ -641,11 +703,7 @@ export default function QuoteBuilderPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  {it.image && (
-                    <div className="relative w-16 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
-                      <Image src={it.image} alt="" fill sizes="64px" className="object-contain" />
-                    </div>
-                  )}
+                  <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
                   <div className="flex-1 min-w-0">
                     <ProductPicker onPick={(entry) => pickProduct(it.id, entry)} />
                   </div>

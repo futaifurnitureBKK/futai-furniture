@@ -422,6 +422,13 @@ export default function QuoteBuilderPage() {
           @page { margin: 10mm; }
           body * { visibility: hidden; }
           #print-area, #print-area * { visibility: visible; }
+          /* position:sticky on the wrapper (for on-screen scrolling) makes it
+             a positioning context, same as position:relative would — without
+             this override, #print-area's position:absolute below resolves
+             against that sticky box instead of the page, landing wherever the
+             (still layout-occupying, just invisible) form content pushed it
+             and leaving page 1 blank. */
+          .preview-sticky-wrapper { position: static !important; overflow: visible !important; max-height: none !important; }
           /* Explicit width, not 100% or auto: position:absolute with only
              "left:0" set makes a block shrink-to-fit its content instead of
              keeping the 794px it had on screen, which silently reflows every
@@ -707,7 +714,7 @@ export default function QuoteBuilderPage() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <div className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

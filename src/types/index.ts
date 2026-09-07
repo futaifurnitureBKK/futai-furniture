@@ -39,7 +39,7 @@ export interface Lead {
   updated_at: string;
 }
 
-export type SavedQuoteDocType = "quotation" | "invoice";
+export type SavedQuoteDocType = "quotation" | "invoice" | "delivery_note";
 export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
 export type SavedQuoteStatus = "pending" | "in_progress" | "confirmed" | "completed";
 export type SavedQuoteChannel = "facebook" | "shopee" | "tiktok" | "other";

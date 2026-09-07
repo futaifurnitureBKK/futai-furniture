@@ -3,7 +3,7 @@
 
 create table if not exists saved_quotes (
   id bigint generated always as identity primary key,
-  doc_type text not null check (doc_type in ('quotation', 'invoice')),
+  doc_type text not null check (doc_type in ('quotation', 'invoice', 'delivery_note')),
   doc_no text not null,
   status text not null default 'pending' check (status in ('pending', 'in_progress', 'confirmed', 'completed')),
   channel text not null default 'other' check (channel in ('facebook', 'shopee', 'tiktok', 'other')),

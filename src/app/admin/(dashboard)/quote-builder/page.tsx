@@ -17,7 +17,7 @@ import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
 import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
 
-type DocType = "quotation" | "invoice";
+type DocType = "quotation" | "invoice" | "delivery_note";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
 
 const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string; color: string }> = {
@@ -56,13 +56,15 @@ interface LineItem {
 type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "channel">;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
-  quotation: { th: "ใบเสนอราคา", en: "QUOTATION", zh: "报价单", prefix: "QT" },
-  invoice:   { th: "ใบแจ้งหนี้", en: "INVOICE",   zh: "发票",   prefix: "IV" },
+  quotation:     { th: "ใบเสนอราคา", en: "QUOTATION",      zh: "报价单", prefix: "QT" },
+  invoice:       { th: "ใบแจ้งหนี้", en: "INVOICE",        zh: "发票",   prefix: "IV" },
+  delivery_note: { th: "ใบส่งของ",   en: "DELIVERY NOTE",  zh: "送货单", prefix: "DN" },
 };
 
 const DOC_NO_LABELS: Record<DocType, TriText> = {
-  quotation: { th: "เลขที่ใบเสนอราคา", en: "Quotation No", zh: "报价单号" },
-  invoice:   { th: "เลขที่ใบแจ้งหนี้", en: "Invoice No",   zh: "发票号码" },
+  quotation:     { th: "เลขที่ใบเสนอราคา", en: "Quotation No", zh: "报价单号" },
+  invoice:       { th: "เลขที่ใบแจ้งหนี้", en: "Invoice No",   zh: "发票号码" },
+  delivery_note: { th: "เลขที่ใบส่งของ",   en: "DN No.",       zh: "送货单号" },
 };
 
 const LANG_OPTIONS: { value: LangMode; label: string }[] = [
@@ -128,8 +130,9 @@ const TXT = {
     en: "This document is valid for 30 days from the issue date.",
     zh: "报价有效期30天。",
   },
-  sellerSign: { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
-  buyerSign:  { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
+  sellerSign:   { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
+  buyerSign:    { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
+  receiverSign: { th: "ลายเซ็นผู้รับสินค้า",       en: "Received By",            zh: "收货人签名" },
 } satisfies Record<string, TriText>;
 
 function joinLang(langMode: LangMode, t: TriText): string {
@@ -503,6 +506,7 @@ export default function QuoteBuilderPage() {
   const depositAmount = grandTotal * (depositPct / 100);
   const balanceAmount = grandTotal - depositAmount;
 
+  const isDeliveryNote = docType === "delivery_note";
   const doc = DOC_LABELS[docType];
   // Second title-bar line: whichever non-Thai language(s) are selected,
   // e.g. "QUOTATION / 报价单" — Thai stands alone on the line above it,
@@ -688,7 +692,7 @@ export default function QuoteBuilderPage() {
         <div className="space-y-4 no-print">
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex gap-2">
-              {(["quotation", "invoice"] as DocType[]).map((docTypeOption) => (
+              {(["quotation", "invoice", "delivery_note"] as DocType[]).map((docTypeOption) => (
                 <button
                   key={docTypeOption}
                   type="button"
@@ -759,14 +763,18 @@ export default function QuoteBuilderPage() {
                   placeholder={t("เช่น บริษัท ... จำกัด", "e.g. ... Co., Ltd.", "例如：... 有限公司")}
                 />
               </div>
-              <div className="col-span-2">
-                <Label>{t("ที่อยู่", "Address", "地址")}</Label>
-                <Textarea className="mt-1" rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <Label>{t("เลขผู้เสียภาษี", "Tax ID", "纳税人识别号")}</Label>
-                <Input className="mt-1" value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value)} />
-              </div>
+              {!isDeliveryNote && (
+                <>
+                  <div className="col-span-2">
+                    <Label>{t("ที่อยู่", "Address", "地址")}</Label>
+                    <Textarea className="mt-1" rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>{t("เลขผู้เสียภาษี", "Tax ID", "纳税人识别号")}</Label>
+                    <Input className="mt-1" value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value)} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -835,7 +843,7 @@ export default function QuoteBuilderPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
                   <Input
                     type="number"
                     className="h-8 text-xs"
@@ -843,13 +851,15 @@ export default function QuoteBuilderPage() {
                     value={it.qty}
                     onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
                   />
-                  <Input
-                    type="number"
-                    className="h-8 text-xs"
-                    placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
-                    value={it.unitPrice}
-                    onChange={(e) => updateItem(it.id, { unitPrice: Number(e.target.value) || 0 })}
-                  />
+                  {!isDeliveryNote && (
+                    <Input
+                      type="number"
+                      className="h-8 text-xs"
+                      placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
+                      value={it.unitPrice}
+                      onChange={(e) => updateItem(it.id, { unitPrice: Number(e.target.value) || 0 })}
+                    />
+                  )}
                 </div>
                 <Input
                   className="h-8 text-xs"
@@ -857,9 +867,11 @@ export default function QuoteBuilderPage() {
                   value={it.remark}
                   onChange={(e) => updateItem(it.id, { remark: e.target.value })}
                 />
-                <p className="text-right text-xs text-[#6B6B6B]">
-                  {t("รวม", "Total", "总计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(it.qty * it.unitPrice)}</span>
-                </p>
+                {!isDeliveryNote && (
+                  <p className="text-right text-xs text-[#6B6B6B]">
+                    {t("รวม", "Total", "总计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(it.qty * it.unitPrice)}</span>
+                  </p>
+                )}
               </div>
             ))}
 
@@ -868,20 +880,22 @@ export default function QuoteBuilderPage() {
             </Button>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-3 gap-3">
-            <div>
-              <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
-              <Input type="number" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
+          {!isDeliveryNote && (
+            <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-3 gap-3">
+              <div>
+                <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
+                <Input type="number" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>VAT %</Label>
+                <Input type="number" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label>{t("มัดจำ %", "Deposit %", "定金 %")}</Label>
+                <Input type="number" className="mt-1" value={depositPct} onChange={(e) => setDepositPct(Number(e.target.value) || 0)} />
+              </div>
             </div>
-            <div>
-              <Label>VAT %</Label>
-              <Input type="number" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
-            </div>
-            <div>
-              <Label>{t("มัดจำ %", "Deposit %", "定金 %")}</Label>
-              <Input type="number" className="mt-1" value={depositPct} onChange={(e) => setDepositPct(Number(e.target.value) || 0)} />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
@@ -942,14 +956,18 @@ export default function QuoteBuilderPage() {
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.customer)}:</td>
                   <td colSpan={7}>{customerName || "-"}</td>
                 </tr>
-                <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
-                  <td colSpan={7}>{customerAddress || "-"}</td>
-                </tr>
-                <tr>
-                  <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
-                  <td colSpan={7}>{customerTaxId || "-"}</td>
-                </tr>
+                {!isDeliveryNote && (
+                  <>
+                    <tr>
+                      <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
+                      <td colSpan={7}>{customerAddress || "-"}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.taxId)}:</td>
+                      <td colSpan={7}>{customerTaxId || "-"}</td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
 
@@ -957,14 +975,18 @@ export default function QuoteBuilderPage() {
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
                   <th className="border border-[#1A1A1A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "19%" }}>{L(TXT.colItem)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "13%" }}>{L(TXT.colModel)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colPhoto)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "17%" }}>{L(TXT.colSize)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "7%" }}>{L(TXT.colQty)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colRemark)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "24%" : "19%" }}>{L(TXT.colItem)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "15%" : "13%" }}>{L(TXT.colModel)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "13%" : "11%" }}>{L(TXT.colPhoto)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "20%" : "17%" }}>{L(TXT.colSize)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "8%" : "7%" }}>{L(TXT.colQty)}</th>
+                  {!isDeliveryNote && (
+                    <>
+                      <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
+                      <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
+                    </>
+                  )}
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "14%" : "11%" }}>{L(TXT.colRemark)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -984,44 +1006,50 @@ export default function QuoteBuilderPage() {
                     </td>
                     <td className="border border-[#1A1A1A] p-1">{it.size || "-"}</td>
                     <td className="border border-[#1A1A1A] p-1">{it.qty}</td>
-                    <td className="border border-[#1A1A1A] p-1 text-right">{fmtMoney(it.unitPrice)}</td>
-                    <td className="border border-[#1A1A1A] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
+                    {!isDeliveryNote && (
+                      <>
+                        <td className="border border-[#1A1A1A] p-1 text-right">{fmtMoney(it.unitPrice)}</td>
+                        <td className="border border-[#1A1A1A] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
+                      </>
+                    )}
                     <td className="border border-[#1A1A1A] p-1 text-left">{it.remark}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <table className="w-full border-collapse mb-2 text-[10px]">
-              <tbody>
-                <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
-                </tr>
-                {discountPct > 0 && (
+            {!isDeliveryNote && (
+              <table className="w-full border-collapse mb-2 text-[10px]">
+                <tbody>
                   <tr>
-                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
-                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.subtotal)}</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                   </tr>
-                )}
-                <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)} ({vatPct}%)</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
-                </tr>
-                <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
-                </tr>
-                <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
-                </tr>
-                <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
-                </tr>
-              </tbody>
-            </table>
+                  {discountPct > 0 && (
+                    <tr>
+                      <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
+                      <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)} ({vatPct}%)</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(vatAmount)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
+                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
 
             {/* Delivery info — separate from the customer/billing block above,
                 matches the real invoice layout exactly (shipping details go
@@ -1043,30 +1071,40 @@ export default function QuoteBuilderPage() {
               </tbody>
             </table>
 
-            <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
-              <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>TERMS OF SALE AND OTHER COMMENTS</p>
-              <div className="p-1.5 space-y-0.5">
-                <p>1. {L(TXT.term1)}</p>
-                <p>2. {L(TXT.term2)}</p>
-                <p>3. {L(TXT.term3)}</p>
-                <p>4. {L(TXT.term4)}</p>
-              </div>
-            </div>
+            {!isDeliveryNote && (
+              <>
+                <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+                  <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>TERMS OF SALE AND OTHER COMMENTS</p>
+                  <div className="p-1.5 space-y-0.5">
+                    <p>1. {L(TXT.term1)}</p>
+                    <p>2. {L(TXT.term2)}</p>
+                    <p>3. {L(TXT.term3)}</p>
+                    <p>4. {L(TXT.term4)}</p>
+                  </div>
+                </div>
 
-            <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
-              <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>Bank Account (THB)</p>
-              <div className="p-1.5 space-y-0.5">
-                <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
-                <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
-                <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
-                <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
-              </div>
-            </div>
+                <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
+                  <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>Bank Account (THB)</p>
+                  <div className="p-1.5 space-y-0.5">
+                    <p>Account name : FUTAI FURNITURE CO.,LTD. &nbsp; Account number : 100000301332239 (THB)</p>
+                    <p>Name of beneficiary bank : BANK OF CHINA (THAI) PCL &nbsp; Beneficiary Bank Code : 052</p>
+                    <p>Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120</p>
+                    <p>SWIFT Code (Field 57) : BKCHTHBKXXX &nbsp; Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX</p>
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className="no-break grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
-              <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
-              <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
-            </div>
+            {isDeliveryNote ? (
+              <div className="no-break text-[10px] text-[#1A1A1A] pt-2">
+                <p className="whitespace-pre-line h-16">{L(TXT.receiverSign)} :</p>
+              </div>
+            ) : (
+              <div className="no-break grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
+                <p className="whitespace-pre-line h-16">{L(TXT.sellerSign)} :</p>
+                <p className="whitespace-pre-line h-16">{L(TXT.buyerSign)} :</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

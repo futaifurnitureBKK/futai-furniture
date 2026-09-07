@@ -51,6 +51,16 @@ interface LineItem {
   unitPrice: number;
   remark: string;
   image: string | null;
+  seats: number;
+  baseUnitPrice: number;
+}
+
+const SEAT_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+// Catalog price is the 1-seat price; each seat added on top costs half of
+// that base price (shared frame/legs bring the per-seat cost down).
+function computeSeatPrice(baseUnitPrice: number, seats: number): number {
+  return baseUnitPrice + (seats - 1) * Math.floor(baseUnitPrice / 2);
 }
 
 type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "channel">;
@@ -151,6 +161,8 @@ function newLine(): LineItem {
     unitPrice: 0,
     remark: "",
     image: null,
+    seats: 1,
+    baseUnitPrice: 0,
   };
 }
 
@@ -380,6 +392,8 @@ export default function QuoteBuilderPage() {
           unitPrice: it.unitPrice,
           remark: it.remark,
           image: it.image,
+          seats: it.seats,
+          baseUnitPrice: it.baseUnitPrice,
         })
       ),
     };
@@ -425,7 +439,12 @@ export default function QuoteBuilderPage() {
     setDepositPct(q.deposit_pct);
     setItems(
       q.items.length
-        ? q.items.map((it) => ({ ...it, id: Math.random().toString(36).slice(2) }))
+        ? q.items.map((it) => ({
+            ...it,
+            id: Math.random().toString(36).slice(2),
+            seats: it.seats ?? 1,
+            baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
+          }))
         : [newLine()]
     );
     setListOpen(false);
@@ -494,6 +513,8 @@ export default function QuoteBuilderPage() {
       sku: entry.sku,
       size: entry.size,
       unitPrice: entry.price ?? 0,
+      seats: 1,
+      baseUnitPrice: entry.price ?? 0,
       image: entry.image,
     });
   }
@@ -843,7 +864,7 @@ export default function QuoteBuilderPage() {
                   />
                 </div>
 
-                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
+                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
                   <Input
                     type="number"
                     className="h-8 text-xs"
@@ -852,13 +873,39 @@ export default function QuoteBuilderPage() {
                     onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
                   />
                   {!isDeliveryNote && (
-                    <Input
-                      type="number"
-                      className="h-8 text-xs"
-                      placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
-                      value={it.unitPrice}
-                      onChange={(e) => updateItem(it.id, { unitPrice: Number(e.target.value) || 0 })}
-                    />
+                    <>
+                      <Select
+                        value={String(it.seats)}
+                        onValueChange={(v) => {
+                          const seats = Number(v);
+                          updateItem(it.id, { seats, unitPrice: computeSeatPrice(it.baseUnitPrice, seats) });
+                        }}
+                      >
+                        <SelectTrigger size="sm" className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SEAT_OPTIONS.map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n} {t("ที่นั่ง", "seats", "座")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        className="h-8 text-xs"
+                        placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
+                        value={it.unitPrice}
+                        onChange={(e) => {
+                          const unitPrice = Number(e.target.value) || 0;
+                          updateItem(it.id, {
+                            unitPrice,
+                            ...(it.seats === 1 ? { baseUnitPrice: unitPrice } : {}),
+                          });
+                        }}
+                      />
+                    </>
                   )}
                 </div>
                 <Input

@@ -59,6 +59,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
         images: v.images,
       }));
     }
+    if ("seat_variants" in body) {
+      const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
+      update.seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
+    }
   } catch (err) {
     return NextResponse.json({ error: `Translation failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
   }

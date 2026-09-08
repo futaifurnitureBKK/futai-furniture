@@ -2,17 +2,18 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartItem, CartItemColor, Product } from "@/types";
 
-// A cart line is identified by SKU + chosen color (no color = base product),
-// so picking two different colors of the same product yields two separate lines.
-function sameLine(item: CartItem, sku: string, colorLabelTh?: string) {
-  return item.product.sku === sku && item.color?.label_th === colorLabelTh;
+// A cart line is identified by SKU + chosen color + chosen seat count (no
+// color/seats = base product), so picking different variants of the same
+// product yields separate lines.
+function sameLine(item: CartItem, sku: string, colorLabelTh?: string, seats?: number) {
+  return item.product.sku === sku && item.color?.label_th === colorLabelTh && item.seats === seats;
 }
 
 interface CartStore {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number, color?: CartItemColor) => void;
-  removeItem: (sku: string, colorLabelTh?: string) => void;
-  updateQuantity: (sku: string, quantity: number, colorLabelTh?: string) => void;
+  addItem: (product: Product, quantity?: number, color?: CartItemColor, seats?: number) => void;
+  removeItem: (sku: string, colorLabelTh?: string, seats?: number) => void;
+  updateQuantity: (sku: string, quantity: number, colorLabelTh?: string, seats?: number) => void;
   clearCart: () => void;
   totalItems: () => number;
   subtotal: () => number | null;
@@ -24,9 +25,9 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       items: [],
 
-      addItem: (product, quantity = 1, color) => {
+      addItem: (product, quantity = 1, color, seats) => {
         set((state) => {
-          const existing = state.items.find((i) => sameLine(i, product.sku, color?.label_th));
+          const existing = state.items.find((i) => sameLine(i, product.sku, color?.label_th, seats));
           if (existing) {
             return {
               items: state.items.map((i) =>
@@ -34,23 +35,23 @@ export const useCart = create<CartStore>()(
               ),
             };
           }
-          return { items: [...state.items, { product, quantity, color }] };
+          return { items: [...state.items, { product, quantity, color, seats }] };
         });
       },
 
-      removeItem: (sku, colorLabelTh) =>
+      removeItem: (sku, colorLabelTh, seats) =>
         set((state) => ({
-          items: state.items.filter((i) => !sameLine(i, sku, colorLabelTh)),
+          items: state.items.filter((i) => !sameLine(i, sku, colorLabelTh, seats)),
         })),
 
-      updateQuantity: (sku, quantity, colorLabelTh) => {
+      updateQuantity: (sku, quantity, colorLabelTh, seats) => {
         if (quantity <= 0) {
-          get().removeItem(sku, colorLabelTh);
+          get().removeItem(sku, colorLabelTh, seats);
           return;
         }
         set((state) => ({
           items: state.items.map((i) =>
-            sameLine(i, sku, colorLabelTh) ? { ...i, quantity } : i
+            sameLine(i, sku, colorLabelTh, seats) ? { ...i, quantity } : i
           ),
         }));
       },

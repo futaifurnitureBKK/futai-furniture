@@ -49,6 +49,7 @@ export default function CheckoutPage() {
           sku: i.product.sku,
           quantity: i.quantity,
           color_th: i.color?.label_th,
+          seats: i.seats,
         })),
       }),
     });

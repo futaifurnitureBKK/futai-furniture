@@ -6,6 +6,7 @@ interface CartItemInput {
   sku: string;
   quantity: number;
   color_th?: string;
+  seats?: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -40,7 +41,12 @@ export async function POST(req: NextRequest) {
     .map((i) => {
       const p = productBySku.get(i.sku)!;
       const colorTh = typeof i.color_th === "string" ? i.color_th.trim() : "";
-      const name_snapshot = colorTh ? `${p.name_th} (สี: ${colorTh})` : p.name_th;
+      const seats = Number.isInteger(i.seats) && (i.seats as number) > 0 ? i.seats : undefined;
+      const suffixes = [
+        colorTh && `สี: ${colorTh}`,
+        seats && `${seats} ที่นั่ง`,
+      ].filter(Boolean);
+      const name_snapshot = suffixes.length ? `${p.name_th} (${suffixes.join(", ")})` : p.name_th;
       return { sku: i.sku, name_snapshot, quantity: i.quantity, price_snapshot: p.price };
     });
 

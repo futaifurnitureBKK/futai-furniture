@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
   const name_th: string = body.name_th ?? "";
   const description_th: string = body.description_th ?? "";
   const colorVariantsIn: { label_th: string; hex: string; images: string[] }[] = body.color_variants ?? [];
+  const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
+  const seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
 
   let name_en = "";
   let name_zh = "";
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
       images: body.images ?? [],
       tags: body.tags ?? [],
       color_variants,
+      seat_variants,
       is_featured: body.is_featured ?? false,
       is_active: body.is_active ?? true,
     })

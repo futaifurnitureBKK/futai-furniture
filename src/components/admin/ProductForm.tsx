@@ -20,6 +20,11 @@ interface ColorVariantInput {
   images: string[];
 }
 
+interface SeatVariantInput {
+  seats: string;
+  images: string[];
+}
+
 export interface ProductFormValues {
   sku: string;
   name_th: string;
@@ -31,6 +36,7 @@ export interface ProductFormValues {
   images: string[];
   tags: string;
   colorVariants: ColorVariantInput[];
+  seatVariants: SeatVariantInput[];
   is_featured: boolean;
   is_active: boolean;
 }
@@ -47,6 +53,7 @@ function toFormValues(p?: Product): ProductFormValues {
     images: p?.images ?? [],
     tags: p?.tags?.join(", ") ?? "",
     colorVariants: p?.color_variants?.map((v) => ({ label_th: v.label_th, hex: v.hex, images: v.images })) ?? [],
+    seatVariants: p?.seat_variants?.map((v) => ({ seats: String(v.seats), images: v.images })) ?? [],
     is_featured: p?.is_featured ?? false,
     is_active: p?.is_active ?? true,
   };
@@ -87,6 +94,24 @@ export function ProductForm({
     );
   }
 
+  function addSeatVariant() {
+    set("seatVariants", [...values.seatVariants, { seats: "", images: [] }]);
+  }
+
+  function updateSeatVariant(idx: number, patch: Partial<SeatVariantInput>) {
+    set(
+      "seatVariants",
+      values.seatVariants.map((v, i) => (i === idx ? { ...v, ...patch } : v))
+    );
+  }
+
+  function removeSeatVariant(idx: number) {
+    set(
+      "seatVariants",
+      values.seatVariants.filter((_, i) => i !== idx)
+    );
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -108,6 +133,9 @@ export function ProductForm({
       color_variants: values.colorVariants
         .filter((v) => v.label_th.trim())
         .map((v) => ({ label_th: v.label_th.trim(), hex: v.hex, images: v.images })),
+      seat_variants: values.seatVariants
+        .filter((v) => v.seats.trim() && Number(v.seats) > 0)
+        .map((v) => ({ seats: Number(v.seats), images: v.images })),
       is_featured: values.is_featured,
       is_active: values.is_active,
     };
@@ -258,6 +286,49 @@ export function ProductForm({
             </div>
           )}
           <p className="text-xs text-[#9B9B9B] mt-1">ระบบจะแปลชื่อสีเป็นอังกฤษและจีนให้อัตโนมัติตอนบันทึก</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-sm font-medium text-[#1A1A1A]">ตัวเลือกจำนวนที่นั่ง (ถ้ามี)</label>
+            <Button type="button" variant="outline" size="sm" onClick={addSeatVariant}>
+              + เพิ่มจำนวนที่นั่ง
+            </Button>
+          </div>
+          {values.seatVariants.length === 0 ? (
+            <p className="text-xs text-[#9B9B9B]">ยังไม่มีตัวเลือกที่นั่ง — ใช้กับโต๊ะทำงาน/โต๊ะคลัสเตอร์ที่มีรูปแยกตามจำนวนที่นั่ง</p>
+          ) : (
+            <div className="space-y-4">
+              {values.seatVariants.map((v, i) => (
+                <div key={i} className="rounded-lg border border-[#E8E5E0] p-3 space-y-3">
+                  <ImageUploader
+                    images={v.images}
+                    onChange={(images) => updateSeatVariant(i, { images })}
+                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={v.seats}
+                      onChange={(e) => updateSeatVariant(i, { seats: e.target.value })}
+                      placeholder="จำนวนที่นั่ง เช่น 4"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeSeatVariant(i)}
+                      className="shrink-0 text-[#C8102E] border-[#C8102E]/30 hover:bg-[#C8102E]/5"
+                    >
+                      ลบตัวเลือกนี้
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-[#9B9B9B] mt-1">หน้าเว็บจะแสดงเป็นปุ่มให้ลูกค้าเลือกจำนวนที่นั่ง แล้วสลับรูปตามที่เลือก (ไม่มีการโชว์ราคา)</p>
         </div>
 
         <div className="sm:col-span-2">

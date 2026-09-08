@@ -47,9 +47,11 @@ export default function CartPage() {
             {items.map((item) => {
               const variantImage = item.color
                 ? item.product.color_variants?.find((v) => v.label_th === item.color!.label_th)?.images[0]
+                : item.seats != null
+                ? item.product.seat_variants?.find((v) => v.seats === item.seats)?.images[0]
                 : undefined;
               return (
-              <FadeIn key={item.product.sku + (item.color?.label_th ?? "")}>
+              <FadeIn key={item.product.sku + (item.color?.label_th ?? "") + (item.seats ?? "")}>
                 <div className="bg-white rounded-xl p-4 flex gap-4 shadow-sm">
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#FAF7F2] shrink-0">
                     <Image
@@ -74,13 +76,18 @@ export default function CartPage() {
                         {t(item.color.label_th, item.color.label_en, item.color.label_zh)}
                       </p>
                     )}
+                    {item.seats != null && (
+                      <p className="text-xs text-[#6B6B6B] mt-1">
+                        {t("จำนวนที่นั่ง", "Seats", "座位数")}: {item.seats}
+                      </p>
+                    )}
                     <p className="text-xs text-[#C8102E] mt-1">
                       {t("ราคาตามใบเสนอราคา", "Price on quote", "价格以报价单为准")}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-3 shrink-0">
                     <button
-                      onClick={() => removeItem(item.product.sku, item.color?.label_th)}
+                      onClick={() => removeItem(item.product.sku, item.color?.label_th, item.seats)}
                       className="text-[#6B6B6B] hover:text-red-500 transition-colors"
                       aria-label="Remove item"
                     >
@@ -88,14 +95,14 @@ export default function CartPage() {
                     </button>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateQuantity(item.product.sku, item.quantity - 1, item.color?.label_th)}
+                        onClick={() => updateQuantity(item.product.sku, item.quantity - 1, item.color?.label_th, item.seats)}
                         className="w-7 h-7 rounded border border-[#E8E5E0] flex items-center justify-center hover:bg-[#E8E5E0] transition-colors"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.product.sku, item.quantity + 1, item.color?.label_th)}
+                        onClick={() => updateQuantity(item.product.sku, item.quantity + 1, item.color?.label_th, item.seats)}
                         className="w-7 h-7 rounded border border-[#E8E5E0] flex items-center justify-center hover:bg-[#E8E5E0] transition-colors"
                       >
                         <Plus size={12} />

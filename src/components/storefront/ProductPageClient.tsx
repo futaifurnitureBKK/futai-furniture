@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ShoppingCart, MapPin, Share2 } from "lucide-react";
+import { ShoppingCart, MapPin, Share2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/storefront/ProductCard";
@@ -20,27 +20,38 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
   const [activeVariant, setActiveVariant] = useState(-1); // -1 = no color picked yet
+  const [activeSeat, setActiveSeat] = useState(-1); // -1 = no seat count picked yet
   const colorVariants = product.color_variants ?? [];
+  const seatVariants = [...(product.seat_variants ?? [])].sort((a, b) => a.seats - b.seats);
 
-  // One combined strip: cover photo first, then every color's photos —
-  // all always visible, regardless of which color is currently picked.
-  // Each entry remembers which color (if any) it belongs to, so picking a
-  // thumbnail also syncs the color swatch/label, and vice versa.
+  // One combined strip: cover photo first, then every color's photos, then
+  // every seat count's photos — all always visible, regardless of which
+  // variant is currently picked. Each entry remembers which color/seat
+  // count (if any) it belongs to, so picking a thumbnail also syncs the
+  // matching selector, and vice versa.
   const galleryEntries = [
-    { src: product.images[0], variantIndex: -1 },
-    ...colorVariants.flatMap((v, vi) => v.images.map((src) => ({ src, variantIndex: vi }))),
+    { src: product.images[0], variantIndex: -1, seatIndex: -1 },
+    ...colorVariants.flatMap((v, vi) => v.images.map((src) => ({ src, variantIndex: vi, seatIndex: -1 }))),
+    ...seatVariants.flatMap((v, si) => v.images.map((src) => ({ src, variantIndex: -1, seatIndex: si }))),
   ];
   const galleryImages = galleryEntries.map((e) => e.src);
 
   function selectImage(i: number) {
     setActiveImg(i);
     setActiveVariant(galleryEntries[i].variantIndex);
+    setActiveSeat(galleryEntries[i].seatIndex);
   }
 
   function selectVariant(idx: number) {
     const i = galleryEntries.findIndex((e) => e.variantIndex === idx);
     setActiveVariant(idx);
     setActiveImg(i >= 0 ? i : 0);
+  }
+
+  function selectSeat(idx: number) {
+    const i = galleryEntries.findIndex((e) => e.seatIndex === idx);
+    setActiveSeat(idx);
+    if (i >= 0) setActiveImg(i);
   }
 
   const stockLabel: Record<string, string> = {
@@ -60,7 +71,8 @@ export function ProductPageClient({ product, related }: { product: Product; rela
     const color = variant
       ? { label_th: variant.label_th, label_en: variant.label_en, label_zh: variant.label_zh, hex: variant.hex }
       : undefined;
-    addItem(product, 1, color);
+    const seats = activeSeat >= 0 ? seatVariants[activeSeat].seats : undefined;
+    addItem(product, 1, color, seats);
     toast.success(t("เพิ่มลงตะกร้าแล้ว", "Added to cart", "已加入购物车"));
   };
 
@@ -167,6 +179,38 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </div>
             )}
 
+            {/* Seat count variants */}
+            {seatVariants.length > 0 && (
+              <div className="mb-6">
+                <p className="text-xs text-[#6B6B6B] mb-2">
+                  {t("จำนวนที่นั่ง", "Seats", "座位数")}
+                  {activeSeat >= 0 && (
+                    <span className="text-[#1A1A1A] font-medium ml-1">
+                      : {seatVariants[activeSeat].seats} {t("ที่นั่ง", "seats", "座")}
+                    </span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {seatVariants.map((v, i) => (
+                    <button
+                      key={v.seats}
+                      type="button"
+                      onClick={() => selectSeat(i)}
+                      aria-label={`${v.seats} ${t("ที่นั่ง", "seats", "座")}`}
+                      className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg border-2 transition-all ${
+                        activeSeat === i
+                          ? "border-[#C8102E] bg-[#C8102E]/5 text-[#C8102E]"
+                          : "border-[#E8E5E0] text-[#6B6B6B] hover:border-[#C9A876]"
+                      }`}
+                    >
+                      <User size={16} />
+                      <span className="text-xs font-medium mt-0.5">{v.seats}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Price / CTA — pricing is hidden storefront-wide (quote-only model) */}
             <div className="space-y-3 mb-8">
               <p className="text-[#6B6B6B] text-sm">
@@ -184,7 +228,11 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </Button>
               <Button
                 onClick={handleAddToCart}
-                disabled={product.stock_status === "out_of_stock" || (colorVariants.length > 0 && activeVariant < 0)}
+                disabled={
+                  product.stock_status === "out_of_stock" ||
+                  (colorVariants.length > 0 && activeVariant < 0) ||
+                  (seatVariants.length > 0 && activeSeat < 0)
+                }
                 variant="outline"
                 className="w-full h-11 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
               >
@@ -193,6 +241,9 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </Button>
               {colorVariants.length > 0 && activeVariant < 0 && (
                 <p className="text-xs text-[#C8102E]">{t("กรุณาเลือกสีก่อนเพิ่มลงตะกร้า", "Please pick a color before adding to cart", "请先选择颜色再加入购物车")}</p>
+              )}
+              {seatVariants.length > 0 && activeSeat < 0 && (
+                <p className="text-xs text-[#C8102E]">{t("กรุณาเลือกจำนวนที่นั่งก่อนเพิ่มลงตะกร้า", "Please pick a seat count before adding to cart", "请先选择座位数再加入购物车")}</p>
               )}
             </div>
 

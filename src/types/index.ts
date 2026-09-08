@@ -101,6 +101,11 @@ export interface ColorVariant {
   images: string[];
 }
 
+export interface SeatVariant {
+  seats: number;
+  images: string[];
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -118,6 +123,7 @@ export interface Product {
   images: string[];
   tags: string[];
   color_variants?: ColorVariant[];
+  seat_variants?: SeatVariant[];
   is_featured: boolean;
   is_active: boolean;
   view_count: number;
@@ -186,6 +192,7 @@ export interface CartItem {
   product: Product;
   quantity: number;
   color?: CartItemColor;
+  seats?: number;
 }
 
 export interface QuoteFormValues {

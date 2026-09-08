@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
+import { User } from "lucide-react";
 import type { Product } from "@/types";
 import { useLanguage } from "@/store/language";
 
@@ -10,6 +11,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
+  const seatVariants = product.seat_variants ?? [];
 
   return (
     <Link
@@ -37,7 +39,13 @@ export function ProductCard({ product }: ProductCardProps) {
         <h3 className="text-[13px] font-semibold text-[#1A1A1A] leading-snug line-clamp-2 mb-1 group-hover:text-[#C8102E] transition-colors">
           {t(product.name_th, product.name_en, product.name_zh)}
         </h3>
-        <p className="text-[11px] text-[#999] mb-2">{product.dimensions}</p>
+        <p className="text-[11px] text-[#999] mb-1">{product.dimensions}</p>
+        {seatVariants.length > 0 && (
+          <p className="flex items-center gap-1 text-[11px] text-[#6B6B6B] mb-2">
+            <User size={11} />
+            {seatVariants.map((v) => v.seats).join("/")} {t("ที่นั่ง", "seats", "座")}
+          </p>
+        )}
         <div>
           <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote", "索取报价")}</p>
         </div>

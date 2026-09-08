@@ -12,6 +12,11 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const seatVariants = product.seat_variants ?? [];
+  const seatCounts = seatVariants.map((v) => v.seats);
+  const seatLabel =
+    seatCounts.length > 1
+      ? `${Math.min(...seatCounts)}-${Math.max(...seatCounts)}`
+      : String(seatCounts[0] ?? "");
 
   return (
     <Link
@@ -32,6 +37,12 @@ export function ProductCard({ product }: ProductCardProps) {
             {t("แนะนำ", "Featured", "推荐")}
           </div>
         )}
+        {seatVariants.length > 0 && (
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-[#1A1A1A]/80 text-white text-[10px] font-medium px-2 py-1 rounded">
+            <User size={11} />
+            {seatLabel} {t("ที่นั่ง", "seats", "座")}
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -39,13 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <h3 className="text-[13px] font-semibold text-[#1A1A1A] leading-snug line-clamp-2 mb-1 group-hover:text-[#C8102E] transition-colors">
           {t(product.name_th, product.name_en, product.name_zh)}
         </h3>
-        <p className="text-[11px] text-[#999] mb-1">{product.dimensions}</p>
-        {seatVariants.length > 0 && (
-          <p className="flex items-center gap-1 text-[11px] text-[#6B6B6B] mb-2">
-            <User size={11} />
-            {seatVariants.map((v) => v.seats).join("/")} {t("ที่นั่ง", "seats", "座")}
-          </p>
-        )}
+        <p className="text-[11px] text-[#999] mb-2">{product.dimensions}</p>
         <div>
           <p className="text-xs text-[#C8102E] font-semibold">{t("ขอใบเสนอราคา", "Request Quote", "索取报价")}</p>
         </div>

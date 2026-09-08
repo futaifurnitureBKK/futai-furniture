@@ -32,7 +32,7 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   // count (if any) it belongs to, so picking a thumbnail also syncs the
   // matching selector, and vice versa.
   const galleryEntries = [
-    { src: product.images[0], variantIndex: -1, seatIndex: -1 },
+    ...product.images.map((src) => ({ src, variantIndex: -1, seatIndex: -1 })),
     ...colorVariants.flatMap((v, vi) => v.images.map((src) => ({ src, variantIndex: vi, seatIndex: -1 }))),
     ...seatVariants.flatMap((v, si) => v.images.map((src) => ({ src, variantIndex: -1, seatIndex: si }))),
   ];

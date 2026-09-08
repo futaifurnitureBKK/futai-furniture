@@ -3,7 +3,8 @@ import "server-only";
 const ENDPOINT = "https://api.mymemory.translated.net/get";
 const MAX_CHUNK = 450; // MyMemory's free tier caps ~500 chars per request
 const CONCURRENCY = 3; // avoid bursting past MyMemory's free-tier rate limit
-const RETRY_DELAYS_MS = [1000, 3000, 8000]; // retry transient failures (rate limits, gateway timeouts)
+const REQUEST_TIMEOUT_MS = 4000; // give up on a hung/slow request fast rather than let it stall the save
+const RETRY_DELAYS_MS = [400]; // one quick retry — callers fall back gracefully on failure, so don't make the admin wait long
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,7 +31,7 @@ async function translateChunkOnce(text: string, target: "en" | "zh"): Promise<st
   // shared platform IP like Vercel's can be near the anonymous cap already.
   const url = `${ENDPOINT}?q=${encodeURIComponent(text)}&langpair=${langpair}&de=futai.furniture@gmail.com`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`MyMemory API failed: ${res.status} ${await res.text()}`);
   }
@@ -104,10 +105,13 @@ export async function translateHtml(html: string, target: "en" | "zh"): Promise<
   return translatedParts.join("");
 }
 
+const OVERALL_TIMEOUT_MS = 12000; // hard cap regardless of chunk count, so a long description can't stall a save
+
 export async function translateToEnZh(text: string, isHtml: boolean): Promise<{ en: string; zh: string }> {
   const fn = isHtml ? translateHtml : translateText;
-  // Sequential (not parallel) en/zh passes — halves the peak request burst.
-  const en = await fn(text, "en");
-  const zh = await fn(text, "zh");
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("Translation timed out")), OVERALL_TIMEOUT_MS)
+  );
+  const [en, zh] = await Promise.race([Promise.all([fn(text, "en"), fn(text, "zh")]), timeout]);
   return { en, zh };
 }

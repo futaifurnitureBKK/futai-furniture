@@ -56,7 +56,7 @@ function toFormValues(p?: Product): ProductFormValues {
     images: p?.images ?? [],
     tags: p?.tags?.join(", ") ?? "",
     colorVariants: p?.color_variants?.map((v) => ({ label_th: v.label_th, hex: v.hex, images: v.images })) ?? [],
-    seatVariants: p?.seat_variants?.map((v) => ({ seats: String(v.seats), size: v.size, images: v.images })) ?? [],
+    seatVariants: p?.seat_variants?.map((v) => ({ seats: String(v.seats), size: v.size ?? "", images: v.images })) ?? [],
     is_featured: p?.is_featured ?? false,
     is_active: p?.is_active ?? true,
   };
@@ -146,7 +146,7 @@ export function ProductForm({
         .map((v) => ({ label_th: v.label_th.trim(), hex: v.hex, images: v.images })),
       seat_variants: values.seatVariants
         .filter((v) => v.seats.trim() && Number(v.seats) > 0)
-        .map((v) => ({ seats: Number(v.seats), size: v.size.trim(), images: v.images })),
+        .map((v) => ({ seats: Number(v.seats), size: (v.size ?? "").trim(), images: v.images })),
       is_featured: values.is_featured,
       is_active: values.is_active,
     };

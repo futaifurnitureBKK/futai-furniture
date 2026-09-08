@@ -316,10 +316,15 @@ export function ProductForm({
             <div className="space-y-4">
               {values.seatVariants.map((v, i) => (
                 <div key={i} className="rounded-lg border border-[#E8E5E0] p-3 space-y-3">
-                  <ImageUploader
-                    images={v.images}
-                    onChange={(images) => updateSeatVariant(i, { images })}
-                  />
+                  <div>
+                    <p className="text-xs text-[#9B9B9B] mb-1.5">
+                      รูปสำหรับที่นั่งนี้ (ไม่บังคับ — ถ้าไม่มีรูป หน้าสินค้าจะใช้รูปหลักแทน)
+                    </p>
+                    <ImageUploader
+                      images={v.images}
+                      onChange={(images) => updateSeatVariant(i, { images })}
+                    />
+                  </div>
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col gap-0.5 shrink-0">
                       <Button

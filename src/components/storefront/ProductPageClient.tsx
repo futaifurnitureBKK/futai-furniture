@@ -53,7 +53,11 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   function selectSeat(idx: number) {
     const i = galleryEntries.findIndex((e) => e.seatIndex === idx);
     setActiveSeat(idx);
-    if (i >= 0) setActiveImg(i);
+    // Fall back to the base cover photo (index 0) when this seat count has
+    // no photo of its own — otherwise whatever photo was showing before
+    // (e.g. a different seat count's) stays up, wrongly implying it's a
+    // match for the newly picked seat count.
+    setActiveImg(i >= 0 ? i : 0);
   }
 
   const stockLabel: Record<string, string> = {

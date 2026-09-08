@@ -103,6 +103,7 @@ export interface ColorVariant {
 
 export interface SeatVariant {
   seats: number;
+  size: string;
   images: string[];
 }
 

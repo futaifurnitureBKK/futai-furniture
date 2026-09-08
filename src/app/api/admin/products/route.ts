@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const name_th: string = body.name_th ?? "";
   const description_th: string = body.description_th ?? "";
   const colorVariantsIn: { label_th: string; hex: string; images: string[] }[] = body.color_variants ?? [];
-  const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
+  const seatVariantsIn: { seats: number; size: string; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
   const seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
 
   // The translation API (MyMemory) occasionally times out or rate-limits —

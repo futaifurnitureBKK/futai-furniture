@@ -142,10 +142,13 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               </p>
             )}
 
-            {/* Dimensions */}
+            {/* Dimensions — swaps to the selected seat variant's size, since
+                seat count changes the physical dimensions of the desk */}
             <div className="bg-[#E8E5E0] rounded-lg px-4 py-3 mb-6">
               <p className="text-xs text-[#6B6B6B] mb-1">{t("ขนาด", "Dimensions", "尺寸")}</p>
-              <p className="font-mono text-[#1A1A1A] font-medium">{product.dimensions}</p>
+              <p className="font-mono text-[#1A1A1A] font-medium">
+                {activeSeat >= 0 && seatVariants[activeSeat].size ? seatVariants[activeSeat].size : product.dimensions}
+              </p>
             </div>
 
             {/* Color variants */}

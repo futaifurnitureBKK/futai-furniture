@@ -22,7 +22,9 @@ export function ProductPageClient({ product, related }: { product: Product; rela
   const [activeVariant, setActiveVariant] = useState(-1); // -1 = no color picked yet
   const [activeSeat, setActiveSeat] = useState(-1); // -1 = no seat count picked yet
   const colorVariants = product.color_variants ?? [];
-  const seatVariants = [...(product.seat_variants ?? [])].sort((a, b) => a.seats - b.seats);
+  // Order as configured in the admin (reorderable there), not auto-sorted —
+  // lets the admin control the button order shown to customers.
+  const seatVariants = product.seat_variants ?? [];
 
   // One combined strip: cover photo first, then every color's photos, then
   // every seat count's photos — all always visible, regardless of which

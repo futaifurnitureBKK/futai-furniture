@@ -2,6 +2,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/admin/ImageUploader";
@@ -111,6 +112,14 @@ export function ProductForm({
       "seatVariants",
       values.seatVariants.filter((_, i) => i !== idx)
     );
+  }
+
+  function moveSeatVariant(idx: number, direction: -1 | 1) {
+    const target = idx + direction;
+    if (target < 0 || target >= values.seatVariants.length) return;
+    const next = [...values.seatVariants];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    set("seatVariants", next);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -311,6 +320,28 @@ export function ProductForm({
                     onChange={(images) => updateSeatVariant(i, { images })}
                   />
                   <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={() => moveSeatVariant(i, -1)}
+                        disabled={i === 0}
+                        aria-label="เลื่อนขึ้น"
+                      >
+                        <ArrowUp size={12} />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={() => moveSeatVariant(i, 1)}
+                        disabled={i === values.seatVariants.length - 1}
+                        aria-label="เลื่อนลง"
+                      >
+                        <ArrowDown size={12} />
+                      </Button>
+                    </div>
                     <Input
                       type="number"
                       min={1}

@@ -3,7 +3,7 @@ import "server-only";
 const ENDPOINT = "https://api.mymemory.translated.net/get";
 const MAX_CHUNK = 450; // MyMemory's free tier caps ~500 chars per request
 const CONCURRENCY = 3; // avoid bursting past MyMemory's free-tier rate limit
-const RETRY_DELAYS_MS = [500, 1500]; // retry transient failures (rate limits, timeouts)
+const RETRY_DELAYS_MS = [1000, 3000, 8000]; // retry transient failures (rate limits, gateway timeouts)
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

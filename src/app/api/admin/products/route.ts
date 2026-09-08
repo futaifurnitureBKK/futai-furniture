@@ -27,31 +27,37 @@ export async function POST(req: NextRequest) {
   const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
   const seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
 
-  let name_en = "";
-  let name_zh = "";
-  let description_en = "";
-  let description_zh = "";
-  let color_variants: Array<{ label_th: string; label_en: string; label_zh: string; hex: string; images: string[] }> = [];
-  try {
-    const [nameT, descT, variantLabels] = await Promise.all([
-      translateToEnZh(name_th, false),
-      translateToEnZh(description_th, true),
-      Promise.all(colorVariantsIn.map((v) => translateToEnZh(v.label_th, false))),
-    ]);
-    name_en = nameT.en;
-    name_zh = nameT.zh;
-    description_en = descT.en;
-    description_zh = descT.zh;
-    color_variants = colorVariantsIn.map((v, i) => ({
-      label_th: v.label_th,
-      label_en: variantLabels[i].en,
-      label_zh: variantLabels[i].zh,
-      hex: v.hex,
-      images: v.images,
-    }));
-  } catch (err) {
-    return NextResponse.json({ error: `Translation failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
+  // The translation API (MyMemory) occasionally times out or rate-limits —
+  // that shouldn't block saving the product. Fall back to the Thai text
+  // (admin can fix it up manually, or just re-save later to retry) instead
+  // of failing the whole request.
+  let translationFailed = false;
+  async function translateOrFallback(text: string, isHtml: boolean): Promise<{ en: string; zh: string }> {
+    try {
+      return await translateToEnZh(text, isHtml);
+    } catch (err) {
+      translationFailed = true;
+      console.warn("Translation failed, falling back to Thai text:", err);
+      return { en: text, zh: text };
+    }
   }
+
+  const [nameT, descT, variantLabels] = await Promise.all([
+    translateOrFallback(name_th, false),
+    translateOrFallback(description_th, true),
+    Promise.all(colorVariantsIn.map((v) => translateOrFallback(v.label_th, false))),
+  ]);
+  const name_en = nameT.en;
+  const name_zh = nameT.zh;
+  const description_en = descT.en;
+  const description_zh = descT.zh;
+  const color_variants = colorVariantsIn.map((v, i) => ({
+    label_th: v.label_th,
+    label_en: variantLabels[i].en,
+    label_zh: variantLabels[i].zh,
+    hex: v.hex,
+    images: v.images,
+  }));
 
   const { data, error } = await db
     .from("products")
@@ -81,5 +87,5 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ product: data });
+  return NextResponse.json({ product: data, translationFailed });
 }

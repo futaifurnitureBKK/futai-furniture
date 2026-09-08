@@ -1,6 +1,7 @@
 "use client";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/admin/ImageUploader";
@@ -150,6 +151,10 @@ export function ProductForm({
     });
 
     if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.translationFailed) {
+        toast.warning("บันทึกสำเร็จ แต่ระบบแปลภาษาไม่ตอบสนอง (คำแปลอังกฤษ/จีนอาจไม่อัปเดต) ลองแก้ไขและบันทึกอีกครั้งภายหลัง");
+      }
       router.push("/admin/products");
       router.refresh();
     } else {

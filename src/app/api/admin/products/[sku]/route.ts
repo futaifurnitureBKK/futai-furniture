@@ -36,35 +36,58 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
     update.category_id = cat?.id ?? null;
   }
 
-  // Re-translate Thai name/description into English/Chinese whenever they change.
-  try {
-    if ("name_th" in update) {
+  // Re-translate Thai name/description into English/Chinese whenever they
+  // change. The translation API (MyMemory) occasionally times out or
+  // rate-limits — that shouldn't block saving the rest of the edit. On
+  // failure, leave the existing en/zh translation untouched (better than
+  // overwriting a good translation with a fallback) and report it back so
+  // the admin can re-save later to retry.
+  let translationFailed = false;
+
+  if ("name_th" in update) {
+    try {
       const { en, zh } = await translateToEnZh(update.name_th as string, false);
       update.name_en = en;
       update.name_zh = zh;
+    } catch (err) {
+      translationFailed = true;
+      console.warn("Translation failed for name_th, keeping existing translation:", err);
     }
-    if ("description_th" in update) {
+  }
+  if ("description_th" in update) {
+    try {
       const { en, zh } = await translateToEnZh(update.description_th as string, true);
       update.description_en = en;
       update.description_zh = zh;
+    } catch (err) {
+      translationFailed = true;
+      console.warn("Translation failed for description_th, keeping existing translation:", err);
     }
-    if ("color_variants" in body) {
-      const colorVariantsIn: { label_th: string; hex: string; images: string[] }[] = body.color_variants ?? [];
-      const labels = await Promise.all(colorVariantsIn.map((v) => translateToEnZh(v.label_th, false)));
-      update.color_variants = colorVariantsIn.map((v, i) => ({
-        label_th: v.label_th,
-        label_en: labels[i].en,
-        label_zh: labels[i].zh,
-        hex: v.hex,
-        images: v.images,
-      }));
-    }
-    if ("seat_variants" in body) {
-      const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
-      update.seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
-    }
-  } catch (err) {
-    return NextResponse.json({ error: `Translation failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
+  }
+  if ("color_variants" in body) {
+    const colorVariantsIn: { label_th: string; hex: string; images: string[] }[] = body.color_variants ?? [];
+    const labels = await Promise.all(
+      colorVariantsIn.map(async (v) => {
+        try {
+          return await translateToEnZh(v.label_th, false);
+        } catch (err) {
+          translationFailed = true;
+          console.warn("Translation failed for color label, falling back to Thai text:", err);
+          return { en: v.label_th, zh: v.label_th };
+        }
+      })
+    );
+    update.color_variants = colorVariantsIn.map((v, i) => ({
+      label_th: v.label_th,
+      label_en: labels[i].en,
+      label_zh: labels[i].zh,
+      hex: v.hex,
+      images: v.images,
+    }));
+  }
+  if ("seat_variants" in body) {
+    const seatVariantsIn: { seats: number; images: string[] }[] = Array.isArray(body.seat_variants) ? body.seat_variants : [];
+    update.seat_variants = seatVariantsIn.filter((v) => Number.isFinite(v.seats) && v.seats > 0);
   }
 
   const { data, error } = await db.from("products").update(update).eq("sku", sku).select().single();
@@ -72,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-  return NextResponse.json({ product: data });
+  return NextResponse.json({ product: data, translationFailed });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ sku: string }> }) {

@@ -1086,14 +1086,18 @@ export default function QuoteBuilderPage() {
                     <td colSpan={8} className="border border-[#1A1A1A] p-1 font-bold text-[#1A1A1A]">{L(TXT.grandTotal)}</td>
                     <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</td>
                   </tr>
-                  <tr>
-                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
-                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
-                    <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
-                  </tr>
+                  {depositPct > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
+                        <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.balance)}</td>
+                        <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(balanceAmount)}</td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             )}

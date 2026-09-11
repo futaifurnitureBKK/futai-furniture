@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { ArrowRight, BookOpen, ChevronRight, Search, ShoppingCart } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, Download, Search, ShoppingCart } from "lucide-react";
 import { ProductCard } from "@/components/storefront/ProductCard";
 import { CategoryTile } from "@/components/storefront/CategoryTile";
 import { VideoHero } from "@/components/storefront/VideoHero";
@@ -258,6 +258,14 @@ export function HomeClient({
                   <BookOpen size={18} />
                   {t("แคตตาล็อก", "Catalog", "产品目录")}
                 </Link>
+                <a
+                  href="/catalog.pdf"
+                  download
+                  className="inline-flex items-center gap-2 border border-white/40 hover:border-white hover:bg-white/10 text-white text-sm px-6 h-12 transition-all"
+                >
+                  <Download size={18} />
+                  {t("ดาวน์โหลดแคตตาล็อก", "Download Catalog", "下载产品目录")}
+                </a>
               </motion.div>
             </div>
           </div>

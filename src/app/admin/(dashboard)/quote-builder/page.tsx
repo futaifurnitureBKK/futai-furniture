@@ -592,7 +592,7 @@ export default function QuoteBuilderPage() {
         }
       `}</style>
 
-      <div className="flex items-center justify-between no-print">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 no-print">
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("สร้างใบเสนอราคา / ใบแจ้งหนี้", "Quote / Invoice Builder", "生成报价单/发票")}</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">
@@ -603,7 +603,7 @@ export default function QuoteBuilderPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Button variant="outline" onClick={() => setListOpen((v) => !v)}>
             <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({savedList.length})
           </Button>
@@ -712,13 +712,13 @@ export default function QuoteBuilderPage() {
         {/* ── Form ─────────────────────────────────────────────────── */}
         <div className="space-y-4 no-print">
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(["quotation", "invoice", "delivery_note"] as DocType[]).map((docTypeOption) => (
                 <button
                   key={docTypeOption}
                   type="button"
                   onClick={() => setDocTypeAndPrefix(docTypeOption)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
                     docType === docTypeOption ? "bg-[#C8102E] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
                   }`}
                 >
@@ -729,13 +729,13 @@ export default function QuoteBuilderPage() {
 
             <div>
               <Label>{t("ช่องทางที่มาของออเดอร์", "Order Channel", "订单渠道")}</Label>
-              <div className="flex gap-2 mt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
                 {CHANNEL_ORDER.map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => setChannel(c)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       channel === c ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
                     }`}
                   >
@@ -747,13 +747,13 @@ export default function QuoteBuilderPage() {
 
             <div>
               <Label>{t("ภาษาในเอกสาร", "Document Language", "文件语言")}</Label>
-              <div className="flex gap-2 mt-1">
+              <div className="grid grid-cols-3 gap-2 mt-1">
                 {LANG_OPTIONS.map((o) => (
                   <button
                     key={o.value}
                     type="button"
                     onClick={() => setLangMode(o.value)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
                       langMode === o.value ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
                     }`}
                   >
@@ -946,7 +946,7 @@ export default function QuoteBuilderPage() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <div className="preview-sticky-wrapper xl:sticky xl:top-4 self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto overflow-x-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

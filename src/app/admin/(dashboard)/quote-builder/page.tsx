@@ -319,54 +319,8 @@ export default function QuoteBuilderPage() {
   const [listOpen, setListOpen] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const L = (t: TriText) => joinLang(langMode, t);
-
-  // window.print() is unreliable on mobile (many mobile/in-app browsers
-  // don't implement it, or only offer it through a multi-step print
-  // preview) — render the preview to an image and build the PDF directly
-  // so "Download PDF" works the same way (a plain file download) on every
-  // device.
-  async function downloadPdf() {
-    const el = document.getElementById("print-area");
-    if (!el) return;
-    setGeneratingPdf(true);
-    try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const margin = 10;
-      const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-      const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let renderedHeight = 0;
-      let page = 0;
-      const MAX_PAGES = 30;
-      while (renderedHeight < imgHeight && page < MAX_PAGES) {
-        if (page > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", margin, margin - renderedHeight, imgWidth, imgHeight);
-        renderedHeight += pageHeight;
-        page++;
-      }
-      pdf.save(`${docNo || "document"}.pdf`);
-    } catch (err) {
-      console.error(err);
-      toast.error(t("สร้าง PDF ไม่สำเร็จ ลองใหม่อีกครั้ง", "Failed to generate PDF, please try again", "生成PDF失败，请重试"));
-    } finally {
-      setGeneratingPdf(false);
-    }
-  }
 
   async function fetchSavedList() {
     setLoadingList(true);
@@ -659,13 +613,8 @@ export default function QuoteBuilderPage() {
           <Button variant="outline" onClick={saveQuote} disabled={saving}>
             <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
           </Button>
-          <Button onClick={downloadPdf} disabled={generatingPdf}>
-            {generatingPdf ? (
-              <Loader2 size={14} className="mr-1.5 animate-spin" />
-            ) : (
-              <Printer size={14} className="mr-1.5" />
-            )}
-            {generatingPdf ? t("กำลังสร้าง PDF...", "Generating PDF...", "生成中...") : t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
+          <Button onClick={() => window.print()}>
+            <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
           </Button>
         </div>
       </div>

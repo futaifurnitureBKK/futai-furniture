@@ -147,12 +147,35 @@ export function ProductPageClient({ product, related }: { product: Product; rela
             )}
 
             {/* Dimensions — swaps to the selected seat variant's size, since
-                seat count changes the physical dimensions of the desk */}
+                seat count changes the physical dimensions of the desk.
+                Some products list several manufactured sizes in one string
+                separated by "-" (e.g. multiple conference table lengths) —
+                split those into separate boxes instead of one run-on line. */}
             <div className="bg-[#E8E5E0] rounded-lg px-4 py-3 mb-6">
               <p className="text-xs text-[#6B6B6B] mb-1">{t("ขนาด", "Dimensions", "尺寸")}</p>
-              <p className="font-mono text-[#1A1A1A] font-medium">
-                {activeSeat >= 0 && seatVariants[activeSeat].size ? seatVariants[activeSeat].size : product.dimensions}
-              </p>
+              {(() => {
+                const dimensionsText =
+                  activeSeat >= 0 && seatVariants[activeSeat].size ? seatVariants[activeSeat].size : product.dimensions;
+                const sizes = dimensionsText
+                  .split("-")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (sizes.length > 1) {
+                  return (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {sizes.map((size, i) => (
+                        <span
+                          key={i}
+                          className="font-mono text-xs text-[#1A1A1A] font-medium bg-white border border-[#D8D5CE] rounded px-2.5 py-1.5"
+                        >
+                          {size}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                }
+                return <p className="font-mono text-[#1A1A1A] font-medium">{dimensionsText}</p>;
+              })()}
             </div>
 
             {/* Color variants */}

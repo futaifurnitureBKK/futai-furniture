@@ -1117,7 +1117,7 @@ export default function QuoteBuilderPage() {
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.shipContact)}：</td>
                   <td colSpan={3} className="border border-[#1A1A1A] p-1">{customerContact || "-"}</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{L(TXT.shipPhone)}：</td>
-                  <td colSpan={2} className="border border-[#1A1A1A] p-1">{customerPhone || "-"}</td>
+                  <td colSpan={2} className="border border-[#1A1A1A] p-1 whitespace-nowrap">{customerPhone || "-"}</td>
                 </tr>
               </tbody>
             </table>

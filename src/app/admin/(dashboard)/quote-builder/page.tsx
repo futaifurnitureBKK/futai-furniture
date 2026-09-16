@@ -16,6 +16,7 @@ import {
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
 import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
+import type ExcelJS from "exceljs";
 
 type DocType = "quotation" | "invoice" | "delivery_note";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
@@ -319,6 +320,7 @@ export default function QuoteBuilderPage() {
   const [listOpen, setListOpen] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingExcel, setGeneratingExcel] = useState(false);
 
   const L = (t: TriText) => joinLang(langMode, t);
 
@@ -553,60 +555,199 @@ export default function QuoteBuilderPage() {
     { key: "th", text: COMPANY.nameTh, show: true },
   ].filter((l) => l.show);
 
-  // A plain, editable .xlsx of the same document — the PDF is for sending
-  // as-is, this is for opening in Excel to tweak further (wording, extra
-  // notes, formatting) before sending.
+  // A styled, editable .xlsx mirroring the PDF layout (letterhead, peach
+  // title bar, bordered item table, totals, delivery info, terms/bank
+  // boxes) — for opening in Excel to tweak wording/formatting before
+  // sending. Line-item photos aren't embedded per row (kept simple); the
+  // SKU still identifies the product. Note: exceljs, not the "xlsx"
+  // package — SheetJS's free tier can't write cell fills/borders/fonts,
+  // only exceljs supports full styling for free.
   async function downloadExcel() {
-    const XLSX = await import("xlsx");
-    const rows: (string | number)[][] = [];
+    setGeneratingExcel(true);
+    try {
+    const ExcelJSLib = (await import("exceljs")).default;
+    const wb = new ExcelJSLib.Workbook();
+    const ws = wb.addWorksheet("Sheet1");
 
-    for (const line of companyLines) rows.push([line.text]);
-    rows.push([`${L(TXT.address)}: 99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา อำเภอลำลูกกา จ.ปทุมธานี 12150`]);
-    rows.push([`${L(TXT.tel)}: ${COMPANY.tel}`, "", `${L(TXT.email)}: ${COMPANY.email}`]);
-    rows.push([]);
-    rows.push([doc.th, "", docSubLine]);
-    rows.push([]);
-    rows.push([`${L(TXT.date)}: ${date}`, "", `${L(DOC_NO_LABELS[docType])}: ${docNo}`]);
-    rows.push([`${L(TXT.customer)}: ${customerName || "-"}`]);
-    if (!isDeliveryNote) {
-      rows.push([`${L(TXT.address)}: ${customerAddress || "-"}`]);
-      rows.push([`${L(TXT.taxId)}: ${customerTaxId || "-"}`]);
+    const numCols = isDeliveryNote ? 6 : 8;
+    const widths = isDeliveryNote ? [6, 26, 16, 16, 8, 24] : [6, 22, 14, 14, 7, 12, 12, 20];
+    widths.forEach((w, i) => {
+      ws.getColumn(i + 1).width = w;
+    });
+
+    const thinBorder: ExcelJS.Border = { style: "thin", color: { argb: "FF1A1A1A" } };
+    const allBorders: Partial<ExcelJS.Borders> = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
+    const PEACH = "FFF8CAAC";
+    const RED = "FFC8102E";
+
+    let r = 0;
+    function nextRow() {
+      r += 1;
+      return r;
     }
-    rows.push([]);
+    function styleCell(
+      cell: ExcelJS.Cell,
+      opts: { bold?: boolean; size?: number; align?: "left" | "center" | "right"; fill?: string; color?: string; border?: boolean } = {}
+    ) {
+      cell.font = { bold: opts.bold ?? false, size: opts.size ?? 10, color: { argb: opts.color ?? "FF1A1A1A" }, name: "Tahoma" };
+      cell.alignment = { horizontal: opts.align ?? "left", vertical: "middle", wrapText: true };
+      if (opts.fill) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: opts.fill } };
+      if (opts.border) cell.border = allBorders;
+    }
+    function mergedRow(text: string, opts: Parameters<typeof styleCell>[1] = {}, height?: number) {
+      const row = nextRow();
+      ws.mergeCells(row, 1, row, numCols);
+      const cell = ws.getCell(row, 1);
+      cell.value = text;
+      styleCell(cell, opts);
+      if (height) ws.getRow(row).height = height;
+      return row;
+    }
+    function splitRow(left: string, right: string, opts: Parameters<typeof styleCell>[1] = {}) {
+      const row = nextRow();
+      const half = Math.ceil(numCols / 2);
+      ws.mergeCells(row, 1, row, half);
+      ws.mergeCells(row, half + 1, row, numCols);
+      const lc = ws.getCell(row, 1);
+      lc.value = left;
+      styleCell(lc, { ...opts, align: opts.align ?? "left" });
+      const rc = ws.getCell(row, half + 1);
+      rc.value = right;
+      styleCell(rc, { ...opts, align: "right" });
+      return row;
+    }
+    function totalRow(label: string, amount: number, opts: Parameters<typeof styleCell>[1] = {}) {
+      const row = nextRow();
+      ws.mergeCells(row, 1, row, numCols - 2);
+      ws.mergeCells(row, numCols - 1, row, numCols);
+      const lc = ws.getCell(row, 1);
+      lc.value = label;
+      styleCell(lc, { ...opts, border: true });
+      const rc = ws.getCell(row, numCols - 1);
+      rc.value = amount;
+      rc.numFmt = "#,##0.00";
+      styleCell(rc, { ...opts, align: "right", border: true });
+    }
 
-    const header = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colSize), L(TXT.colQty)];
-    if (!isDeliveryNote) header.push(L(TXT.colUnitPrice), L(TXT.colAmount));
-    header.push(L(TXT.colRemark));
-    rows.push(header);
+    // Logo (floating image, doesn't consume its own row)
+    try {
+      const logoRes = await fetch("/icon.png");
+      const logoBuffer = await logoRes.arrayBuffer();
+      const imageId = wb.addImage({ buffer: logoBuffer, extension: "png" });
+      ws.addImage(imageId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 42, height: 42 } });
+    } catch {
+      // Logo is decorative — skip silently if it can't be fetched.
+    }
+
+    // Letterhead
+    companyLines.forEach((line, i) => {
+      mergedRow(line.text, { bold: i === 0, size: i === 0 ? 13 : 11, align: "center" });
+    });
+    mergedRow(
+      `${L(TXT.address)}: 99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา อำเภอลำลูกกา จ.ปทุมธานี 12150`,
+      { size: 9, align: "center" }
+    );
+    splitRow(`${L(TXT.tel)}: ${COMPANY.tel}`, `${L(TXT.web)}: ${COMPANY.web}`, { size: 9 });
+    splitRow(`${L(TXT.taxId)}: ${COMPANY.taxId}`, `${L(TXT.email)}: ${COMPANY.email}`, { size: 9 });
+    nextRow();
+
+    // Title bar
+    mergedRow(`${doc.th}\n${docSubLine}`, { bold: true, size: 14, align: "center", fill: PEACH }, 34);
+    nextRow();
+
+    // Date / doc no / customer
+    splitRow(`${L(TXT.date)}: ${date}`, `${L(DOC_NO_LABELS[docType])}: ${docNo}`);
+    mergedRow(`${L(TXT.customer)}: ${customerName || "-"}`);
+    if (!isDeliveryNote) {
+      mergedRow(`${L(TXT.address)}: ${customerAddress || "-"}`);
+      mergedRow(`${L(TXT.taxId)}: ${customerTaxId || "-"}`);
+    }
+    nextRow();
+
+    // Item table
+    const headerLabels = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colSize), L(TXT.colQty)];
+    if (!isDeliveryNote) headerLabels.push(L(TXT.colUnitPrice), L(TXT.colAmount));
+    headerLabels.push(L(TXT.colRemark));
+    const headerRow = nextRow();
+    headerLabels.forEach((label, i) => {
+      const cell = ws.getCell(headerRow, i + 1);
+      cell.value = label;
+      styleCell(cell, { bold: true, align: "center", fill: PEACH, border: true });
+    });
 
     items.forEach((it, idx) => {
-      const row: (string | number)[] = [idx + 1, it.name, it.sku, it.size, it.qty];
-      if (!isDeliveryNote) row.push(it.unitPrice, it.qty * it.unitPrice);
-      row.push(it.remark);
-      rows.push(row);
+      const row = nextRow();
+      const values: (string | number)[] = [idx + 1, it.name || "-", it.sku || "-", it.size || "-", it.qty];
+      if (!isDeliveryNote) values.push(it.unitPrice, it.qty * it.unitPrice);
+      values.push(it.remark);
+      values.forEach((v, i) => {
+        const cell = ws.getCell(row, i + 1);
+        cell.value = v;
+        const isMoneyCol = !isDeliveryNote && (i === 5 || i === 6);
+        if (isMoneyCol) cell.numFmt = "#,##0.00";
+        styleCell(cell, {
+          align: i === 1 || i === headerLabels.length - 1 ? "left" : isMoneyCol ? "right" : "center",
+          border: true,
+        });
+      });
     });
-    rows.push([]);
+    nextRow();
 
+    // Totals
     if (!isDeliveryNote) {
-      rows.push([L(TXT.subtotal), "", subtotal]);
-      if (discountPct > 0) rows.push([`${L(TXT.discount)} (${discountPct}%)`, "", -discountAmount]);
-      rows.push([`${L(TXT.vatAmountLabel)} (${vatPct}%)`, "", vatAmount]);
-      rows.push([L(TXT.grandTotal), "", grandTotal]);
+      totalRow(L(TXT.subtotal), subtotal);
+      if (discountPct > 0) totalRow(`${L(TXT.discount)} (${discountPct}%)`, -discountAmount, { color: RED });
+      totalRow(`${L(TXT.vatAmountLabel)} (${vatPct}%)`, vatAmount);
+      totalRow(L(TXT.grandTotal), grandTotal, { bold: true });
       if (depositPct > 0) {
-        rows.push([`${L(TXT.depositAmount)} (${depositPct}%)`, "", depositAmount]);
-        rows.push([L(TXT.balance), "", balanceAmount]);
+        totalRow(`${L(TXT.depositAmount)} (${depositPct}%)`, depositAmount);
+        totalRow(L(TXT.balance), balanceAmount);
       }
-      rows.push([]);
+      nextRow();
     }
 
-    rows.push([`${L(TXT.shipAddress)}: ${shippingAddress || "-"}`, "", `${L(TXT.shipDate)}: ${shippingDate || "-"}`]);
-    rows.push([`${L(TXT.shipContact)}: ${customerContact || "-"}`, "", `${L(TXT.shipPhone)}: ${customerPhone || "-"}`]);
+    // Delivery info
+    splitRow(`${L(TXT.shipAddress)}: ${shippingAddress || "-"}`, `${L(TXT.shipDate)}: ${shippingDate || "-"}`, { border: true });
+    splitRow(`${L(TXT.shipContact)}: ${customerContact || "-"}`, `${L(TXT.shipPhone)}: ${customerPhone || "-"}`, { border: true });
+    nextRow();
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 24 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, `${docNo || "document"}.xlsx`);
+    // Terms + bank (quotation/invoice only, matches the PDF)
+    if (!isDeliveryNote) {
+      mergedRow("TERMS OF SALE AND OTHER COMMENTS", { bold: true, align: "center", fill: PEACH, border: true });
+      [L(TXT.term1), L(TXT.term2), L(TXT.term3), L(TXT.term4)].forEach((line, i) => mergedRow(`${i + 1}. ${line}`, { size: 9, border: true }));
+      nextRow();
+
+      mergedRow("Bank Account (THB)", { bold: true, align: "center", fill: PEACH, border: true });
+      [
+        "Account name : FUTAI FURNITURE CO.,LTD.   Account number : 100000301332239 (THB)",
+        "Name of beneficiary bank : BANK OF CHINA (THAI) PCL   Beneficiary Bank Code : 052",
+        "Address : 179/4 BANGKOK CITY TOWER, SOUTH SATHORN RD, TUNGMAHAMEK, SATHORN, BANGKOK 10120",
+        "SWIFT Code (Field 57) : BKCHTHBKXXX   Correspondent Bank (Field 56A) For THB : BKCHCNBJXXX",
+      ].forEach((line) => mergedRow(line, { size: 9, border: true }));
+      nextRow();
+    }
+
+    // Signature(s)
+    if (isDeliveryNote) {
+      mergedRow(`${L(TXT.receiverSign)} :`);
+    } else {
+      splitRow(`${L(TXT.sellerSign)} :`, `${L(TXT.buyerSign)} :`);
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${docNo || "document"}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error(t("สร้างไฟล์ Excel ไม่สำเร็จ ลองใหม่อีกครั้ง", "Failed to generate Excel file, please try again", "生成Excel文件失败，请重试"));
+    } finally {
+      setGeneratingExcel(false);
+    }
   }
 
   return (
@@ -669,8 +810,13 @@ export default function QuoteBuilderPage() {
           <Button variant="outline" onClick={saveQuote} disabled={saving}>
             <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
           </Button>
-          <Button variant="outline" onClick={downloadExcel}>
-            <FileSpreadsheet size={14} className="mr-1.5" /> {t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
+          <Button variant="outline" onClick={downloadExcel} disabled={generatingExcel}>
+            {generatingExcel ? (
+              <Loader2 size={14} className="mr-1.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet size={14} className="mr-1.5" />
+            )}
+            {generatingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
           </Button>
           <Button onClick={() => window.print()}>
             <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}

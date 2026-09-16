@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -553,6 +553,62 @@ export default function QuoteBuilderPage() {
     { key: "th", text: COMPANY.nameTh, show: true },
   ].filter((l) => l.show);
 
+  // A plain, editable .xlsx of the same document — the PDF is for sending
+  // as-is, this is for opening in Excel to tweak further (wording, extra
+  // notes, formatting) before sending.
+  async function downloadExcel() {
+    const XLSX = await import("xlsx");
+    const rows: (string | number)[][] = [];
+
+    for (const line of companyLines) rows.push([line.text]);
+    rows.push([`${L(TXT.address)}: 99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา อำเภอลำลูกกา จ.ปทุมธานี 12150`]);
+    rows.push([`${L(TXT.tel)}: ${COMPANY.tel}`, "", `${L(TXT.email)}: ${COMPANY.email}`]);
+    rows.push([]);
+    rows.push([doc.th, "", docSubLine]);
+    rows.push([]);
+    rows.push([`${L(TXT.date)}: ${date}`, "", `${L(DOC_NO_LABELS[docType])}: ${docNo}`]);
+    rows.push([`${L(TXT.customer)}: ${customerName || "-"}`]);
+    if (!isDeliveryNote) {
+      rows.push([`${L(TXT.address)}: ${customerAddress || "-"}`]);
+      rows.push([`${L(TXT.taxId)}: ${customerTaxId || "-"}`]);
+    }
+    rows.push([]);
+
+    const header = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colSize), L(TXT.colQty)];
+    if (!isDeliveryNote) header.push(L(TXT.colUnitPrice), L(TXT.colAmount));
+    header.push(L(TXT.colRemark));
+    rows.push(header);
+
+    items.forEach((it, idx) => {
+      const row: (string | number)[] = [idx + 1, it.name, it.sku, it.size, it.qty];
+      if (!isDeliveryNote) row.push(it.unitPrice, it.qty * it.unitPrice);
+      row.push(it.remark);
+      rows.push(row);
+    });
+    rows.push([]);
+
+    if (!isDeliveryNote) {
+      rows.push([L(TXT.subtotal), "", subtotal]);
+      if (discountPct > 0) rows.push([`${L(TXT.discount)} (${discountPct}%)`, "", -discountAmount]);
+      rows.push([`${L(TXT.vatAmountLabel)} (${vatPct}%)`, "", vatAmount]);
+      rows.push([L(TXT.grandTotal), "", grandTotal]);
+      if (depositPct > 0) {
+        rows.push([`${L(TXT.depositAmount)} (${depositPct}%)`, "", depositAmount]);
+        rows.push([L(TXT.balance), "", balanceAmount]);
+      }
+      rows.push([]);
+    }
+
+    rows.push([`${L(TXT.shipAddress)}: ${shippingAddress || "-"}`, "", `${L(TXT.shipDate)}: ${shippingDate || "-"}`]);
+    rows.push([`${L(TXT.shipContact)}: ${customerContact || "-"}`, "", `${L(TXT.shipPhone)}: ${customerPhone || "-"}`]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 24 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, `${docNo || "document"}.xlsx`);
+  }
+
   return (
     <div className="space-y-6">
       <style>{`
@@ -612,6 +668,9 @@ export default function QuoteBuilderPage() {
           </Button>
           <Button variant="outline" onClick={saveQuote} disabled={saving}>
             <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
+          </Button>
+          <Button variant="outline" onClick={downloadExcel}>
+            <FileSpreadsheet size={14} className="mr-1.5" /> {t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
           </Button>
           <Button onClick={() => window.print()}>
             <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}

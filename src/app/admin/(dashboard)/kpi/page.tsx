@@ -491,16 +491,16 @@ export default function KpiPage() {
 
       {/* ── Drill-in dialog for one status column ───────────────────── */}
       <Dialog open={!!openBoardKey} onOpenChange={(v) => !v && setOpenBoardKey(null)}>
-        <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] w-[1400px] h-[92vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg">
               {activeBoard?.label} ({activeBoard?.leads.length ?? 0})
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 py-2">
+          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 py-2 content-start">
             {activeBoard?.leads.length === 0 ? (
-              <p className="text-sm text-[#9CA3AF] text-center py-12">ไม่มีรายการ</p>
+              <p className="col-span-full text-sm text-[#9CA3AF] text-center py-12">ไม่มีรายการ</p>
             ) : (
               activeBoard?.leads.map((lead) => {
                 const overdue =

@@ -9,9 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
@@ -25,6 +22,19 @@ import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const BOARD_COLUMNS: {
+  key: string;
+  label: string;
+  statuses: LeadStatus[];
+  header: string;
+  body: string;
+}[] = [
+  { key: "A", label: "คอนเฟิร์ม / จ่ายเงินแล้ว", statuses: ["converted"], header: "bg-emerald-600", body: "bg-emerald-50/60 border-emerald-200" },
+  { key: "B", label: "รออนุมัติ (ส่งใบเสนอราคาแล้ว)", statuses: ["quoted"], header: "bg-amber-500", body: "bg-amber-50/60 border-amber-200" },
+  { key: "C", label: "ยังไม่ได้ตอบกลับ", statuses: ["new", "followed_1", "followed_2plus", "engaged"], header: "bg-orange-500", body: "bg-orange-50/60 border-orange-200" },
+  { key: "D", label: "ปฏิเสธ", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
+];
 
 const emptyForm = {
   lead_date: todayStr(),
@@ -204,6 +214,15 @@ export default function KpiPage() {
 
     return { total, followed, followUpRate, responseRate, conversionRate, avgCycleDays, aov, revenue };
   }, [leads]);
+
+  const boardGroups = useMemo(
+    () =>
+      BOARD_COLUMNS.map((col) => ({
+        ...col,
+        leads: leads.filter((l) => col.statuses.includes(l.status)),
+      })),
+    [leads]
+  );
 
   const channelData = useMemo(
     () =>
@@ -435,103 +454,96 @@ export default function KpiPage() {
         </div>
       </div>
 
-      {/* ── Daily tracker table ──────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-[#FAF7F2]">
-              <TableHead className="text-xs">วันที่</TableHead>
-              <TableHead className="text-xs">ลูกค้า</TableHead>
-              <TableHead className="text-xs">Channel</TableHead>
-              <TableHead className="text-xs">SKU</TableHead>
-              <TableHead className="text-xs">สถานะ</TableHead>
-              <TableHead className="text-xs">ติดต่อทาง</TableHead>
-              <TableHead className="text-xs">ติดตามครั้งถัดไป</TableHead>
-              <TableHead className="text-xs">หมายเหตุ</TableHead>
-              <TableHead className="text-xs" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-[#6B6B6B]">
-                  กำลังโหลด...
-                </TableCell>
-              </TableRow>
-            ) : leads.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-[#6B6B6B]">
-                  ยังไม่มีลีด — กด &quot;เพิ่มลีด&quot; เพื่อเริ่มบันทึก
-                </TableCell>
-              </TableRow>
-            ) : (
-              leads.map((lead) => {
-                const overdue =
-                  !!lead.next_followup_date &&
-                  lead.next_followup_date < today &&
-                  lead.status !== "converted" &&
-                  lead.status !== "lost";
-                return (
-                  <TableRow key={lead.id} className="hover:bg-[#FAF7F2]/50">
-                    <TableCell className="text-xs text-[#6B6B6B] whitespace-nowrap">{lead.lead_date}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="size-9">
-                          {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
-                          <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium leading-tight">{lead.customer_name}</p>
-                          {lead.customer_id && <p className="text-[10px] text-[#9CA3AF] leading-tight">{lead.customer_id}</p>}
+      {/* ── Status board ─────────────────────────────────────────── */}
+      {loading ? (
+        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">กำลังโหลด...</div>
+      ) : leads.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
+          ยังไม่มีลีด — กด &quot;เพิ่มลีด&quot; เพื่อเริ่มบันทึก
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          {boardGroups.map((col) => (
+            <div key={col.key} className={`rounded-xl border overflow-hidden ${col.body}`}>
+              <div className={`${col.header} text-white px-4 py-2.5 flex items-center justify-between`}>
+                <p className="text-sm font-semibold">{col.label}</p>
+                <span className="text-xs font-bold bg-white/25 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                  {col.leads.length}
+                </span>
+              </div>
+
+              <div className="p-2.5 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                {col.leads.length === 0 ? (
+                  <p className="text-xs text-[#9CA3AF] text-center py-6">ไม่มีรายการ</p>
+                ) : (
+                  col.leads.map((lead) => {
+                    const overdue =
+                      !!lead.next_followup_date &&
+                      lead.next_followup_date < today &&
+                      lead.status !== "converted" &&
+                      lead.status !== "lost";
+                    return (
+                      <div key={lead.id} className="bg-white rounded-lg shadow-sm p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Avatar className="size-9 shrink-0">
+                              {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
+                              <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium leading-tight truncate">{lead.customer_name}</p>
+                              {lead.customer_id && <p className="text-[10px] text-[#9CA3AF] leading-tight">{lead.customer_id}</p>}
+                            </div>
+                          </div>
+                          <div className="flex gap-0.5 shrink-0">
+                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label="แก้ไข">
+                              <Pencil size={13} />
+                            </Button>
+                            <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label="ลบ">
+                              <Trash2 size={13} className="text-red-500" />
+                            </Button>
+                          </div>
                         </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
+                          <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">
+                            {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
+                          </span>
+                          {lead.sku && <span className="font-mono bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.sku}</span>}
+                          <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.lead_date}</span>
+                        </div>
+
+                        {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
+
+                        <div className={`text-[10px] ${overdue ? "text-red-600 font-semibold" : "text-[#9CA3AF]"}`}>
+                          ติดตามถัดไป: {lead.next_followup_date || "-"}
+                          {overdue && " ⚠ เลยกำหนด"}
+                        </div>
+
+                        <Select value={lead.status} onValueChange={(v) => quickSetStatus(lead, v as LeadStatus)}>
+                          <SelectTrigger
+                            size="sm"
+                            className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${statusMeta(lead.status).color}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-xs whitespace-nowrap">
-                      {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
-                    </TableCell>
-                    <TableCell className="text-xs font-mono text-[#6B6B6B] whitespace-nowrap">{lead.sku || "-"}</TableCell>
-                    <TableCell>
-                      <Select value={lead.status} onValueChange={(v) => quickSetStatus(lead, v as LeadStatus)}>
-                        <SelectTrigger
-                          size="sm"
-                          className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium whitespace-nowrap ${statusMeta(lead.status).color}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s.value} value={s.value}>
-                              {s.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-xs text-[#6B6B6B] whitespace-nowrap">
-                      {CONTACT_METHODS.find((m) => m.value === lead.contact_method)?.label || "-"}
-                    </TableCell>
-                    <TableCell className={`text-xs whitespace-nowrap ${overdue ? "text-red-600 font-semibold" : "text-[#6B6B6B]"}`}>
-                      {lead.next_followup_date || "-"}
-                      {overdue && " ⚠"}
-                    </TableCell>
-                    <TableCell className="text-xs text-[#6B6B6B] max-w-[200px] truncate">{lead.notes || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label="แก้ไข">
-                          <Pencil size={13} />
-                        </Button>
-                        <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label="ลบ">
-                          <Trash2 size={13} className="text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

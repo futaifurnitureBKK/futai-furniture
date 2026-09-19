@@ -6,10 +6,12 @@ export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const archived = req.nextUrl.searchParams.get("archived") === "true";
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("saved_quotes")
-    .select("id, doc_type, doc_no, customer_name, doc_date, status, channel, updated_at")
+    .select("id, doc_type, doc_no, customer_name, doc_date, status, archived, channel, updated_at")
+    .eq("archived", archived)
     .order("updated_at", { ascending: false });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

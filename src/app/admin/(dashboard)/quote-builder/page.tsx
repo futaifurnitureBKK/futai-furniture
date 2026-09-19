@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,13 @@ type DocType = "quotation" | "invoice" | "delivery_note";
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
 
 const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string; color: string }> = {
-  pending:     { th: "รอการตอบกลับ",       en: "Awaiting Response", zh: "待回复",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
-  in_progress: { th: "กำลังดำเนินการ",     en: "In Progress",       zh: "进行中",     color: "bg-blue-100 text-blue-700" },
-  confirmed:   { th: "คอนเฟิร์ม/รอชำระ",   en: "Confirmed / Awaiting Payment", zh: "已确认/待付款", color: "bg-yellow-100 text-yellow-700" },
-  completed:   { th: "เสร็จสิ้น",          en: "Completed",         zh: "已完成",     color: "bg-green-100 text-green-700" },
+  pending:            { th: "รอการตอบกลับ",       en: "Awaiting Response", zh: "待回复",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
+  in_progress:        { th: "กำลังดำเนินการ",     en: "In Progress",       zh: "进行中",     color: "bg-blue-100 text-blue-700" },
+  confirmed:          { th: "คอนเฟิร์ม/รอชำระ",   en: "Confirmed / Awaiting Payment", zh: "已确认/待付款", color: "bg-yellow-100 text-yellow-700" },
+  awaiting_shipment:  { th: "รอจัดส่ง",           en: "Awaiting Shipment", zh: "待发货",     color: "bg-purple-100 text-purple-700" },
+  completed:          { th: "จัดส่งเสร็จแล้ว",     en: "Shipped / Completed", zh: "已发货/完成", color: "bg-green-100 text-green-700" },
 };
-const STATUS_ORDER: SavedQuoteStatus[] = ["pending", "in_progress", "confirmed", "completed"];
+const STATUS_ORDER: SavedQuoteStatus[] = ["pending", "in_progress", "confirmed", "awaiting_shipment", "completed"];
 
 const CHANNEL_META: Record<SavedQuoteChannel, { th: string; en: string; zh: string; color: string }> = {
   facebook: { th: "Facebook", en: "Facebook", zh: "Facebook", color: "bg-blue-100 text-blue-700" },
@@ -64,7 +65,7 @@ function computeSeatPrice(baseUnitPrice: number, seats: number): number {
   return baseUnitPrice + (seats - 1) * Math.floor(baseUnitPrice / 2);
 }
 
-type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "channel">;
+type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "archived" | "channel">;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation:     { th: "ใบเสนอราคา", en: "QUOTATION",      zh: "报价单", prefix: "QT" },
@@ -318,15 +319,16 @@ export default function QuoteBuilderPage() {
   const [savedId, setSavedId] = useState<number | null>(null);
   const [savedList, setSavedList] = useState<SavedListRow[]>([]);
   const [listOpen, setListOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
   const L = (t: TriText) => joinLang(langMode, t);
 
-  async function fetchSavedList() {
+  async function fetchSavedList(archived = showArchived) {
     setLoadingList(true);
-    const res = await fetch("/api/admin/saved-quotes");
+    const res = await fetch(`/api/admin/saved-quotes?archived=${archived}`);
     const data = await res.json();
     setLoadingList(false);
     if (res.ok) setSavedList(data.quotes);
@@ -335,7 +337,8 @@ export default function QuoteBuilderPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/saved-quotes");
+      if (!cancelled) setLoadingList(true);
+      const res = await fetch(`/api/admin/saved-quotes?archived=${showArchived}`);
       const data = await res.json();
       if (!cancelled) {
         if (res.ok) setSavedList(data.quotes);
@@ -345,7 +348,7 @@ export default function QuoteBuilderPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showArchived]);
 
   function resetForm() {
     setSavedId(null);
@@ -480,15 +483,32 @@ export default function QuoteBuilderPage() {
     }
   }
 
-  async function deleteQuote(id: number) {
-    if (!confirm(t("ลบใบนี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)", "Delete this document? This can't be undone.", "确定删除吗？删除后无法恢复。"))) return;
-    const res = await fetch(`/api/admin/saved-quotes/${id}`, { method: "DELETE" });
+  async function archiveQuote(id: number) {
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: true }),
+    });
     if (res.ok) {
       setSavedList((prev) => prev.filter((q) => q.id !== id));
       if (savedId === id) resetForm();
-      toast.success(t("ลบแล้ว", "Deleted", "已删除"));
+      toast.success(t("เก็บเข้าคลังแล้ว", "Archived", "已归档"));
     } else {
-      toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
+      toast.error(t("เก็บเข้าคลังไม่สำเร็จ", "Archive failed", "归档失败"));
+    }
+  }
+
+  async function restoreQuote(id: number) {
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: false }),
+    });
+    if (res.ok) {
+      setSavedList((prev) => prev.filter((q) => q.id !== id));
+      toast.success(t("กู้คืนแล้ว", "Restored", "已恢复"));
+    } else {
+      toast.error(t("กู้คืนไม่สำเร็จ", "Restore failed", "恢复失败"));
     }
   }
 
@@ -807,7 +827,7 @@ export default function QuoteBuilderPage() {
           <Button variant="outline" onClick={resetForm}>
             <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
           </Button>
-          <Button variant="outline" onClick={saveQuote} disabled={saving}>
+          <Button onClick={saveQuote} disabled={saving}>
             <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
           </Button>
           <Button variant="outline" onClick={downloadExcel} disabled={generatingExcel}>
@@ -826,7 +846,24 @@ export default function QuoteBuilderPage() {
 
       {listOpen && (
         <div className="bg-white rounded-xl shadow-sm p-5 no-print">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("รายการที่บันทึกไว้", "Saved Documents", "已保存文件")}</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-[#1A1A1A]">
+              {showArchived
+                ? t("เอกสารที่เก็บเข้าคลัง", "Archived Documents", "已归档文件")
+                : t("รายการที่บันทึกไว้", "Saved Documents", "已保存文件")}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => setShowArchived((v) => !v)}>
+              {showArchived ? (
+                <>
+                  <FolderOpen size={13} className="mr-1.5" /> {t("ดูรายการปกติ", "View active", "查看正常列表")}
+                </>
+              ) : (
+                <>
+                  <Archive size={13} className="mr-1.5" /> {t("ดูที่เก็บถาวร", "View archived", "查看归档")}
+                </>
+              )}
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
@@ -849,7 +886,9 @@ export default function QuoteBuilderPage() {
               ) : savedList.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
-                    {t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
+                    {showArchived
+                      ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
+                      : t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -900,9 +939,15 @@ export default function QuoteBuilderPage() {
                         <Button size="sm" variant="outline" onClick={() => loadQuote(q.id)}>
                           {t("เปิด", "Open", "打开")}
                         </Button>
-                        <Button size="icon-sm" variant="ghost" onClick={() => deleteQuote(q.id)} aria-label={t("ลบ", "Delete", "删除")}>
-                          <Trash2 size={13} className="text-red-500" />
-                        </Button>
+                        {showArchived ? (
+                          <Button size="icon-sm" variant="ghost" onClick={() => restoreQuote(q.id)} aria-label={t("กู้คืน", "Restore", "恢复")}>
+                            <ArchiveRestore size={13} className="text-[#6B6B6B]" />
+                          </Button>
+                        ) : (
+                          <Button size="icon-sm" variant="ghost" onClick={() => archiveQuote(q.id)} aria-label={t("เก็บเข้าคลัง", "Archive", "归档")}>
+                            <Archive size={13} className="text-[#6B6B6B]" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

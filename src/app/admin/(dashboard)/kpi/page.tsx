@@ -491,7 +491,7 @@ export default function KpiPage() {
 
       {/* ── Drill-in dialog for one status column ───────────────────── */}
       <Dialog open={!!openBoardKey} onOpenChange={(v) => !v && setOpenBoardKey(null)}>
-        <DialogContent className="max-w-[95vw] w-[1400px] h-[92vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] sm:max-w-[95vw] w-[1400px] h-[92vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-lg">
               {activeBoard?.label} ({activeBoard?.leads.length ?? 0})
@@ -571,7 +571,7 @@ export default function KpiPage() {
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-4xl sm:max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editing ? "แก้ไขลีด" : "เพิ่มลีดใหม่"}</DialogTitle>
           </DialogHeader>

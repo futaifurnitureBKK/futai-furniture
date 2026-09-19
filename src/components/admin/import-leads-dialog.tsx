@@ -282,7 +282,7 @@ export function ImportLeadsDialog({
         }
       }}
     >
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
+      <DialogContent className="max-w-5xl sm:max-w-5xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>นำเข้าลีดจาก Excel</DialogTitle>
         </DialogHeader>

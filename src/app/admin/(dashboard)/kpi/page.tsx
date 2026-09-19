@@ -476,7 +476,7 @@ export default function KpiPage() {
                     <TableCell className="text-xs text-[#6B6B6B] whitespace-nowrap">{lead.lead_date}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Avatar size="sm">
+                        <Avatar className="size-9">
                           {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
                           <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
                         </Avatar>
@@ -535,36 +535,70 @@ export default function KpiPage() {
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editing ? "แก้ไขลีด" : "เพิ่มลีดใหม่"}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3 py-2 overflow-y-auto">
-            <div className="col-span-2 flex items-center gap-3">
-              <Avatar size="lg">
-                {form.profile_image_url && <AvatarImage src={form.profile_image_url} alt="" />}
-                <AvatarFallback>{form.customer_name.slice(0, 1).toUpperCase() || "?"}</AvatarFallback>
-              </Avatar>
-              <label>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium border rounded-md px-3 py-1.5 cursor-pointer hover:bg-[#FAF7F2]">
-                  {uploadingPhoto ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
-                  {uploadingPhoto ? "กำลังอัปโหลด..." : "อัปโหลดภาพโปรไฟล์"}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingPhoto}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadPhoto(f);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
+            {/* Customer profile card */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 bg-[#FAF7F2] rounded-xl p-5">
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <Avatar className="size-28 text-2xl">
+                  {form.profile_image_url && <AvatarImage src={form.profile_image_url} alt="" />}
+                  <AvatarFallback>{form.customer_name.slice(0, 1).toUpperCase() || "?"}</AvatarFallback>
+                </Avatar>
+                <label>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium border rounded-md px-3 py-1.5 cursor-pointer bg-white hover:bg-[#F0EDE6]">
+                    {uploadingPhoto ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+                    {uploadingPhoto ? "กำลังอัปโหลด..." : "อัปโหลดรูป"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingPhoto}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadPhoto(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <Label className="text-sm">ชื่อลูกค้า</Label>
+                  <Input
+                    className="mt-1 text-base h-11"
+                    value={form.customer_name}
+                    onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                    placeholder="เช่น คุณสมชาย"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm">หมายเลขลูกค้า (Customer ID)</Label>
+                  <Input
+                    className="mt-1"
+                    value={form.customer_id}
+                    onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
+                    placeholder="เช่น C-0012"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm">ที่อยู่</Label>
+                  <Input
+                    className="mt-1"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    placeholder="ที่อยู่ลูกค้า/บริษัท"
+                  />
+                </div>
+              </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>วันที่ติดตาม</Label>
               <Input
@@ -572,34 +606,6 @@ export default function KpiPage() {
                 className="mt-1"
                 value={form.lead_date}
                 onChange={(e) => setForm({ ...form, lead_date: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>หมายเลขลูกค้า (Customer ID)</Label>
-              <Input
-                className="mt-1"
-                value={form.customer_id}
-                onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                placeholder="เช่น C-0012"
-              />
-            </div>
-
-            <div>
-              <Label>ชื่อลูกค้า</Label>
-              <Input
-                className="mt-1"
-                value={form.customer_name}
-                onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-                placeholder="เช่น คุณสมชาย"
-              />
-            </div>
-            <div>
-              <Label>ที่อยู่</Label>
-              <Input
-                className="mt-1"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="ที่อยู่ลูกค้า/บริษัท"
               />
             </div>
 
@@ -765,6 +771,7 @@ export default function KpiPage() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="บันทึกการสนทนา / ป้ายกำกับต่อไป"
               />
+            </div>
             </div>
           </div>
 

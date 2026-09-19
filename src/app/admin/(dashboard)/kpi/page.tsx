@@ -472,16 +472,16 @@ export default function KpiPage() {
               <button
                 key={col.key}
                 onClick={() => setOpenBoardKey(col.key)}
-                className="text-left bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                className="text-left bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <div className={`${col.header} h-1.5`} />
-                <div className="p-4">
-                  <p className="text-xs text-[#6B6B6B]">{col.label}</p>
-                  <p className="text-3xl font-bold text-[#1A1A1A] mt-1">{col.leads.length}</p>
-                  <div className="h-1.5 bg-[#F0EDE6] rounded-full mt-3 overflow-hidden">
+                <div className={`${col.header} h-2.5`} />
+                <div className="p-6">
+                  <p className="text-sm font-medium text-[#6B6B6B]">{col.label}</p>
+                  <p className="text-6xl font-bold text-[#1A1A1A] mt-2">{col.leads.length}</p>
+                  <div className="h-2.5 bg-[#F0EDE6] rounded-full mt-5 overflow-hidden">
                     <div className={`${col.header} h-full rounded-full`} style={{ width: `${pct}%` }} />
                   </div>
-                  <p className="text-[10px] text-[#9CA3AF] mt-1">{pct}% ของทั้งหมด</p>
+                  <p className="text-xs text-[#9CA3AF] mt-2">{pct}% ของทั้งหมด</p>
                 </div>
               </button>
             );
@@ -571,7 +571,7 @@ export default function KpiPage() {
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-4xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-[92vw] sm:max-w-[92vw] w-[1300px] h-[92vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editing ? "แก้ไขลีด" : "เพิ่มลีดใหม่"}</DialogTitle>
           </DialogHeader>
@@ -634,7 +634,7 @@ export default function KpiPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label>วันที่ติดตาม</Label>
               <Input
@@ -698,7 +698,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-3">
               <Label>รายละเอียดของลูกค้า</Label>
               <Textarea
                 className="mt-1"
@@ -752,7 +752,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-3">
               <Label>สถานะติดตาม</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}>
                 <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
@@ -765,7 +765,7 @@ export default function KpiPage() {
             </div>
 
             {form.status === "lost" && (
-              <div className="col-span-2">
+              <div className="sm:col-span-3">
                 <Label>เหตุผลที่เสียลูกค้า</Label>
                 <Select value={form.lost_reason} onValueChange={(v) => setForm({ ...form, lost_reason: v ?? "" })}>
                   <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="เลือกเหตุผล" /></SelectTrigger>
@@ -798,7 +798,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-3">
               <Label>ติดตามรายละเอียดเพิ่มเติม</Label>
               <Textarea
                 className="mt-1"

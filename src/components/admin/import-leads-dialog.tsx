@@ -13,29 +13,43 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { CHANNELS, SEGMENTS, STATUSES } from "@/lib/lead-options";
-import type { Lead, LeadChannel, LeadSegment, LeadStatus } from "@/types";
+import type { Lead, LeadChannel, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 
 interface ParsedRow {
   key: string;
   include: boolean;
+  customer_id: string;
   customer_name: string;
+  address: string;
   channel: LeadChannel;
   segment: LeadSegment;
   status: LeadStatus;
+  customer_details: string;
+  phone_contacted: YesNoUnknown;
+  has_office_plan: YesNoUnknown;
+  will_visit_showroom: YesNoUnknown;
+  needed_by_date: string;
   notes: string;
   lead_date: string;
   sheet: string;
 }
 
 const HEADER_KEYWORDS = {
+  customerId: ["customer id", "หมายเลขลูกค้า"],
   company: ["company", "公司"],
   contactPerson: ["contact person", "联系人"],
+  address: ["address", "ที่อยู่", "地址"],
   interest: ["interest", "感兴趣"],
   customerStatus: ["customer status", "客户状态"],
+  customerDetails: ["รายละเอียดของลูกค้า", "customer detail"],
   followUpDate: ["follow-up date", "follow up date", "日期"],
   followUpResult: ["follow-up result", "follow up result", "跟进结果"],
   notes: ["notes", "备注"],
   channel: ["ช่องทาง", "channel"],
+  phoneContacted: ["ติดต่อทางโทรศัพท์", "phone contact"],
+  officePlan: ["แปลนออฟฟิศ", "office plan", "floor plan"],
+  showroomVisit: ["มาที่โชว์รูม", "โชว์รูม", "showroom"],
+  neededByDate: ["ต้องการเฟอร์นิเจอร์", "จำเป็นต้องใช้", "needed date", "required date"],
 };
 
 function cellText(v: unknown): string {
@@ -65,6 +79,14 @@ function detectChannelFromText(text: string): LeadChannel | null {
   if (t.includes("tiktok")) return "tiktok";
   if (t.includes("line") || t.includes("ไลน์")) return "line";
   return null;
+}
+
+function parseYesNo(text: string): YesNoUnknown {
+  const t = text.trim().toLowerCase();
+  if (!t || t === "-") return "unknown";
+  if (t.includes("ไม่") || t === "no" || t === "n") return "no";
+  if (t.includes("ใช่") || t === "yes" || t === "y") return "yes";
+  return "unknown";
 }
 
 function detectChannelFromSheetName(name: string): LeadChannel {
@@ -117,14 +139,21 @@ export function ImportLeadsDialog({
         if (!grid.length) return;
 
         const headerRow = grid[0];
+        const colCustomerId = findCol(headerRow, HEADER_KEYWORDS.customerId);
         const colCompany = findCol(headerRow, HEADER_KEYWORDS.company);
         const colContact = findCol(headerRow, HEADER_KEYWORDS.contactPerson);
+        const colAddress = findCol(headerRow, HEADER_KEYWORDS.address);
         const colInterest = findCol(headerRow, HEADER_KEYWORDS.interest);
         const colStatus = findCol(headerRow, HEADER_KEYWORDS.customerStatus);
+        const colDetails = findCol(headerRow, HEADER_KEYWORDS.customerDetails);
         const colDate = findCol(headerRow, HEADER_KEYWORDS.followUpDate);
         const colResult = findCol(headerRow, HEADER_KEYWORDS.followUpResult);
         const colNotes = findCol(headerRow, HEADER_KEYWORDS.notes);
         const colChannel = findCol(headerRow, HEADER_KEYWORDS.channel);
+        const colPhone = findCol(headerRow, HEADER_KEYWORDS.phoneContacted);
+        const colOfficePlan = findCol(headerRow, HEADER_KEYWORDS.officePlan);
+        const colShowroom = findCol(headerRow, HEADER_KEYWORDS.showroomVisit);
+        const colNeededBy = findCol(headerRow, HEADER_KEYWORDS.neededByDate);
 
         // Sheet has none of the columns we recognize — skip it.
         if (colCompany === -1 && colContact === -1) return;
@@ -135,12 +164,19 @@ export function ImportLeadsDialog({
           const contact = colContact >= 0 ? cellText(row[colContact]) : "";
           if (!company && !contact) continue;
 
+          const customerId = colCustomerId >= 0 ? cellText(row[colCustomerId]) : "";
+          const address = colAddress >= 0 ? cellText(row[colAddress]) : "";
           const interest = colInterest >= 0 ? cellText(row[colInterest]) : "";
           const statusText = colStatus >= 0 ? cellText(row[colStatus]) : "";
+          const detailsText = colDetails >= 0 ? cellText(row[colDetails]) : "";
           const resultText = colResult >= 0 ? cellText(row[colResult]) : "";
           const notesText = colNotes >= 0 ? cellText(row[colNotes]) : "";
           const channelCell = colChannel >= 0 ? cellText(row[colChannel]) : "";
           const dateCell = colDate >= 0 ? row[colDate] : "";
+          const neededByCell = colNeededBy >= 0 ? row[colNeededBy] : "";
+          const phoneContacted = colPhone >= 0 ? parseYesNo(cellText(row[colPhone])) : "unknown";
+          const hasOfficePlan = colOfficePlan >= 0 ? parseYesNo(cellText(row[colOfficePlan])) : "unknown";
+          const willVisitShowroom = colShowroom >= 0 ? parseYesNo(cellText(row[colShowroom])) : "unknown";
 
           const channel =
             (channelCell && channelCell !== "-" && detectChannelFromText(channelCell)) ||
@@ -156,14 +192,23 @@ export function ImportLeadsDialog({
 
           const leadDate =
             (typeof dateCell === "number" ? excelSerialToISODate(dateCell) : null) || todayStr();
+          const neededByDate =
+            typeof neededByCell === "number" ? excelSerialToISODate(neededByCell) || "" : cellText(neededByCell);
 
           parsed.push({
             key: `${sheetName}-${r}`,
             include: true,
+            customer_id: customerId,
             customer_name: company || contact,
+            address,
             channel,
             segment: company ? "b2b" : "b2c",
             status: "new",
+            customer_details: detailsText,
+            phone_contacted: phoneContacted,
+            has_office_plan: hasOfficePlan,
+            will_visit_showroom: willVisitShowroom,
+            needed_by_date: neededByDate,
             notes: notesParts.join(" | "),
             lead_date: leadDate,
             sheet: sheetName,
@@ -197,10 +242,17 @@ export function ImportLeadsDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lead_date: r.lead_date,
+            customer_id: r.customer_id || null,
             customer_name: r.customer_name,
+            address: r.address || null,
             channel: r.channel,
             segment: r.segment,
             status: r.status,
+            customer_details: r.customer_details || null,
+            phone_contacted: r.phone_contacted,
+            has_office_plan: r.has_office_plan,
+            will_visit_showroom: r.will_visit_showroom,
+            needed_by_date: r.needed_by_date || null,
             notes: r.notes,
           }),
         });
@@ -283,8 +335,13 @@ export function ImportLeadsDialog({
                           onCheckedChange={(v) => updateRow(r.key, { include: v === true })}
                         />
                       </TableCell>
-                      <TableCell className="text-sm font-medium whitespace-nowrap">
-                        {r.customer_name}
+                      <TableCell className="whitespace-nowrap">
+                        <p className="text-sm font-medium leading-tight">{r.customer_name}</p>
+                        {(r.customer_id || r.address) && (
+                          <p className="text-[10px] text-[#9CA3AF] leading-tight">
+                            {[r.customer_id, r.address].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Select
@@ -325,7 +382,14 @@ export function ImportLeadsDialog({
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="text-xs text-[#6B6B6B] max-w-[220px] truncate" title={r.notes}>
+                      <TableCell
+                        className="text-xs text-[#6B6B6B] max-w-[220px] truncate"
+                        title={[
+                          r.notes,
+                          r.customer_details && `รายละเอียด: ${r.customer_details}`,
+                          r.needed_by_date && `ต้องการใช้: ${r.needed_by_date}`,
+                        ].filter(Boolean).join(" | ")}
+                      >
                         {r.notes || "-"}
                       </TableCell>
                     </TableRow>

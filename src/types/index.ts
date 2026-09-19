@@ -19,18 +19,28 @@ export type LeadStatus =
   | "quoted"
   | "converted"
   | "lost";
-export type LeadContactMethod = "line" | "phone" | "email" | "messenger";
+export type LeadContactMethod = "line" | "phone" | "email" | "messenger" | "wechat";
+export type YesNoUnknown = "yes" | "no" | "unknown";
 
 export interface Lead {
   id: number;
   lead_date: string;
+  customer_id: string | null;
   customer_name: string;
+  profile_image_url: string | null;
+  address: string | null;
   channel: LeadChannel;
   segment: LeadSegment;
   sku: string | null;
   status: LeadStatus;
   contact_method: LeadContactMethod | null;
+  contact_id: string | null;
+  customer_details: string | null;
   notes: string;
+  phone_contacted: YesNoUnknown;
+  has_office_plan: YesNoUnknown;
+  will_visit_showroom: YesNoUnknown;
+  needed_by_date: string | null;
   next_followup_date: string | null;
   deal_value: number | null;
   lost_reason: string | null;

@@ -1,4 +1,4 @@
-import type { LeadChannel, LeadContactMethod, LeadSegment, LeadStatus } from "@/types";
+import type { LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 
 export const CHANNELS: { value: LeadChannel; label: string; color: string }[] = [
   { value: "facebook", label: "Facebook", color: "#1877F2" },
@@ -23,6 +23,13 @@ export const CONTACT_METHODS: { value: LeadContactMethod; label: string }[] = [
   { value: "phone",     label: "โทรศัพท์" },
   { value: "email",     label: "อีเมล" },
   { value: "messenger", label: "Messenger" },
+  { value: "wechat",    label: "WeChat" },
+];
+
+export const YES_NO_UNKNOWN: { value: YesNoUnknown; label: string }[] = [
+  { value: "yes",     label: "ใช่" },
+  { value: "no",      label: "ไม่ใช่" },
+  { value: "unknown", label: "ยังไม่ทราบ" },
 ];
 
 export const SEGMENTS: { value: LeadSegment; label: string }[] = [

@@ -29,13 +29,22 @@ export async function POST(req: NextRequest) {
     .from("leads")
     .insert({
       lead_date: body.lead_date || new Date().toISOString().slice(0, 10),
+      customer_id: body.customer_id || null,
       customer_name: body.customer_name,
+      profile_image_url: body.profile_image_url || null,
+      address: body.address || null,
       channel: body.channel,
       segment: body.segment || "b2c",
       sku: body.sku || null,
       status: body.status || "new",
       contact_method: body.contact_method || null,
+      contact_id: body.contact_id || null,
+      customer_details: body.customer_details || null,
       notes: body.notes || "",
+      phone_contacted: body.phone_contacted || "unknown",
+      has_office_plan: body.has_office_plan || "unknown",
+      will_visit_showroom: body.will_visit_showroom || "unknown",
+      needed_by_date: body.needed_by_date || null,
       next_followup_date: body.next_followup_date || null,
       deal_value: body.deal_value ?? null,
     })

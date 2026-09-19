@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Pencil, Download, Upload } from "lucide-react";
+import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
 } from "recharts";
@@ -17,8 +17,9 @@ import {
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus } from "@/types";
-import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, statusMeta } from "@/lib/lead-options";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
+import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
 
 function todayStr() {
@@ -27,13 +28,22 @@ function todayStr() {
 
 const emptyForm = {
   lead_date: todayStr(),
+  customer_id: "",
   customer_name: "",
+  profile_image_url: "",
+  address: "",
   channel: "facebook" as LeadChannel,
   segment: "b2c" as LeadSegment,
   sku: "",
   status: "new" as LeadStatus,
   contact_method: "line" as LeadContactMethod,
+  contact_id: "",
+  customer_details: "",
   notes: "",
+  phone_contacted: "unknown" as YesNoUnknown,
+  has_office_plan: "unknown" as YesNoUnknown,
+  will_visit_showroom: "unknown" as YesNoUnknown,
+  needed_by_date: "",
   next_followup_date: "",
   deal_value: "",
   lost_reason: "",
@@ -47,6 +57,7 @@ export default function KpiPage() {
   const [editing, setEditing] = useState<Lead | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,13 +84,22 @@ export default function KpiPage() {
     setEditing(lead);
     setForm({
       lead_date: lead.lead_date,
+      customer_id: lead.customer_id || "",
       customer_name: lead.customer_name,
+      profile_image_url: lead.profile_image_url || "",
+      address: lead.address || "",
       channel: lead.channel,
       segment: lead.segment,
       sku: lead.sku || "",
       status: lead.status,
       contact_method: lead.contact_method || "line",
+      contact_id: lead.contact_id || "",
+      customer_details: lead.customer_details || "",
       notes: lead.notes,
+      phone_contacted: lead.phone_contacted || "unknown",
+      has_office_plan: lead.has_office_plan || "unknown",
+      will_visit_showroom: lead.will_visit_showroom || "unknown",
+      needed_by_date: lead.needed_by_date || "",
       next_followup_date: lead.next_followup_date || "",
       deal_value: lead.deal_value != null ? String(lead.deal_value) : "",
       lost_reason: lead.lost_reason || "",
@@ -87,12 +107,35 @@ export default function KpiPage() {
     setDialogOpen(true);
   }
 
+  async function uploadPhoto(file: File) {
+    setUploadingPhoto(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/leads/upload-photo", { method: "POST", body });
+      const data = await res.json();
+      if (res.ok) {
+        setForm((f) => ({ ...f, profile_image_url: data.url }));
+      } else {
+        alert(data.error || "อัปโหลดรูปไม่สำเร็จ");
+      }
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   async function saveLead() {
     if (!form.customer_name.trim()) return;
     setSaving(true);
     const payload = {
       ...form,
+      customer_id: form.customer_id || null,
+      profile_image_url: form.profile_image_url || null,
+      address: form.address || null,
       sku: form.sku || null,
+      contact_id: form.contact_id || null,
+      customer_details: form.customer_details || null,
+      needed_by_date: form.needed_by_date || null,
       next_followup_date: form.next_followup_date || null,
       deal_value: form.deal_value ? Number(form.deal_value) : null,
       lost_reason: form.status === "lost" ? form.lost_reason || null : null,
@@ -213,12 +256,20 @@ export default function KpiPage() {
       const logSheet = XLSX.utils.json_to_sheet(
         leads.map((l) => ({
           วันที่: l.lead_date,
+          "หมายเลขลูกค้า": l.customer_id || "",
           ลูกค้า: l.customer_name,
+          ที่อยู่: l.address || "",
           Channel: l.channel,
           Segment: l.segment,
           SKU: l.sku || "",
           สถานะ: statusMeta(l.status).label,
           ช่องทางติดต่อ: l.contact_method || "",
+          "ไอดี/เบอร์ติดต่อ": l.contact_id || "",
+          "รายละเอียดลูกค้า": l.customer_details || "",
+          "ติดต่อทางโทรศัพท์แล้ว": YES_NO_UNKNOWN.find((o) => o.value === l.phone_contacted)?.label || "",
+          "มีแปลนออฟฟิศ": YES_NO_UNKNOWN.find((o) => o.value === l.has_office_plan)?.label || "",
+          "จะมาโชว์รูม": YES_NO_UNKNOWN.find((o) => o.value === l.will_visit_showroom)?.label || "",
+          "ต้องการใช้ภายในวันที่": l.needed_by_date || "",
           หมายเหตุ: l.notes,
           ติดตามครั้งถัดไป: l.next_followup_date || "",
           มูลค่าดีล: l.deal_value ?? "",
@@ -423,7 +474,18 @@ export default function KpiPage() {
                 return (
                   <TableRow key={lead.id} className="hover:bg-[#FAF7F2]/50">
                     <TableCell className="text-xs text-[#6B6B6B] whitespace-nowrap">{lead.lead_date}</TableCell>
-                    <TableCell className="text-sm font-medium whitespace-nowrap">{lead.customer_name}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Avatar size="sm">
+                          {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
+                          <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium leading-tight">{lead.customer_name}</p>
+                          {lead.customer_id && <p className="text-[10px] text-[#9CA3AF] leading-tight">{lead.customer_id}</p>}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs whitespace-nowrap">
                       {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
                     </TableCell>
@@ -473,12 +535,36 @@ export default function KpiPage() {
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editing ? "แก้ไขลีด" : "เพิ่มลีดใหม่"}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="grid grid-cols-2 gap-3 py-2 overflow-y-auto">
+            <div className="col-span-2 flex items-center gap-3">
+              <Avatar size="lg">
+                {form.profile_image_url && <AvatarImage src={form.profile_image_url} alt="" />}
+                <AvatarFallback>{form.customer_name.slice(0, 1).toUpperCase() || "?"}</AvatarFallback>
+              </Avatar>
+              <label>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium border rounded-md px-3 py-1.5 cursor-pointer hover:bg-[#FAF7F2]">
+                  {uploadingPhoto ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+                  {uploadingPhoto ? "กำลังอัปโหลด..." : "อัปโหลดภาพโปรไฟล์"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPhoto(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
             <div>
               <Label>วันที่ติดตาม</Label>
               <Input
@@ -489,12 +575,31 @@ export default function KpiPage() {
               />
             </div>
             <div>
-              <Label>ชื่อ/ID ลูกค้า</Label>
+              <Label>หมายเลขลูกค้า (Customer ID)</Label>
+              <Input
+                className="mt-1"
+                value={form.customer_id}
+                onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
+                placeholder="เช่น C-0012"
+              />
+            </div>
+
+            <div>
+              <Label>ชื่อลูกค้า</Label>
               <Input
                 className="mt-1"
                 value={form.customer_name}
                 onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
                 placeholder="เช่น คุณสมชาย"
+              />
+            </div>
+            <div>
+              <Label>ที่อยู่</Label>
+              <Input
+                className="mt-1"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                placeholder="ที่อยู่ลูกค้า/บริษัท"
               />
             </div>
 
@@ -540,6 +645,69 @@ export default function KpiPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>ไอดี/เบอร์ติดต่อ</Label>
+              <Input
+                className="mt-1"
+                value={form.contact_id}
+                onChange={(e) => setForm({ ...form, contact_id: e.target.value })}
+                placeholder="LINE ID / WeChat ID / เบอร์โทร"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label>รายละเอียดของลูกค้า</Label>
+              <Textarea
+                className="mt-1"
+                rows={2}
+                value={form.customer_details}
+                onChange={(e) => setForm({ ...form, customer_details: e.target.value })}
+                placeholder="ธุรกิจ, ความต้องการเบื้องต้น, บริบทลูกค้า"
+              />
+            </div>
+
+            <div>
+              <Label>มีการติดต่อทางโทรศัพท์หรือไม่?</Label>
+              <Select value={form.phone_contacted} onValueChange={(v) => setForm({ ...form, phone_contacted: v as YesNoUnknown })}>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {YES_NO_UNKNOWN.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>มีแปลนออฟฟิศไหม?</Label>
+              <Select value={form.has_office_plan} onValueChange={(v) => setForm({ ...form, has_office_plan: v as YesNoUnknown })}>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {YES_NO_UNKNOWN.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>ลูกค้าจะมาที่โชว์รูมไหม?</Label>
+              <Select value={form.will_visit_showroom} onValueChange={(v) => setForm({ ...form, will_visit_showroom: v as YesNoUnknown })}>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {YES_NO_UNKNOWN.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>ต้องการใช้เฟอร์นิเจอร์ภายในวันที่</Label>
+              <Input
+                type="date"
+                className="mt-1"
+                value={form.needed_by_date}
+                onChange={(e) => setForm({ ...form, needed_by_date: e.target.value })}
+              />
             </div>
 
             <div className="col-span-2">
@@ -589,7 +757,7 @@ export default function KpiPage() {
             </div>
 
             <div className="col-span-2">
-              <Label>หมายเหตุ</Label>
+              <Label>ติดตามรายละเอียดเพิ่มเติม</Label>
               <Textarea
                 className="mt-1"
                 rows={3}

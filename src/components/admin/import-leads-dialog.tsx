@@ -230,14 +230,14 @@ export function ImportLeadsDialog({
         }
       }}
     >
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>นำเข้าลีดจาก Excel</DialogTitle>
         </DialogHeader>
 
         {rows.length === 0 ? (
-          <div className="py-8">
-            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[#E8E5E0] rounded-xl py-12 cursor-pointer hover:bg-[#FAF7F2] transition-colors">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <label className="flex-1 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[#E8E5E0] rounded-xl cursor-pointer hover:bg-[#FAF7F2] transition-colors">
               <UploadCloud size={28} className="text-[#9CA3AF]" />
               <span className="text-sm text-[#6B6B6B]">
                 {parsing ? "กำลังอ่านไฟล์..." : "คลิกเพื่อเลือกไฟล์ .xlsx (เช่น facebook shopee line)"}
@@ -257,12 +257,12 @@ export function ImportLeadsDialog({
             {error && <p className="text-xs text-red-600 mt-3 text-center">{error}</p>}
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-[#6B6B6B]">
+          <div className="flex-1 min-h-0 flex flex-col gap-3">
+            <p className="text-xs text-[#6B6B6B] shrink-0">
               จากไฟล์ <span className="font-medium">{fileName}</span> — พบ {rows.length} รายชื่อ, เลือกไว้ {includedCount} รายการ
               ตรวจสอบชื่อ/ช่องทาง/สถานะก่อนกดนำเข้า
             </p>
-            <div className="max-h-[50vh] overflow-y-auto border border-[#E8E5E0] rounded-lg">
+            <div className="flex-1 min-h-0 overflow-y-auto border border-[#E8E5E0] rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-[#FAF7F2]">

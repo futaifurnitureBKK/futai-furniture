@@ -68,7 +68,6 @@ export default function KpiPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [openBoardKey, setOpenBoardKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,8 +223,6 @@ export default function KpiPage() {
       })),
     [leads]
   );
-
-  const activeBoard = boardGroups.find((c) => c.key === openBoardKey);
 
   const channelData = useMemo(
     () =>
@@ -457,7 +454,7 @@ export default function KpiPage() {
         </div>
       </div>
 
-      {/* ── Status board (summary tiles → click to drill in) ───────── */}
+      {/* ── Status board ─────────────────────────────────────────── */}
       {loading ? (
         <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">กำลังโหลด...</div>
       ) : leads.length === 0 ? (
@@ -465,109 +462,88 @@ export default function KpiPage() {
           ยังไม่มีลีด — กด &quot;เพิ่มลีด&quot; เพื่อเริ่มบันทึก
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {boardGroups.map((col) => {
-            const pct = leads.length ? Math.round((col.leads.length / leads.length) * 100) : 0;
-            return (
-              <button
-                key={col.key}
-                onClick={() => setOpenBoardKey(col.key)}
-                className="text-left bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-              >
-                <div className={`${col.header} h-1.5`} />
-                <div className="p-4">
-                  <p className="text-xs text-[#6B6B6B]">{col.label}</p>
-                  <p className="text-3xl font-bold text-[#1A1A1A] mt-1">{col.leads.length}</p>
-                  <div className="h-1.5 bg-[#F0EDE6] rounded-full mt-3 overflow-hidden">
-                    <div className={`${col.header} h-full rounded-full`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <p className="text-[10px] text-[#9CA3AF] mt-1">{pct}% ของทั้งหมด</p>
-                </div>
-              </button>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          {boardGroups.map((col) => (
+            <div key={col.key} className={`rounded-xl border overflow-hidden ${col.body}`}>
+              <div className={`${col.header} text-white px-4 py-2.5 flex items-center justify-between`}>
+                <p className="text-sm font-semibold">{col.label}</p>
+                <span className="text-xs font-bold bg-white/25 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                  {col.leads.length}
+                </span>
+              </div>
+
+              <div className="p-2.5 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                {col.leads.length === 0 ? (
+                  <p className="text-xs text-[#9CA3AF] text-center py-6">ไม่มีรายการ</p>
+                ) : (
+                  col.leads.map((lead) => {
+                    const overdue =
+                      !!lead.next_followup_date &&
+                      lead.next_followup_date < today &&
+                      lead.status !== "converted" &&
+                      lead.status !== "lost";
+                    return (
+                      <div key={lead.id} className="bg-white rounded-lg shadow-sm p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Avatar className="size-9 shrink-0">
+                              {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
+                              <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium leading-tight truncate">{lead.customer_name}</p>
+                              {lead.customer_id && <p className="text-[10px] text-[#9CA3AF] leading-tight">{lead.customer_id}</p>}
+                            </div>
+                          </div>
+                          <div className="flex gap-0.5 shrink-0">
+                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label="แก้ไข">
+                              <Pencil size={13} />
+                            </Button>
+                            <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label="ลบ">
+                              <Trash2 size={13} className="text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
+                          <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">
+                            {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
+                          </span>
+                          {lead.sku && <span className="font-mono bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.sku}</span>}
+                          <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.lead_date}</span>
+                        </div>
+
+                        {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
+
+                        <div className={`text-[10px] ${overdue ? "text-red-600 font-semibold" : "text-[#9CA3AF]"}`}>
+                          ติดตามถัดไป: {lead.next_followup_date || "-"}
+                          {overdue && " ⚠ เลยกำหนด"}
+                        </div>
+
+                        <Select value={lead.status} onValueChange={(v) => quickSetStatus(lead, v as LeadStatus)}>
+                          <SelectTrigger
+                            size="sm"
+                            className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${statusMeta(lead.status).color}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
-
-      {/* ── Drill-in dialog for one status column ───────────────────── */}
-      <Dialog open={!!openBoardKey} onOpenChange={(v) => !v && setOpenBoardKey(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[95vw] w-[1400px] h-[92vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-lg">
-              {activeBoard?.label} ({activeBoard?.leads.length ?? 0})
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 py-2 content-start">
-            {activeBoard?.leads.length === 0 ? (
-              <p className="col-span-full text-sm text-[#9CA3AF] text-center py-12">ไม่มีรายการ</p>
-            ) : (
-              activeBoard?.leads.map((lead) => {
-                const overdue =
-                  !!lead.next_followup_date &&
-                  lead.next_followup_date < today &&
-                  lead.status !== "converted" &&
-                  lead.status !== "lost";
-                return (
-                  <div key={lead.id} className={`rounded-lg shadow-sm p-3 space-y-2 ${activeBoard?.body}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Avatar className="size-9 shrink-0">
-                          {lead.profile_image_url && <AvatarImage src={lead.profile_image_url} alt={lead.customer_name} />}
-                          <AvatarFallback>{lead.customer_name.slice(0, 1).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium leading-tight truncate">{lead.customer_name}</p>
-                          {lead.customer_id && <p className="text-[10px] text-[#9CA3AF] leading-tight">{lead.customer_id}</p>}
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5 shrink-0">
-                        <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label="แก้ไข">
-                          <Pencil size={13} />
-                        </Button>
-                        <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label="ลบ">
-                          <Trash2 size={13} className="text-red-500" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
-                      <span className="bg-white rounded px-1.5 py-0.5">
-                        {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
-                      </span>
-                      {lead.sku && <span className="font-mono bg-white rounded px-1.5 py-0.5">{lead.sku}</span>}
-                      <span className="bg-white rounded px-1.5 py-0.5">{lead.lead_date}</span>
-                    </div>
-
-                    {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
-
-                    <div className={`text-[10px] ${overdue ? "text-red-600 font-semibold" : "text-[#9CA3AF]"}`}>
-                      ติดตามถัดไป: {lead.next_followup_date || "-"}
-                      {overdue && " ⚠ เลยกำหนด"}
-                    </div>
-
-                    <Select value={lead.status} onValueChange={(v) => quickSetStatus(lead, v as LeadStatus)}>
-                      <SelectTrigger
-                        size="sm"
-                        className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${statusMeta(lead.status).color}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUSES.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>
-                            {s.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* ── Add / edit dialog ─────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

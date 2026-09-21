@@ -6,14 +6,18 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { useLanguage } from "@/store/language";
 import type { QuoteRequest, QuoteStatus } from "@/types";
 
-const STATUSES: { value: QuoteStatus | "all"; label: string }[] = [
-  { value: "all",       label: "ทั้งหมด" },
-  { value: "pending",   label: "รอตอบกลับ" },
-  { value: "quoted",    label: "ส่งราคาแล้ว" },
-  { value: "converted", label: "เปลี่ยนเป็นออเดอร์" },
-  { value: "archived",  label: "เก็บถาวร" },
+const STATUSES: { value: QuoteStatus | "all"; th: string; en: string; zh: string }[] = [
+  { value: "all",       th: "ทั้งหมด",           en: "All",             zh: "全部" },
+  { value: "pending",   th: "รอตอบกลับ",         en: "Pending",         zh: "待回复" },
+  { value: "quoted",    th: "ส่งราคาแล้ว",       en: "Quoted",          zh: "已报价" },
+  { value: "converted", th: "เปลี่ยนเป็นออเดอร์", en: "Converted",       zh: "已转为订单" },
+  { value: "archived",  th: "เก็บถาวร",           en: "Archived",        zh: "已归档" },
 ];
 
 const STATUS_COLOR: Record<QuoteStatus, string> = {
@@ -24,6 +28,7 @@ const STATUS_COLOR: Record<QuoteStatus, string> = {
 };
 
 export default function QuotesPage() {
+  const { t } = useLanguage();
   const [allQuotes, setAllQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<QuoteStatus | "all">("all");
@@ -53,13 +58,13 @@ export default function QuotesPage() {
   }
 
   async function deleteQuote(id: string) {
-    if (!confirm("ลบคำขอใบเสนอราคานี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)")) return;
+    if (!confirm(t("ลบคำขอใบเสนอราคานี้ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)", "Delete this quote request? (This cannot be undone)", "确定要删除此报价请求吗？（删除后无法恢复）"))) return;
     const prev = allQuotes;
     setAllQuotes((p) => p.filter((q) => q.id !== id));
     const res = await fetch(`/api/admin/quotes/${id}`, { method: "DELETE" });
     if (!res.ok) {
       setAllQuotes(prev);
-      alert("ลบไม่สำเร็จ กรุณาลองใหม่");
+      alert(t("ลบไม่สำเร็จ กรุณาลองใหม่", "Delete failed, please try again", "删除失败，请重试"));
     }
   }
 
@@ -68,7 +73,7 @@ export default function QuotesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">คำขอใบเสนอราคา</h1>
+        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("คำขอใบเสนอราคา", "Quote Requests", "报价请求")}</h1>
       </div>
 
       {/* Filter tabs */}
@@ -83,7 +88,7 @@ export default function QuotesPage() {
                 : "bg-[#E8E5E0] text-[#1A1A1A] hover:bg-[#d0cdc8]"
             }`}
           >
-            {s.label}
+            {t(s.th, s.en, s.zh)}
             {s.value !== "all" && (
               <span className="ml-1.5 opacity-70">
                 ({allQuotes.filter((q) => q.status === s.value).length})
@@ -97,26 +102,26 @@ export default function QuotesPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-[#FAF7F2]">
-              <TableHead className="text-xs">วันที่</TableHead>
-              <TableHead className="text-xs">สินค้า</TableHead>
-              <TableHead className="text-xs">ลูกค้า</TableHead>
-              <TableHead className="text-xs">บริษัท</TableHead>
-              <TableHead className="text-xs">จำนวน</TableHead>
-              <TableHead className="text-xs">สถานะ</TableHead>
-              <TableHead className="text-xs">จัดการ</TableHead>
+              <TableHead className="text-xs">{t("วันที่", "Date", "日期")}</TableHead>
+              <TableHead className="text-xs">{t("สินค้า", "Product", "产品")}</TableHead>
+              <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
+              <TableHead className="text-xs">{t("บริษัท", "Company", "公司")}</TableHead>
+              <TableHead className="text-xs">{t("จำนวน", "Qty", "数量")}</TableHead>
+              <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
+              <TableHead className="text-xs">{t("จัดการ", "Actions", "操作")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
-                  กำลังโหลด...
+                  {t("กำลังโหลด...", "Loading...", "加载中...")}
                 </TableCell>
               </TableRow>
             ) : quotes.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
-                  ไม่พบคำขอใบเสนอราคา
+                  {t("ไม่พบคำขอใบเสนอราคา", "No quote requests found", "未找到报价请求")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -136,15 +141,35 @@ export default function QuotesPage() {
                   <TableCell className="text-xs text-[#6B6B6B]">{quote.company}</TableCell>
                   <TableCell className="text-sm text-center">{quote.quantity}</TableCell>
                   <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded font-medium ${STATUS_COLOR[quote.status]}`}>
-                      {STATUSES.find((s) => s.value === quote.status)?.label}
-                    </span>
+                    <Select
+                      value={quote.status}
+                      onValueChange={(value) => setStatus(quote.id, value as QuoteStatus)}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_COLOR[quote.status]}`}
+                      >
+                        <SelectValue>
+                          {(v: QuoteStatus) => {
+                            const s = STATUSES.find((s) => s.value === v);
+                            return s ? t(s.th, s.en, s.zh) : v;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUSES.filter((s) => s.value !== "all").map((s) => (
+                          <SelectItem key={s.value} value={s.value}>
+                            {t(s.th, s.en, s.zh)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Link href={`/admin/quotes/${quote.id}`}>
                         <Button size="sm" variant="outline" className="h-7 text-xs">
-                          ดู
+                          {t("ดู", "View", "查看")}
                         </Button>
                       </Link>
                       {quote.status === "pending" && (
@@ -153,7 +178,7 @@ export default function QuotesPage() {
                           onClick={() => setStatus(quote.id, "quoted")}
                           className="h-7 text-xs bg-[#C8102E] hover:bg-[#a30d25] text-white"
                         >
-                          ตอบกลับแล้ว
+                          {t("ตอบกลับแล้ว", "Marked Replied", "已回复")}
                         </Button>
                       )}
                       <Button

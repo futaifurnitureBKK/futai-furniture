@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
@@ -72,6 +72,13 @@ export default function KpiPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editingRef = useRef<Lead | null>(null);
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +98,7 @@ export default function KpiPage() {
   function openAdd() {
     setEditing(null);
     setForm(emptyForm);
+    setLastSavedAt(null);
     setDialogOpen(true);
   }
 
@@ -118,6 +126,7 @@ export default function KpiPage() {
       deal_value: lead.deal_value != null ? String(lead.deal_value) : "",
       lost_reason: lead.lost_reason || "",
     });
+    setLastSavedAt(null);
     setDialogOpen(true);
   }
 
@@ -138,32 +147,36 @@ export default function KpiPage() {
     }
   }
 
+  function buildPayload(f: typeof emptyForm) {
+    return {
+      ...f,
+      customer_id: f.customer_id || null,
+      profile_image_url: f.profile_image_url || null,
+      address: f.address || null,
+      sku: f.sku || null,
+      contact_id: f.contact_id || null,
+      customer_details: f.customer_details || null,
+      needed_by_date: f.needed_by_date || null,
+      next_followup_date: f.next_followup_date || null,
+      deal_value: f.deal_value ? Number(f.deal_value) : null,
+      lost_reason: f.status === "lost" ? f.lost_reason || null : null,
+    };
+  }
+
   async function saveLead() {
     if (!form.customer_name.trim()) return;
     setSaving(true);
-    const payload = {
-      ...form,
-      customer_id: form.customer_id || null,
-      profile_image_url: form.profile_image_url || null,
-      address: form.address || null,
-      sku: form.sku || null,
-      contact_id: form.contact_id || null,
-      customer_details: form.customer_details || null,
-      needed_by_date: form.needed_by_date || null,
-      next_followup_date: form.next_followup_date || null,
-      deal_value: form.deal_value ? Number(form.deal_value) : null,
-      lost_reason: form.status === "lost" ? form.lost_reason || null : null,
-    };
-    const res = await fetch(editing ? `/api/admin/leads/${editing.id}` : "/api/admin/leads", {
-      method: editing ? "PATCH" : "POST",
+    const currentId = editingRef.current?.id;
+    const res = await fetch(currentId ? `/api/admin/leads/${currentId}` : "/api/admin/leads", {
+      method: currentId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(buildPayload(form)),
     });
     const data = await res.json();
     setSaving(false);
     if (res.ok) {
-      if (editing) {
-        setLeads((prev) => prev.map((l) => (l.id === editing.id ? data.lead : l)));
+      if (currentId) {
+        setLeads((prev) => prev.map((l) => (l.id === currentId ? data.lead : l)));
       } else {
         setLeads((prev) => [data.lead, ...prev]);
       }
@@ -172,6 +185,49 @@ export default function KpiPage() {
       alert(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
     }
   }
+
+  // Debounced auto-save: keeps the open dialog's edits from being lost if
+  // the user navigates away instead of clicking Save. The first auto-save
+  // for a brand-new lead creates it (POST) and flips into edit mode so
+  // every subsequent change just PATCHes the same record.
+  const autoSaving = useRef(false);
+  async function autoSaveLead() {
+    if (!form.customer_name.trim() || autoSaving.current) return;
+    autoSaving.current = true;
+    try {
+      const currentId = editingRef.current?.id;
+      const res = await fetch(currentId ? `/api/admin/leads/${currentId}` : "/api/admin/leads", {
+        method: currentId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload(form)),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        editingRef.current = data.lead;
+        setEditing(data.lead);
+        if (currentId) {
+          setLeads((prev) => prev.map((l) => (l.id === currentId ? data.lead : l)));
+        } else {
+          setLeads((prev) => [data.lead, ...prev]);
+        }
+        setLastSavedAt(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }));
+      }
+    } finally {
+      autoSaving.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveLead();
+    }, 1200);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, dialogOpen]);
 
   async function quickSetStatus(lead: Lead, status: LeadStatus) {
     const prevLeads = leads;
@@ -226,6 +282,25 @@ export default function KpiPage() {
         leads: leads.filter((l) => col.statuses.includes(l.status)),
       })),
     [leads]
+  );
+
+  // Last 30 calendar days, one bar per day — click a bar (or pick a date)
+  // to see exactly which leads came in that day.
+  const dateData = useMemo(() => {
+    const days: { date: string; count: number }[] = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      days.push({ date: dateStr, count: leads.filter((l) => l.lead_date === dateStr).length });
+    }
+    return days;
+  }, [leads]);
+
+  const leadsOnSelectedDate = useMemo(
+    () => leads.filter((l) => l.lead_date === selectedDate),
+    [leads, selectedDate]
   );
 
   const channelData = useMemo(
@@ -372,6 +447,108 @@ export default function KpiPage() {
             <p className="text-[10px] text-[#9CA3AF] mt-1">{c.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* ── Leads by date ─────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <p className="text-sm font-semibold text-[#1A1A1A]">
+            {t("ลีดรายวัน (30 วันล่าสุด)", "Leads by Date (Last 30 Days)", "每日线索（近30天）")}
+          </p>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
+            <Input
+              type="date"
+              className="h-8 w-auto text-xs"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {leads.length === 0 ? (
+          <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={dateData}
+                  margin={{ top: 20, right: 8, left: -20, bottom: 0 }}
+                  onClick={(state) => {
+                    const label = state?.activeLabel;
+                    if (typeof label === "string") setSelectedDate(label);
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <CartesianGrid vertical={false} stroke="#E8E5E0" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
+                    tick={{ fontSize: 10, fill: "#6B6B6B" }}
+                    axisLine={{ stroke: "#E8E5E0" }}
+                    tickLine={false}
+                    interval={3}
+                  />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    cursor={{ fill: "#FAF7F2" }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload as (typeof dateData)[number];
+                      return (
+                        <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
+                          <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                          <p className="text-[#6B6B6B]">{t("ลีด", "Leads", "线索数")}: {d.count}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={20}>
+                    {dateData.map((d) => (
+                      <Cell key={d.date} fill={d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="border-t xl:border-t-0 xl:border-l border-[#E8E5E0] pt-4 xl:pt-0 xl:pl-4">
+              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
+                {t("ลีดวันที่", "Leads on", "线索日期")} {selectedDate} ({leadsOnSelectedDate.length})
+              </p>
+              {leadsOnSelectedDate.length === 0 ? (
+                <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีลีดในวันนี้", "No leads on this date", "该日期无线索")}</p>
+              ) : (
+                <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
+                  {leadsOnSelectedDate.map((lead) => {
+                    const c = CHANNELS.find((c) => c.value === lead.channel);
+                    const m = statusMeta(lead.status);
+                    return (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => openEdit(lead)}
+                        className="w-full text-left flex items-center justify-between gap-2 bg-[#FAF7F2] hover:bg-[#F0EDE6] rounded-lg px-2.5 py-1.5 text-xs transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-[#1A1A1A] truncate">{lead.customer_name}</p>
+                          <p className="text-[10px] text-[#9CA3AF]">
+                            {c ? t(c.th, c.en, c.zh) : lead.channel}
+                            {lead.sku ? ` · ${lead.sku}` : ""}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${m.color}`}>
+                          {t(m.th, m.en, m.zh)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Channel chart + side panels ──────────────────────────── */}
@@ -562,7 +739,14 @@ export default function KpiPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl sm:max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editing ? t("แก้ไขลีด", "Edit Lead", "编辑线索") : t("เพิ่มลีดใหม่", "Add New Lead", "添加新线索")}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {editing ? t("แก้ไขลีด", "Edit Lead", "编辑线索") : t("เพิ่มลีดใหม่", "Add New Lead", "添加新线索")}
+              {lastSavedAt && (
+                <span className="text-xs font-normal text-emerald-600">
+                  {t("บันทึกอัตโนมัติแล้ว", "Auto-saved", "已自动保存")} {lastSavedAt}
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">

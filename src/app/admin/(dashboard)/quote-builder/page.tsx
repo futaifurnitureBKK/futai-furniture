@@ -37,6 +37,7 @@ interface LineItem {
   qty: number;
   unitPrice: number;
   remark: string;
+  remarkImage: string | null;
   image: string | null;
   seats: number;
   baseUnitPrice: number;
@@ -147,6 +148,7 @@ function newLine(): LineItem {
     qty: 1,
     unitPrice: 0,
     remark: "",
+    remarkImage: null,
     image: null,
     seats: 1,
     baseUnitPrice: 0,
@@ -382,6 +384,7 @@ function QuoteBuilderInner() {
           qty: it.qty,
           unitPrice: it.unitPrice,
           remark: it.remark,
+          remarkImage: it.remarkImage,
           image: it.image,
           seats: it.seats,
           baseUnitPrice: it.baseUnitPrice,
@@ -435,6 +438,7 @@ function QuoteBuilderInner() {
             id: Math.random().toString(36).slice(2),
             seats: it.seats ?? 1,
             baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
+            remarkImage: it.remarkImage ?? null,
           }))
         : [newLine()]
     );
@@ -1184,12 +1188,18 @@ function QuoteBuilderInner() {
                     </>
                   )}
                 </div>
-                <Input
-                  className="h-8 text-xs"
-                  placeholder={t("หมายเหตุ", "Remark", "备注")}
-                  value={it.remark}
-                  onChange={(e) => updateItem(it.id, { remark: e.target.value })}
-                />
+                <div className="flex gap-2 items-start">
+                  <Input
+                    className="h-8 text-xs flex-1"
+                    placeholder={t("หมายเหตุ", "Remark", "备注")}
+                    value={it.remark}
+                    onChange={(e) => updateItem(it.id, { remark: e.target.value })}
+                  />
+                  <ImageUploadTile
+                    image={it.remarkImage}
+                    onChange={(url) => updateItem(it.id, { remarkImage: url })}
+                  />
+                </div>
                 {!isDeliveryNote && (
                   <p className="text-right text-xs text-[#6B6B6B]">
                     {t("รวม", "Total", "总计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(it.qty * it.unitPrice)}</span>
@@ -1335,7 +1345,14 @@ function QuoteBuilderInner() {
                         <td className="border border-[#1A1A1A] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
                       </>
                     )}
-                    <td className="border border-[#1A1A1A] p-1 text-left">{it.remark}</td>
+                    <td className="border border-[#1A1A1A] p-1 text-left">
+                      {it.remark}
+                      {it.remarkImage && (
+                        <div className="relative w-full h-16 mt-1">
+                          <Image src={it.remarkImage} alt="" fill sizes="90px" className="object-contain" />
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -61,6 +61,7 @@ export interface SavedQuoteItem {
   qty: number;
   unitPrice: number;
   remark: string;
+  remarkImage?: string | null;
   image: string | null;
   seats?: number;
   baseUnitPrice?: number;

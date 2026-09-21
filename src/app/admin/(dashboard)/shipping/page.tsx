@@ -8,6 +8,16 @@ import {
 import { STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS } from "@/lib/saved-quote-options";
 import type { SavedQuote, SavedQuoteStatus } from "@/types";
 
+// This page exists to answer "what needs shipping" — lead with that
+// column and give it more room than the rest.
+const DISPLAY_ORDER: SavedQuoteStatus[] = [
+  "awaiting_shipment",
+  "confirmed",
+  "in_progress",
+  "pending",
+  "completed",
+];
+
 type Row = Pick<
   SavedQuote,
   "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel" | "shipping_date" | "shipping_address" | "updated_at"
@@ -45,7 +55,14 @@ export default function ShippingPage() {
   }
 
   const columns = useMemo(
-    () => STATUS_ORDER.map((s) => ({ key: s, rows: rows.filter((r) => r.status === s) })),
+    () =>
+      DISPLAY_ORDER.map((s) => {
+        const colRows = rows.filter((r) => r.status === s);
+        if (s === "awaiting_shipment") {
+          colRows.sort((a, b) => (a.shipping_date || "9999").localeCompare(b.shipping_date || "9999"));
+        }
+        return { key: s, rows: colRows };
+      }),
     [rows]
   );
 
@@ -65,21 +82,31 @@ export default function ShippingPage() {
           ยังไม่มีเอกสาร — สร้างได้ที่หน้า &quot;สร้างใบเสนอราคา&quot;
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-start">
           {columns.map((col) => {
             const meta = STATUS_META[col.key];
+            const isMain = col.key === "awaiting_shipment";
             return (
-              <div key={col.key} className="rounded-xl border overflow-hidden bg-white">
-                <div className={`px-4 py-2.5 flex items-center justify-between ${meta.color}`}>
-                  <p className="text-sm font-semibold">{meta.th}</p>
+              <div
+                key={col.key}
+                className={`rounded-xl border overflow-hidden bg-white ${
+                  isMain ? "xl:col-span-2 ring-2 ring-purple-300" : ""
+                }`}
+              >
+                <div className={`px-4 py-3 flex items-center justify-between ${meta.color}`}>
+                  <p className={isMain ? "text-base font-bold" : "text-sm font-semibold"}>{meta.th}</p>
                   <span className="text-xs font-bold bg-black/10 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
                     {col.rows.length}
                   </span>
                 </div>
 
-                <div className="p-2.5 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                <div
+                  className={`p-2.5 gap-2.5 max-h-[70vh] overflow-y-auto ${
+                    isMain ? "grid grid-cols-1 sm:grid-cols-2 content-start" : "space-y-2.5"
+                  }`}
+                >
                   {col.rows.length === 0 ? (
-                    <p className="text-xs text-[#9CA3AF] text-center py-6">ไม่มีรายการ</p>
+                    <p className="text-xs text-[#9CA3AF] text-center py-6 col-span-full">ไม่มีรายการ</p>
                   ) : (
                     col.rows.map((r) => (
                       <div key={r.id} className="bg-[#FAF7F2] rounded-lg p-3 space-y-1.5">

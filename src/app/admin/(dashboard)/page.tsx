@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/browser";
+import { useLanguage } from "@/store/language";
 import type { Order, Customer, QuoteRequest, Product } from "@/types";
 
 interface VisitStats {
@@ -14,15 +15,6 @@ interface VisitStats {
   todayViews: number;
   todayVisitors: number;
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "รอดำเนินการ",
-  confirmed: "ยืนยันแล้ว",
-  preparing: "กำลังเตรียม",
-  shipped: "จัดส่งแล้ว",
-  delivered: "ส่งแล้ว",
-  cancelled: "ยกเลิก",
-};
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -34,6 +26,15 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  const { t } = useLanguage();
+  const STATUS_LABEL: Record<string, string> = {
+    pending: t("รอดำเนินการ", "Pending", "待处理"),
+    confirmed: t("ยืนยันแล้ว", "Confirmed", "已确认"),
+    preparing: t("กำลังเตรียม", "Preparing", "备货中"),
+    shipped: t("จัดส่งแล้ว", "Shipped", "已发货"),
+    delivered: t("ส่งแล้ว", "Delivered", "已送达"),
+    cancelled: t("ยกเลิก", "Cancelled", "已取消"),
+  };
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
 
   const KPI = [
     {
-      title: "คนเข้าชมวันนี้",
+      title: t("คนเข้าชมวันนี้", "Visitors Today", "今日访客"),
       value: visits?.todayVisitors ?? 0,
       icon: BarChart3,
       color: "text-indigo-600",
@@ -77,7 +78,7 @@ export default function AdminDashboard() {
       href: "/admin",
     },
     {
-      title: "ออเดอร์รอดำเนินการ",
+      title: t("ออเดอร์รอดำเนินการ", "Pending Orders", "待处理订单"),
       value: orders.filter((o) => o.status === "pending").length,
       icon: AlertCircle,
       color: "text-yellow-600",
@@ -85,7 +86,7 @@ export default function AdminDashboard() {
       href: "/admin/orders",
     },
     {
-      title: "ออเดอร์ทั้งหมด",
+      title: t("ออเดอร์ทั้งหมด", "Total Orders", "订单总数"),
       value: orders.length,
       icon: ShoppingBag,
       color: "text-blue-600",
@@ -93,7 +94,7 @@ export default function AdminDashboard() {
       href: "/admin/orders",
     },
     {
-      title: "สินค้าทั้งหมด",
+      title: t("สินค้าทั้งหมด", "Total Products", "产品总数"),
       value: products.length,
       icon: Package,
       color: "text-[#C8102E]",
@@ -101,7 +102,7 @@ export default function AdminDashboard() {
       href: "/admin/products",
     },
     {
-      title: "ลูกค้าทั้งหมด",
+      title: t("ลูกค้าทั้งหมด", "Total Customers", "客户总数"),
       value: customers.length,
       icon: Users,
       color: "text-green-600",
@@ -118,14 +119,14 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">Dashboard</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">ภาพรวมธุรกิจ ฟูไท่ เฟอร์นิเจอร์</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{t("ภาพรวมธุรกิจ ฟูไท่ เฟอร์นิเจอร์", "Futai Furniture business overview", "富泰家具业务概览")}</p>
         </div>
         <div className="flex gap-3">
           <Link
             href="/admin/products"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            + เพิ่มสินค้า
+            + {t("เพิ่มสินค้า", "Add Product", "添加产品")}
           </Link>
           <Link
             href="/admin/orders"
@@ -134,7 +135,7 @@ export default function AdminDashboard() {
               "bg-[#C8102E] hover:bg-[#a30d25] text-white"
             )}
           >
-            ดูออเดอร์
+            {t("ดูออเดอร์", "View Orders", "查看订单")}
           </Link>
         </div>
       </div>
@@ -167,9 +168,9 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-3">
               <AlertCircle size={18} className="text-[#C8102E] shrink-0" />
               <p className="text-sm text-[#1A1A1A]">
-                มีคำขอใบเสนอราคา{" "}
+                {t("มีคำขอใบเสนอราคา", "You have", "有")}{" "}
                 <strong>{pendingQuotes}</strong>{" "}
-                รายการรอตอบกลับ
+                {t("รายการรอตอบกลับ", "quote requests awaiting reply", "个报价请求待回复")}
               </p>
             </div>
             <Link
@@ -179,7 +180,7 @@ export default function AdminDashboard() {
                 "border-[#C8102E] text-[#C8102E] shrink-0"
               )}
             >
-              ดูทั้งหมด
+              {t("ดูทั้งหมด", "View All", "查看全部")}
             </Link>
           </CardContent>
         </Card>
@@ -190,16 +191,16 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">คำสั่งซื้อล่าสุด</CardTitle>
+              <CardTitle className="text-base">{t("คำสั่งซื้อล่าสุด", "Recent Orders", "最近订单")}</CardTitle>
               <Link href="/admin/orders" className="text-xs text-[#C8102E] hover:underline">
-                ดูทั้งหมด →
+                {t("ดูทั้งหมด", "View All", "查看全部")} →
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {orders.length === 0 ? (
-                <p className="text-sm text-[#6B6B6B] py-4 text-center">ยังไม่มีคำสั่งซื้อ</p>
+                <p className="text-sm text-[#6B6B6B] py-4 text-center">{t("ยังไม่มีคำสั่งซื้อ", "No orders yet", "暂无订单")}</p>
               ) : (
                 orders.slice(0, 5).map((order) => (
                   <div
@@ -226,9 +227,9 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">สินค้าดูมากที่สุด</CardTitle>
+              <CardTitle className="text-base">{t("สินค้าดูมากที่สุด", "Most Viewed Products", "浏览最多的产品")}</CardTitle>
               <Link href="/admin/products" className="text-xs text-[#C8102E] hover:underline">
-                จัดการสินค้า →
+                {t("จัดการสินค้า", "Manage Products", "管理产品")} →
               </Link>
             </div>
           </CardHeader>
@@ -262,12 +263,12 @@ export default function AdminDashboard() {
         <CardContent className="p-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 text-center">
             {[
-              { label: "สินค้าทั้งหมด", value: products.length },
-              { label: "หมวดหมู่", value: 15 },
-              { label: "สินค้ามีสต็อก", value: products.filter((p) => p.stock_status === "in_stock").length },
-              { label: "สินค้า Featured", value: products.filter((p) => p.is_featured).length },
-              { label: "คนเข้าชมทั้งหมด", value: visits?.totalVisitors ?? 0 },
-              { label: "ยอดเข้าชมทั้งหมด", value: visits?.totalViews ?? 0 },
+              { label: t("สินค้าทั้งหมด", "Total Products", "产品总数"), value: products.length },
+              { label: t("หมวดหมู่", "Categories", "分类"), value: 15 },
+              { label: t("สินค้ามีสต็อก", "In Stock", "有库存"), value: products.filter((p) => p.stock_status === "in_stock").length },
+              { label: t("สินค้า Featured", "Featured Products", "推荐产品"), value: products.filter((p) => p.is_featured).length },
+              { label: t("คนเข้าชมทั้งหมด", "Total Visitors", "访客总数"), value: visits?.totalVisitors ?? 0 },
+              { label: t("ยอดเข้าชมทั้งหมด", "Total Views", "浏览总数"), value: visits?.totalViews ?? 0 },
             ].map((s) => (
               <div key={s.label}>
                 <p className="text-2xl font-bold text-[#1A1A1A]">{s.value}</p>

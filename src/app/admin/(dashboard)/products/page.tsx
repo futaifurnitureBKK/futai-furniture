@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/browser";
 import { CATEGORIES } from "@/data/mock";
+import { useLanguage } from "@/store/language";
 import type { Product } from "@/types";
 
-const STOCK_LABEL: Record<string, string> = {
-  in_stock: "มีสินค้า",
-  out_of_stock: "สินค้าหมด",
-  on_order: "สั่งจอง",
+const STOCK_LABEL: Record<string, { th: string; en: string; zh: string }> = {
+  in_stock: { th: "มีสินค้า", en: "In Stock", zh: "有货" },
+  out_of_stock: { th: "สินค้าหมด", en: "Out of Stock", zh: "缺货" },
+  on_order: { th: "สั่งจอง", en: "On Order", zh: "订购中" },
 };
 const STOCK_COLOR: Record<string, string> = {
   in_stock: "bg-green-100 text-green-700",
@@ -22,6 +23,7 @@ const STOCK_COLOR: Record<string, string> = {
 };
 
 export default function ProductsPage() {
+  const { t } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -73,8 +75,8 @@ export default function ProductsPage() {
     if (skus.length === 0) return;
     const confirmMsg =
       skus.length === 1
-        ? `ลบสินค้า ${skus[0]} ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`
-        : `ลบสินค้าที่เลือกทั้งหมด ${skus.length} รายการ ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`;
+        ? t(`ลบสินค้า ${skus[0]} ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`, `Delete product ${skus[0]}? (This cannot be undone)`, `确定要删除商品 ${skus[0]} 吗？（删除后无法恢复）`)
+        : t(`ลบสินค้าที่เลือกทั้งหมด ${skus.length} รายการ ใช่หรือไม่? (ลบแล้วกู้คืนไม่ได้)`, `Delete all ${skus.length} selected products? (This cannot be undone)`, `确定要删除所选的全部 ${skus.length} 件商品吗？（删除后无法恢复）`);
     if (!confirm(confirmMsg)) return;
 
     setDeleting(true);
@@ -96,7 +98,11 @@ export default function ProductsPage() {
 
     const failed = results.filter((r) => !r.ok);
     if (failed.length > 0) {
-      alert(`ลบไม่สำเร็จ ${failed.length} รายการ: ${failed.map((f) => f.sku).join(", ")}`);
+      alert(t(
+        `ลบไม่สำเร็จ ${failed.length} รายการ: ${failed.map((f) => f.sku).join(", ")}`,
+        `Failed to delete ${failed.length} item(s): ${failed.map((f) => f.sku).join(", ")}`,
+        `删除失败 ${failed.length} 项：${failed.map((f) => f.sku).join(", ")}`
+      ));
     }
   }
 
@@ -112,30 +118,32 @@ export default function ProductsPage() {
 
   // Grouped by category (in CATEGORIES order) when no single category is picked,
   // so chairs sit with chairs, sofas with sofas, etc. instead of one flat dump.
-  const groups: { slug: string; name_th: string; products: Product[] }[] =
+  const groups: { slug: string; name_th: string; name_en: string; name_zh: string; products: Product[] }[] =
     catFilter === "all"
       ? [...CATEGORIES]
           .sort((a, b) => a.sort_order - b.sort_order)
-          .map((c) => ({ slug: c.slug, name_th: c.name_th, products: filtered.filter((p) => p.category_slug === c.slug) }))
+          .map((c) => ({ slug: c.slug, name_th: c.name_th, name_en: c.name_en, name_zh: c.name_zh, products: filtered.filter((p) => p.category_slug === c.slug) }))
           .filter((g) => g.products.length > 0)
           .concat([
             {
               slug: "__uncategorized",
               name_th: "ไม่มีหมวดหมู่",
+              name_en: "Uncategorized",
+              name_zh: "未分类",
               products: filtered.filter((p) => !CATEGORIES.some((c) => c.slug === p.category_slug)),
             },
           ].filter((g) => g.products.length > 0))
-      : [{ slug: catFilter, name_th: "", products: filtered }];
+      : [{ slug: catFilter, name_th: "", name_en: "", name_zh: "", products: filtered }];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">จัดการสินค้า</h1>
+        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดการสินค้า", "Manage Products", "商品管理")}</h1>
         <div className="flex gap-3">
-          <Button size="sm" variant="outline">Import CSV</Button>
+          <Button size="sm" variant="outline">{t("นำเข้า CSV", "Import CSV", "导入CSV")}</Button>
           <Link href="/admin/products/new">
             <Button size="sm" className="bg-[#C8102E] hover:bg-[#a30d25] text-white gap-1">
-              <Plus size={14} /> เพิ่มสินค้า
+              <Plus size={14} /> {t("เพิ่มสินค้า", "Add Product", "添加商品")}
             </Button>
           </Link>
         </div>
@@ -146,7 +154,7 @@ export default function ProductsPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]" size={14} />
           <Input
-            placeholder="ค้นหา SKU / ชื่อ..."
+            placeholder={t("ค้นหา SKU / ชื่อ...", "Search SKU / name...", "搜索SKU/名称...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 w-56 h-9 text-sm"
@@ -157,13 +165,13 @@ export default function ProductsPage() {
           onChange={(e) => setCatFilter(e.target.value)}
           className="h-9 px-3 rounded-md border border-[#E8E5E0] text-sm bg-white text-[#1A1A1A]"
         >
-          <option value="all">ทุกหมวดหมู่</option>
+          <option value="all">{t("ทุกหมวดหมู่", "All Categories", "所有分类")}</option>
           {CATEGORIES.map((c) => (
-            <option key={c.slug} value={c.slug}>{c.name_th}</option>
+            <option key={c.slug} value={c.slug}>{t(c.name_th, c.name_en, c.name_zh)}</option>
           ))}
         </select>
         <p className="text-xs text-[#6B6B6B] self-center">
-          {loading ? "กำลังโหลด..." : `${filtered.length} รายการ`}
+          {loading ? t("กำลังโหลด...", "Loading...", "加载中...") : t(`${filtered.length} รายการ`, `${filtered.length} items`, `${filtered.length} 项`)}
         </p>
         {filtered.length > 0 && (
           <label className="flex items-center gap-1.5 text-xs text-[#6B6B6B] self-center cursor-pointer">
@@ -173,7 +181,7 @@ export default function ProductsPage() {
               onChange={toggleSelectAll}
               className="h-3.5 w-3.5"
             />
-            เลือกทั้งหมด
+            {t("เลือกทั้งหมด", "Select All", "全选")}
           </label>
         )}
         {selected.size > 0 && (
@@ -185,7 +193,7 @@ export default function ProductsPage() {
             className="h-9 gap-1 text-xs"
           >
             <Trash2 size={14} />
-            {deleting ? "กำลังลบ..." : `ลบที่เลือก (${selected.size})`}
+            {deleting ? t("กำลังลบ...", "Deleting...", "删除中...") : t(`ลบที่เลือก (${selected.size})`, `Delete Selected (${selected.size})`, `删除所选 (${selected.size})`)}
           </Button>
         )}
       </div>
@@ -195,7 +203,7 @@ export default function ProductsPage() {
         <div key={group.slug} className="space-y-4">
           {group.name_th && (
             <h2 className="text-sm font-bold text-[#1A1A1A] flex items-center gap-2 pt-2">
-              {group.name_th}
+              {t(group.name_th, group.name_en, group.name_zh)}
               <span className="text-xs font-normal text-[#9B9B9B]">({group.products.length})</span>
             </h2>
           )}
@@ -225,10 +233,10 @@ export default function ProductsPage() {
               />
               <div className="absolute top-2 right-2 flex gap-1">
                 {product.is_featured && (
-                  <Badge className="bg-[#C9A876] text-white text-[10px] px-1.5 py-0.5">Featured</Badge>
+                  <Badge className="bg-[#C9A876] text-white text-[10px] px-1.5 py-0.5">{t("แนะนำ", "Featured", "推荐")}</Badge>
                 )}
                 {!product.is_active && (
-                  <Badge className="bg-[#1A1A1A] text-white text-[10px] px-1.5 py-0.5">ซ่อนอยู่</Badge>
+                  <Badge className="bg-[#1A1A1A] text-white text-[10px] px-1.5 py-0.5">{t("ซ่อนอยู่", "Hidden", "已隐藏")}</Badge>
                 )}
               </div>
             </div>
@@ -237,7 +245,7 @@ export default function ProductsPage() {
               <p className="text-sm font-medium text-[#1A1A1A] line-clamp-1 mb-1">{product.name_th}</p>
               <div className="flex items-center justify-between">
                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STOCK_COLOR[product.stock_status]}`}>
-                  {STOCK_LABEL[product.stock_status]}
+                  {t(STOCK_LABEL[product.stock_status].th, STOCK_LABEL[product.stock_status].en, STOCK_LABEL[product.stock_status].zh)}
                 </span>
                 <span className="text-sm font-semibold text-[#C8102E]">
                   {product.price ? `฿${product.price.toLocaleString()}` : "—"}
@@ -246,7 +254,7 @@ export default function ProductsPage() {
               <div className="flex gap-2 mt-3">
                 <Link href={`/admin/products/${encodeURIComponent(product.sku)}/edit`} className="flex-1">
                   <Button size="sm" variant="outline" className="w-full h-7 text-xs">
-                    แก้ไข
+                    {t("แก้ไข", "Edit", "编辑")}
                   </Button>
                 </Link>
                 <Button
@@ -254,10 +262,10 @@ export default function ProductsPage() {
                   variant="outline"
                   onClick={() => toggleActive(product)}
                   className="flex-1 h-7 text-xs gap-1"
-                  title={product.is_active ? "ซ่อนสินค้าจากหน้าเว็บ" : "แสดงสินค้าบนหน้าเว็บ"}
+                  title={product.is_active ? t("ซ่อนสินค้าจากหน้าเว็บ", "Hide product from website", "从网站隐藏商品") : t("แสดงสินค้าบนหน้าเว็บ", "Show product on website", "在网站上显示商品")}
                 >
                   {product.is_active ? <EyeOff size={12} /> : <Eye size={12} />}
-                  {product.is_active ? "ซ่อนสินค้า" : "แสดงสินค้า"}
+                  {product.is_active ? t("ซ่อนสินค้า", "Hide Product", "隐藏商品") : t("แสดงสินค้า", "Show Product", "显示商品")}
                 </Button>
                 <Button
                   size="sm"
@@ -265,7 +273,7 @@ export default function ProductsPage() {
                   disabled={deleting}
                   onClick={() => deleteProducts([product.sku])}
                   className="h-7 w-7 p-0 shrink-0"
-                  title="ลบสินค้า"
+                  title={t("ลบสินค้า", "Delete Product", "删除商品")}
                 >
                   <Trash2 size={12} />
                 </Button>
@@ -278,7 +286,7 @@ export default function ProductsPage() {
                   className="block mt-2"
                 >
                   <Button size="sm" variant="outline" className="w-full h-7 text-xs text-[#C8102E] border-[#C8102E]/30 hover:bg-[#C8102E]/5">
-                    ดูหน้า
+                    {t("ดูหน้า", "View Page", "查看页面")}
                   </Button>
                 </a>
               )}

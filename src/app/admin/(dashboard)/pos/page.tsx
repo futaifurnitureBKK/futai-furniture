@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import QRCode from "react-qr-code";
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { PRODUCTS, CATEGORIES } from "@/data/mock";
 import type { Product } from "@/types";
+import { useLanguage } from "@/store/language";
 
 /* ── PromptPay QR generator ─────────────────────────────── */
 function crc16(s: string) {
@@ -51,6 +52,7 @@ type PayMethod = "transfer" | "quote";
    POS PAGE
 ═══════════════════════════════════════════════════════════ */
 export default function POSPage() {
+  const { t } = useLanguage();
   const [query, setQuery]           = useState("");
   const [catFilter, setCatFilter]   = useState<string | null>(null);
   const [cart, setCart]             = useState<POSItem[]>([]);
@@ -119,7 +121,7 @@ export default function POSPage() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]" />
           <input
             type="text"
-            placeholder="ค้นหา ชื่อสินค้า / SKU…"
+            placeholder={t("ค้นหา ชื่อสินค้า / SKU…", "Search product name / SKU…", "搜索商品名称 / SKU…")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#E8E5E0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30"
@@ -134,7 +136,7 @@ export default function POSPage() {
               !catFilter ? "bg-[#1A1A1A] text-white" : "bg-white border border-[#E8E5E0] text-[#6B6B6B] hover:border-[#1A1A1A]"
             }`}
           >
-            ทั้งหมด ({PRODUCTS.length})
+            {t("ทั้งหมด", "All", "全部")} ({PRODUCTS.length})
           </button>
           {CATEGORIES.map((cat) => (
             <button
@@ -182,7 +184,7 @@ export default function POSPage() {
                     <p className="text-[10px] text-[#9B9B9B] font-mono">{p.sku}</p>
                     <p className="text-xs text-[#1A1A1A] font-medium leading-snug line-clamp-2 mt-0.5">{p.name_th}</p>
                     <p className="text-xs font-semibold mt-1 text-[#C8102E]">
-                      {p.price ? `฿${p.price.toLocaleString()}` : "ตามใบเสนอ"}
+                      {p.price ? `฿${p.price.toLocaleString()}` : t("ตามใบเสนอ", "Quote on request", "按报价")}
                     </p>
                   </div>
                   {/* Add overlay */}
@@ -195,7 +197,7 @@ export default function POSPage() {
             {products.length === 0 && (
               <div className="col-span-full text-center py-16 text-[#6B6B6B]">
                 <Search size={32} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">ไม่พบสินค้า</p>
+                <p className="text-sm">{t("ไม่พบสินค้า", "No products found", "未找到商品")}</p>
               </div>
             )}
           </div>
@@ -207,10 +209,10 @@ export default function POSPage() {
 
         {/* Cart header */}
         <div className="px-4 py-3 border-b border-[#E8E5E0] flex items-center justify-between">
-          <span className="font-semibold text-[#1A1A1A] text-sm">รายการสั่งซื้อ</span>
+          <span className="font-semibold text-[#1A1A1A] text-sm">{t("รายการสั่งซื้อ", "Order List", "订单列表")}</span>
           {cart.length > 0 && (
             <button onClick={() => setCart([])} className="text-xs text-[#9B9B9B] hover:text-red-500 flex items-center gap-1">
-              <RotateCcw size={11} /> ล้าง
+              <RotateCcw size={11} /> {t("ล้าง", "Clear", "清空")}
             </button>
           )}
         </div>
@@ -220,7 +222,7 @@ export default function POSPage() {
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-[#C8C5BE] py-10">
               <ShoppingBag size={36} className="mb-2" />
-              <p className="text-xs">กดสินค้าเพื่อเพิ่มในรายการ</p>
+              <p className="text-xs">{t("กดสินค้าเพื่อเพิ่มในรายการ", "Tap a product to add it to the order", "点击商品加入订单")}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -237,7 +239,7 @@ export default function POSPage() {
                     {item.product.price ? (
                       <p className="text-xs text-[#C8102E] font-semibold">฿{(item.product.price * item.quantity).toLocaleString()}</p>
                     ) : (
-                      <p className="text-[10px] text-[#C8102E]">ตามใบเสนอ</p>
+                      <p className="text-[10px] text-[#C8102E]">{t("ตามใบเสนอ", "Quote on request", "按报价")}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -260,22 +262,22 @@ export default function POSPage() {
 
         {/* Customer info */}
         <div className="px-3 py-3 border-t border-[#E8E5E0] space-y-2">
-          <p className="text-xs font-medium text-[#6B6B6B] flex items-center gap-1.5"><User size={11} />ข้อมูลลูกค้า</p>
+          <p className="text-xs font-medium text-[#6B6B6B] flex items-center gap-1.5"><User size={11} />{t("ข้อมูลลูกค้า", "Customer Info", "客户信息")}</p>
           <input
-            placeholder="ชื่อลูกค้า"
+            placeholder={t("ชื่อลูกค้า", "Customer name", "客户姓名")}
             value={custName}
             onChange={(e) => setCustName(e.target.value)}
             className="w-full px-3 py-1.5 text-xs border border-[#E8E5E0] rounded-lg focus:outline-none focus:border-[#C8102E]"
           />
           <div className="flex gap-2">
             <input
-              placeholder="บริษัท"
+              placeholder={t("บริษัท", "Company", "公司")}
               value={custCompany}
               onChange={(e) => setCustCompany(e.target.value)}
               className="flex-1 px-3 py-1.5 text-xs border border-[#E8E5E0] rounded-lg focus:outline-none focus:border-[#C8102E]"
             />
             <input
-              placeholder="เบอร์โทร"
+              placeholder={t("เบอร์โทร", "Phone number", "电话号码")}
               value={custPhone}
               onChange={(e) => setCustPhone(e.target.value)}
               className="flex-1 px-3 py-1.5 text-xs border border-[#E8E5E0] rounded-lg focus:outline-none focus:border-[#C8102E]"
@@ -286,9 +288,9 @@ export default function POSPage() {
         {/* Total + Payment */}
         <div className="px-4 py-3 border-t border-[#E8E5E0] space-y-3 bg-[#FAFAFA]">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-[#6B6B6B]">{itemCount} รายการ</span>
+            <span className="text-sm text-[#6B6B6B]">{itemCount} {t("รายการ", "items", "件")}</span>
             <span className="text-lg font-bold text-[#1A1A1A]">
-              {hasUnpriced ? "ตามใบเสนอราคา" : `฿${cartTotal.toLocaleString()}`}
+              {hasUnpriced ? t("ตามใบเสนอราคา", "Per quote", "按报价") : `฿${cartTotal.toLocaleString()}`}
             </span>
           </div>
 
@@ -298,14 +300,14 @@ export default function POSPage() {
               onClick={() => openPayment("transfer")}
               className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[#1A2F5E] text-white text-xs font-medium disabled:opacity-40 hover:bg-[#152448] transition-colors"
             >
-              <QrCode size={14} /> โอนเงิน / QR
+              <QrCode size={14} /> {t("โอนเงิน / QR", "Transfer / QR", "转账 / 二维码")}
             </button>
             <button
               disabled={cart.length === 0}
               onClick={() => openPayment("quote")}
               className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-[#C8102E] text-white text-xs font-medium disabled:opacity-40 hover:bg-[#a30d25] transition-colors"
             >
-              <FileText size={14} /> ใบเสนอราคา
+              <FileText size={14} /> {t("ใบเสนอราคา", "Quotation", "报价单")}
             </button>
           </div>
         </div>
@@ -321,7 +323,7 @@ export default function POSPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E5E0]">
               <h2 className="font-semibold text-[#1A1A1A]">
-                {payMethod === "transfer" ? "ชำระเงินโอน / PromptPay" : "สร้างใบเสนอราคา"}
+                {payMethod === "transfer" ? t("ชำระเงินโอน / PromptPay", "Bank Transfer / PromptPay", "转账付款 / PromptPay") : t("สร้างใบเสนอราคา", "Create Quotation", "创建报价单")}
               </h2>
               {!orderDone && (
                 <button onClick={() => setShowModal(false)} className="text-[#6B6B6B] hover:text-[#1A1A1A]">
@@ -338,22 +340,22 @@ export default function POSPage() {
                 <div className="text-center py-4">
                   <CheckCircle2 size={56} className="mx-auto text-green-500 mb-3" />
                   <p className="font-semibold text-[#1A1A1A] text-lg mb-1">
-                    {payMethod === "transfer" ? "บันทึกการรับเงินแล้ว" : "สร้างใบเสนอราคาแล้ว"}
+                    {payMethod === "transfer" ? t("บันทึกการรับเงินแล้ว", "Payment recorded", "已记录收款") : t("สร้างใบเสนอราคาแล้ว", "Quotation created", "报价单已创建")}
                   </p>
-                  <p className="text-sm text-[#6B6B6B] mb-1">เลขที่: {orderNum}</p>
-                  {custName && <p className="text-sm text-[#6B6B6B]">ลูกค้า: {custName}</p>}
+                  <p className="text-sm text-[#6B6B6B] mb-1">{t("เลขที่", "No.", "编号")}: {orderNum}</p>
+                  {custName && <p className="text-sm text-[#6B6B6B]">{t("ลูกค้า", "Customer", "客户")}: {custName}</p>}
                   <div className="mt-6 flex gap-3">
                     <button
                       onClick={handlePrint}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[#E8E5E0] rounded-lg text-sm text-[#1A1A1A] hover:bg-[#FAF7F2]"
                     >
-                      <Printer size={15} /> พิมพ์ใบเสร็จ
+                      <Printer size={15} /> {t("พิมพ์ใบเสร็จ", "Print Receipt", "打印收据")}
                     </button>
                     <button
                       onClick={newOrder}
                       className="flex-1 py-2.5 bg-[#1A1A1A] text-white rounded-lg text-sm font-medium hover:bg-[#333]"
                     >
-                      รายการใหม่
+                      {t("รายการใหม่", "New Order", "新订单")}
                     </button>
                   </div>
                 </div>
@@ -376,7 +378,7 @@ export default function POSPage() {
                   )}
                   {/* Bank info */}
                   <div className="bg-[#F5F7FF] rounded-xl p-4 text-sm space-y-1">
-                    <p className="text-[#6B6B6B] text-xs font-medium uppercase tracking-wide">ข้อมูลบัญชี</p>
+                    <p className="text-[#6B6B6B] text-xs font-medium uppercase tracking-wide">{t("ข้อมูลบัญชี", "Account Info", "账户信息")}</p>
                     <p className="font-semibold text-[#1A1A1A]">{BANK_NAME}</p>
                     <p className="text-[#1A1A1A]">{BANK_ACCOUNT}</p>
                     <p className="text-[#6B6B6B] text-xs">{ACCOUNT_NAME}</p>
@@ -391,7 +393,7 @@ export default function POSPage() {
                     ))}
                     {!hasUnpriced && (
                       <div className="flex justify-between font-semibold text-[#1A1A1A] pt-1 border-t border-[#E8E5E0]">
-                        <span>ยอดรวม</span>
+                        <span>{t("ยอดรวม", "Total", "总计")}</span>
                         <span>฿{cartTotal.toLocaleString()}</span>
                       </div>
                     )}
@@ -400,7 +402,7 @@ export default function POSPage() {
                     onClick={confirmPay}
                     className="w-full py-3 bg-[#1A2F5E] text-white rounded-xl font-medium text-sm hover:bg-[#152448] transition-colors"
                   >
-                    ยืนยันรับเงินแล้ว
+                    {t("ยืนยันรับเงินแล้ว", "Confirm Payment Received", "确认已收款")}
                   </button>
                 </div>
 
@@ -410,9 +412,9 @@ export default function POSPage() {
                   {/* Quote header */}
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-bold text-[#1A2F5E] text-lg">ใบเสนอราคา</p>
-                      <p className="text-xs text-[#6B6B6B]">เลขที่: {orderNum}</p>
-                      <p className="text-xs text-[#6B6B6B]">วันที่: {new Date().toLocaleDateString("th-TH", { year:"numeric", month:"long", day:"numeric" })}</p>
+                      <p className="font-bold text-[#1A2F5E] text-lg">{t("ใบเสนอราคา", "Quotation", "报价单")}</p>
+                      <p className="text-xs text-[#6B6B6B]">{t("เลขที่", "No.", "编号")}: {orderNum}</p>
+                      <p className="text-xs text-[#6B6B6B]">{t("วันที่", "Date", "日期")}: {new Date().toLocaleDateString("th-TH", { year:"numeric", month:"long", day:"numeric" })}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-[#1A1A1A]">ฟูไท่ เฟอร์นิเจอร์</p>
@@ -431,10 +433,10 @@ export default function POSPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-[#E8E5E0] text-[#6B6B6B]">
-                        <th className="text-left py-1.5 font-medium">รายการ</th>
-                        <th className="text-center py-1.5 font-medium w-10">จำนวน</th>
-                        <th className="text-right py-1.5 font-medium w-20">ราคา</th>
-                        <th className="text-right py-1.5 font-medium w-20">รวม</th>
+                        <th className="text-left py-1.5 font-medium">{t("รายการ", "Item", "品项")}</th>
+                        <th className="text-center py-1.5 font-medium w-10">{t("จำนวน", "Qty", "数量")}</th>
+                        <th className="text-right py-1.5 font-medium w-20">{t("ราคา", "Price", "单价")}</th>
+                        <th className="text-right py-1.5 font-medium w-20">{t("รวม", "Total", "小计")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -445,33 +447,33 @@ export default function POSPage() {
                             <p className="text-[#9B9B9B]">{i.product.sku}</p>
                           </td>
                           <td className="text-center py-1.5">{i.quantity}</td>
-                          <td className="text-right py-1.5">{i.product.price ? `฿${i.product.price.toLocaleString()}` : "TBD"}</td>
-                          <td className="text-right py-1.5 font-medium">{i.product.price ? `฿${(i.product.price * i.quantity).toLocaleString()}` : "TBD"}</td>
+                          <td className="text-right py-1.5">{i.product.price ? `฿${i.product.price.toLocaleString()}` : t("TBD", "TBD", "待定")}</td>
+                          <td className="text-right py-1.5 font-medium">{i.product.price ? `฿${(i.product.price * i.quantity).toLocaleString()}` : t("TBD", "TBD", "待定")}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={3} className="text-right pt-2 font-semibold text-[#1A1A1A]">ยอดรวม</td>
+                        <td colSpan={3} className="text-right pt-2 font-semibold text-[#1A1A1A]">{t("ยอดรวม", "Total", "总计")}</td>
                         <td className="text-right pt-2 font-bold text-[#C8102E]">
-                          {hasUnpriced ? "ตามสอบถาม" : `฿${cartTotal.toLocaleString()}`}
+                          {hasUnpriced ? t("ตามสอบถาม", "Upon inquiry", "询价后确定") : `฿${cartTotal.toLocaleString()}`}
                         </td>
                       </tr>
                     </tfoot>
                   </table>
-                  <p className="text-[10px] text-[#9B9B9B]">* ราคานี้มีผลภายใน 30 วัน / Valid for 30 days</p>
+                  <p className="text-[10px] text-[#9B9B9B]">{t("* ราคานี้มีผลภายใน 30 วัน", "* Valid for 30 days", "* 本报价30天内有效")}</p>
                   <div className="flex gap-3 pt-1">
                     <button
                       onClick={() => window.print()}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[#E8E5E0] rounded-lg text-sm text-[#1A1A1A] hover:bg-[#FAF7F2]"
                     >
-                      <Printer size={15} /> พิมพ์ / Export
+                      <Printer size={15} /> {t("พิมพ์", "Print", "打印")} / Export
                     </button>
                     <button
                       onClick={confirmPay}
                       className="flex-1 py-2.5 bg-[#C8102E] text-white rounded-xl font-medium text-sm hover:bg-[#a30d25]"
                     >
-                      บันทึกใบเสนอ
+                      {t("บันทึกใบเสนอ", "Save Quotation", "保存报价单")}
                     </button>
                   </div>
                 </div>
@@ -483,4 +485,3 @@ export default function POSPage() {
     </div>
   );
 }
-

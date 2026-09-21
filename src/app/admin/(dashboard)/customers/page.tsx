@@ -4,9 +4,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/store/language";
 import type { Customer, Order } from "@/types";
 
 export default function CustomersPage() {
+  const { t } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,38 +37,38 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">ลูกค้า</h1>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("ลูกค้า", "Customers", "客户")}</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">
-            ลูกค้าทั้งหมด {customers.length} ราย
+            {t(`ลูกค้าทั้งหมด ${customers.length} ราย`, `${customers.length} customers total`, `共 ${customers.length} 位客户`)}
           </p>
         </div>
-        <Button size="sm" variant="outline">Export CSV</Button>
+        <Button size="sm" variant="outline">{t("ส่งออก CSV", "Export CSV", "导出CSV")}</Button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-[#FAF7F2]">
-              <TableHead className="text-xs">ชื่อ</TableHead>
-              <TableHead className="text-xs">บริษัท</TableHead>
-              <TableHead className="text-xs">โทรศัพท์</TableHead>
-              <TableHead className="text-xs">อีเมล</TableHead>
+              <TableHead className="text-xs">{t("ชื่อ", "Name", "姓名")}</TableHead>
+              <TableHead className="text-xs">{t("บริษัท", "Company", "公司")}</TableHead>
+              <TableHead className="text-xs">{t("โทรศัพท์", "Phone", "电话")}</TableHead>
+              <TableHead className="text-xs">{t("อีเมล", "Email", "邮箱")}</TableHead>
               <TableHead className="text-xs">LINE ID</TableHead>
-              <TableHead className="text-xs">ออเดอร์</TableHead>
-              <TableHead className="text-xs">สมัครเมื่อ</TableHead>
+              <TableHead className="text-xs">{t("ออเดอร์", "Orders", "订单")}</TableHead>
+              <TableHead className="text-xs">{t("สมัครเมื่อ", "Joined", "注册日期")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
-                  กำลังโหลด...
+                  {t("กำลังโหลด...", "Loading...", "加载中...")}
                 </TableCell>
               </TableRow>
             ) : customers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-[#6B6B6B]">
-                  ยังไม่มีลูกค้า
+                  {t("ยังไม่มีลูกค้า", "No customers yet", "暂无客户")}
                 </TableCell>
               </TableRow>
             ) : (

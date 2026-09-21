@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/browser";
+import { useLanguage } from "@/store/language";
 import type { Category } from "@/types";
 
 export default function CategoriesPage() {
+  const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingSlug, setUploadingSlug] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function CategoriesPage() {
         prev.map((c) => (c.slug === category.slug ? { ...c, banner_url: uploadData.url } : c))
       );
     } catch {
-      alert("อัปโหลดรูปไม่สำเร็จ");
+      alert(t("อัปโหลดรูปไม่สำเร็จ", "Failed to upload image", "图片上传失败"));
     } finally {
       setUploadingSlug(null);
     }
@@ -54,14 +56,18 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">จัดการรูปหมวดหมู่</h1>
+        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดการรูปหมวดหมู่", "Manage Category Images", "管理分类图片")}</h1>
         <p className="text-sm text-[#6B6B6B] mt-0.5">
-          รูปเหล่านี้ใช้แสดงในส่วน &ldquo;เลือกซื้อตามหมวดหมู่&rdquo; บนหน้าแรก และหน้าหมวดหมู่สินค้า
+          {t(
+            "รูปเหล่านี้ใช้แสดงในส่วน “เลือกซื้อตามหมวดหมู่” บนหน้าแรก และหน้าหมวดหมู่สินค้า",
+            "These images are shown in the “Shop by Category” section on the homepage and on category pages",
+            "这些图片会显示在首页的“按分类选购”区块以及分类页面中"
+          )}
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm text-[#6B6B6B]">กำลังโหลด...</p>
+        <p className="text-sm text-[#6B6B6B]">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {categories.map((cat) => (
@@ -82,7 +88,7 @@ export default function CategoriesPage() {
                   disabled={uploadingSlug === cat.slug}
                   className="w-full flex items-center justify-center gap-1.5 h-8 text-xs border border-[#E8E5E0] rounded-md hover:border-[#C8102E]/40 hover:bg-[#FAF7F2] transition-colors disabled:opacity-50"
                 >
-                  <Upload size={12} /> เปลี่ยนรูป
+                  <Upload size={12} /> {t("เปลี่ยนรูป", "Change Image", "更换图片")}
                 </button>
                 <input
                   ref={(el) => {

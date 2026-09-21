@@ -6,6 +6,7 @@ import {
   ImageIcon, Loader2, Link2, RefreshCw,
 } from "lucide-react";
 import { PRODUCTS } from "@/data/mock";
+import { useLanguage } from "@/store/language";
 
 /* ── Types ─────────────────────────────────────── */
 interface FileItem {
@@ -31,6 +32,7 @@ const KNOWN_SKUS = PRODUCTS.map((p) => p.sku);
    PAGE
 ══════════════════════════════════════════════════ */
 export default function AdminImagesPage() {
+  const { t } = useLanguage();
   const [tab, setTab] = useState<"upload" | "shopee">("upload");
 
   /* ── Upload tab state ── */
@@ -125,7 +127,7 @@ export default function AdminImagesPage() {
       if (!res.ok) throw new Error(data.error);
       setShopeeRows(data.results);
     } catch (e: unknown) {
-      setShopeeError(e instanceof Error ? e.message : "Parse failed");
+      setShopeeError(e instanceof Error ? e.message : t("แยกวิเคราะห์ข้อมูลไม่สำเร็จ", "Parse failed", "解析失败"));
     } finally {
       setShopeeLoading(false);
     }
@@ -138,16 +140,16 @@ export default function AdminImagesPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">จัดการรูปสินค้า</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">อัปโหลดรูปสินค้าหรือดึงจาก Shopee</p>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดการรูปสินค้า", "Product Images", "商品图片管理")}</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{t("อัปโหลดรูปสินค้าหรือดึงจาก Shopee", "Upload product images or import from Shopee", "上传商品图片或从Shopee导入")}</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-[#F5F3EF] p-1 rounded-xl w-fit">
         {([
-          { key: "upload", label: "อัปโหลดรูปเอง", icon: Upload },
-          { key: "shopee", label: "นำเข้าจาก Shopee", icon: FileSpreadsheet },
+          { key: "upload", label: t("อัปโหลดรูปเอง", "Upload Images", "自行上传图片"), icon: Upload },
+          { key: "shopee", label: t("นำเข้าจาก Shopee", "Import from Shopee", "从Shopee导入"), icon: FileSpreadsheet },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -188,23 +190,23 @@ export default function AdminImagesPage() {
               onChange={(e) => e.target.files && addFiles(e.target.files)}
             />
             <ImageIcon size={36} className="mx-auto text-[#C8C5BE] mb-3" />
-            <p className="font-medium text-[#1A1A1A]">ลากรูปมาวางหรือคลิกเพื่อเลือก</p>
-            <p className="text-sm text-[#6B6B6B] mt-1">รองรับ JPG, PNG, WebP — หลายรูปพร้อมกันได้</p>
-            <p className="text-xs text-[#9B9B9B] mt-2">💡 ตั้งชื่อไฟล์เป็น SKU เช่น <code>HJ-350A.jpg</code> จะ map ให้อัตโนมัติ</p>
+            <p className="font-medium text-[#1A1A1A]">{t("ลากรูปมาวางหรือคลิกเพื่อเลือก", "Drag images here or click to select", "拖放图片到此处或点击选择")}</p>
+            <p className="text-sm text-[#6B6B6B] mt-1">{t("รองรับ JPG, PNG, WebP — หลายรูปพร้อมกันได้", "Supports JPG, PNG, WebP — multiple files at once", "支持 JPG、PNG、WebP — 可同时上传多张")}</p>
+            <p className="text-xs text-[#9B9B9B] mt-2">💡 {t("ตั้งชื่อไฟล์เป็น SKU เช่น", "Name the file as the SKU, e.g.", "将文件名设为SKU，例如")} <code>HJ-350A.jpg</code> {t("จะ map ให้อัตโนมัติ", "and it will be mapped automatically", "系统会自动匹配")}</p>
           </div>
 
           {/* File list */}
           {files.length > 0 && (
             <>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-[#6B6B6B]">{files.length} ไฟล์ · อัปโหลดแล้ว {doneCount}</p>
+                <p className="text-sm text-[#6B6B6B]">{files.length} {t("ไฟล์", "files", "个文件")} · {t("อัปโหลดแล้ว", "Uploaded", "已上传")} {doneCount}</p>
                 <button
                   onClick={uploadAll}
                   disabled={idleCount === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-[#C8102E] text-white text-sm font-medium rounded-lg disabled:opacity-40 hover:bg-[#a30d25] transition-colors"
                 >
                   <Upload size={14} />
-                  อัปโหลดทั้งหมด ({idleCount})
+                  {t("อัปโหลดทั้งหมด", "Upload All", "全部上传")} ({idleCount})
                 </button>
               </div>
 
@@ -216,6 +218,7 @@ export default function AdminImagesPage() {
                       <Image src={f.preview} alt={f.sku} fill sizes="200px" className="object-contain p-2" />
                       <button
                         onClick={() => removeFile(i)}
+                        aria-label={t("ลบไฟล์", "Remove file", "删除文件")}
                         className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80"
                       >
                         <X size={12} />
@@ -243,7 +246,7 @@ export default function AdminImagesPage() {
                       <input
                         value={f.sku}
                         onChange={(e) => updateSku(i, e.target.value)}
-                        placeholder="SKU สินค้า"
+                        placeholder={t("SKU สินค้า", "Product SKU", "商品SKU")}
                         className={`w-full text-xs px-2 py-1.5 border rounded-lg focus:outline-none focus:border-[#C8102E] ${
                           KNOWN_SKUS.includes(f.sku)
                             ? "border-green-400 bg-green-50"
@@ -252,7 +255,7 @@ export default function AdminImagesPage() {
                       />
                       {KNOWN_SKUS.includes(f.sku) && (
                         <p className="text-[10px] text-green-600 flex items-center gap-1">
-                          <CheckCircle2 size={10} /> พบ SKU ในระบบ
+                          <CheckCircle2 size={10} /> {t("พบ SKU ในระบบ", "SKU found in system", "系统中找到该SKU")}
                         </p>
                       )}
                       {f.status === "done" && f.url && (
@@ -262,7 +265,7 @@ export default function AdminImagesPage() {
                           rel="noreferrer"
                           className="text-[10px] text-blue-500 flex items-center gap-1 truncate"
                         >
-                          <Link2 size={10} /> ดูรูป
+                          <Link2 size={10} /> {t("ดูรูป", "View image", "查看图片")}
                         </a>
                       )}
                       {f.status === "error" && (
@@ -277,13 +280,13 @@ export default function AdminImagesPage() {
 
           {/* Setup notice if no BLOB_READ_WRITE_TOKEN */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
-            <p className="font-medium text-amber-800 mb-1">⚙️ ต้องการ Vercel Blob Token</p>
+            <p className="font-medium text-amber-800 mb-1">⚙️ {t("ต้องการ Vercel Blob Token", "Vercel Blob Token Required", "需要 Vercel Blob Token")}</p>
             <p className="text-amber-700 text-xs">
-              เพื่อให้อัปโหลดทำงานได้ใน Production ไปที่{" "}
+              {t("เพื่อให้อัปโหลดทำงานได้ใน Production ไปที่", "For uploads to work in production, go to", "为使上传功能在生产环境中正常工作，请前往")}{" "}
               <a href="https://vercel.com/dashboard" target="_blank" className="underline">Vercel Dashboard</a>
               {" "}→ Project → Storage → Create Blob Store → copy{" "}
               <code className="bg-amber-100 px-1 rounded">BLOB_READ_WRITE_TOKEN</code>
-              {" "}→ ใส่ใน Environment Variables
+              {" "}→ {t("ใส่ใน Environment Variables", "add it to Environment Variables", "添加到 Environment Variables 中")}
             </p>
           </div>
         </div>
@@ -294,25 +297,25 @@ export default function AdminImagesPage() {
         <div className="space-y-4">
           {/* Instructions */}
           <div className="bg-[#F0F4FF] border border-blue-200 rounded-xl p-4 text-sm space-y-2">
-            <p className="font-semibold text-[#1A2F5E]">วิธี Export รูปสินค้าจาก Shopee Seller Center</p>
+            <p className="font-semibold text-[#1A2F5E]">{t("วิธี Export รูปสินค้าจาก Shopee Seller Center", "How to export product images from Shopee Seller Center", "如何从Shopee卖家中心导出商品图片")}</p>
             <ol className="text-[#1A2F5E]/80 space-y-1 list-decimal pl-4 text-xs">
-              <li>เข้า Seller Center → <strong>สินค้า</strong> → <strong>จัดการสินค้าแบบกลุ่ม</strong></li>
-              <li>คลิก <strong>"อัปเดตจำนวนมาก"</strong> → เลือก <strong>"รูปภาพสินค้า"</strong></li>
-              <li>กด <strong>"ดาวน์โหลดเทมเพลต"</strong> จะได้ไฟล์ Excel ที่มี URL รูปสินค้าจริง</li>
-              <li>เปิดไฟล์ Excel → เลือกทุก cell → <strong>Copy (Ctrl+C)</strong></li>
-              <li>วางลงในช่องด้านล่าง</li>
+              <li>{t("เข้า Seller Center →", "Go to Seller Center →", "进入卖家中心 →")} <strong>{t("สินค้า", "Products", "商品")}</strong> → <strong>{t("จัดการสินค้าแบบกลุ่ม", "Bulk Product Management", "批量商品管理")}</strong></li>
+              <li>{t("คลิก", "Click", "点击")} <strong>{t("\"อัปเดตจำนวนมาก\"", "\"Bulk Update\"", "\"批量更新\"")}</strong> → {t("เลือก", "select", "选择")} <strong>{t("\"รูปภาพสินค้า\"", "\"Product Images\"", "\"商品图片\"")}</strong></li>
+              <li>{t("กด", "Click", "点击")} <strong>{t("\"ดาวน์โหลดเทมเพลต\"", "\"Download Template\"", "\"下载模板\"")}</strong> {t("จะได้ไฟล์ Excel ที่มี URL รูปสินค้าจริง", "to get an Excel file containing the actual product image URLs", "即可获得含有商品图片URL的Excel文件")}</li>
+              <li>{t("เปิดไฟล์ Excel → เลือกทุก cell →", "Open the Excel file → select all cells →", "打开Excel文件 → 全选单元格 →")} <strong>Copy (Ctrl+C)</strong></li>
+              <li>{t("วางลงในช่องด้านล่าง", "Paste it into the box below", "粘贴到下方文本框中")}</li>
             </ol>
           </div>
 
           {/* Paste area */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-[#1A1A1A]">
-              วางข้อมูลจาก Shopee Excel ที่นี่
+              {t("วางข้อมูลจาก Shopee Excel ที่นี่", "Paste the data from the Shopee Excel file here", "在此粘贴Shopee Excel中的数据")}
             </label>
             <textarea
               value={shopeeText}
               onChange={(e) => setShopeeText(e.target.value)}
-              placeholder="วางข้อมูลที่ copy จาก Excel ตรงนี้ (Tab-separated)..."
+              placeholder={t("วางข้อมูลที่ copy จาก Excel ตรงนี้ (Tab-separated)...", "Paste the data copied from Excel here (tab-separated)...", "在此粘贴从Excel复制的数据（以制表符分隔）...")}
               rows={8}
               className="w-full px-4 py-3 border border-[#E8E5E0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#C8102E] resize-none"
             />
@@ -322,7 +325,7 @@ export default function AdminImagesPage() {
               className="flex items-center gap-2 px-4 py-2 bg-[#1A2F5E] text-white text-sm font-medium rounded-lg disabled:opacity-40 hover:bg-[#152448] transition-colors"
             >
               {shopeeLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              วิเคราะห์และ Import รูป
+              {t("วิเคราะห์และ Import รูป", "Analyze and Import Images", "分析并导入图片")}
             </button>
           </div>
 
@@ -336,9 +339,9 @@ export default function AdminImagesPage() {
           {shopeeRows.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="font-medium text-[#1A1A1A]">พบ {shopeeRows.length} สินค้า</p>
+                <p className="font-medium text-[#1A1A1A]">{t("พบ", "Found", "找到")} {shopeeRows.length} {t("สินค้า", "products", "件商品")}</p>
                 <span className="text-xs text-[#6B6B6B]">
-                  {shopeeRows.filter((r) => KNOWN_SKUS.includes(r.sku)).length} SKU ตรงกับระบบ
+                  {shopeeRows.filter((r) => KNOWN_SKUS.includes(r.sku)).length} {t("SKU ตรงกับระบบ", "SKUs match the system", "个SKU与系统匹配")}
                 </span>
               </div>
               <div className="rounded-xl border border-[#E8E5E0] overflow-hidden">
@@ -346,8 +349,8 @@ export default function AdminImagesPage() {
                   <thead className="bg-[#F5F3EF]">
                     <tr>
                       <th className="text-left px-4 py-2.5 text-xs font-medium text-[#6B6B6B]">SKU</th>
-                      <th className="text-left px-4 py-2.5 text-xs font-medium text-[#6B6B6B]">รูปภาพ</th>
-                      <th className="text-left px-4 py-2.5 text-xs font-medium text-[#6B6B6B]">สถานะ</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-[#6B6B6B]">{t("รูปภาพ", "Images", "图片")}</th>
+                      <th className="text-left px-4 py-2.5 text-xs font-medium text-[#6B6B6B]">{t("สถานะ", "Status", "状态")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0EDE8]">
@@ -372,11 +375,11 @@ export default function AdminImagesPage() {
                         <td className="px-4 py-2">
                           {KNOWN_SKUS.includes(row.sku) ? (
                             <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                              <CheckCircle2 size={10} /> พบในระบบ
+                              <CheckCircle2 size={10} /> {t("พบในระบบ", "Found in system", "系统中已存在")}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                              <AlertCircle size={10} /> ไม่พบ SKU
+                              <AlertCircle size={10} /> {t("ไม่พบ SKU", "SKU not found", "未找到SKU")}
                             </span>
                           )}
                         </td>
@@ -386,7 +389,7 @@ export default function AdminImagesPage() {
                 </table>
               </div>
               <p className="text-xs text-[#6B6B6B] bg-[#F5F3EF] p-3 rounded-lg">
-                💡 ส่งไฟล์ Excel นี้ให้ Claude แล้วพิมพ์ "import รูป Shopee" — จะอัปเดตรูปสินค้าให้ทันที
+                💡 {t("ส่งไฟล์ Excel นี้ให้ Claude แล้วพิมพ์ \"import รูป Shopee\" — จะอัปเดตรูปสินค้าให้ทันที", "Send this Excel file to Claude and type \"import Shopee images\" — it will update the product images right away", "将此Excel文件发送给Claude，并输入\"import 图片 Shopee\" — 系统会立即更新商品图片")}
               </p>
             </div>
           )}

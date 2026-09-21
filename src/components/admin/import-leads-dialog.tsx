@@ -12,6 +12,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useLanguage } from "@/store/language";
 import { CHANNELS, SEGMENTS, STATUSES } from "@/lib/lead-options";
 import type { Lead, LeadChannel, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 
@@ -111,6 +112,7 @@ export function ImportLeadsDialog({
   onOpenChange: (open: boolean) => void;
   onImported: (leads: Lead[]) => void;
 }) {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -349,11 +351,11 @@ export function ImportLeadsDialog({
                           onValueChange={(v) => updateRow(r.key, { channel: v as LeadChannel })}
                         >
                           <SelectTrigger size="sm" className="h-7 text-xs w-[110px]">
-                            <SelectValue>{(v: LeadChannel) => CHANNELS.find((c) => c.value === v)?.label}</SelectValue>
+                            <SelectValue>{(v: LeadChannel) => { const c = CHANNELS.find((c) => c.value === v); return c && t(c.th, c.en, c.zh); }}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {CHANNELS.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                              <SelectItem key={c.value} value={c.value}>{t(c.th, c.en, c.zh)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -364,11 +366,11 @@ export function ImportLeadsDialog({
                           onValueChange={(v) => updateRow(r.key, { segment: v as LeadSegment })}
                         >
                           <SelectTrigger size="sm" className="h-7 text-xs w-[130px]">
-                            <SelectValue>{(v: LeadSegment) => SEGMENTS.find((s) => s.value === v)?.label}</SelectValue>
+                            <SelectValue>{(v: LeadSegment) => { const s = SEGMENTS.find((s) => s.value === v); return s && t(s.th, s.en, s.zh); }}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {SEGMENTS.map((s) => (
-                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                              <SelectItem key={s.value} value={s.value}>{t(s.th, s.en, s.zh)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -379,11 +381,11 @@ export function ImportLeadsDialog({
                           onValueChange={(v) => updateRow(r.key, { status: v as LeadStatus })}
                         >
                           <SelectTrigger size="sm" className="h-7 text-xs w-[160px]">
-                            <SelectValue>{(v: LeadStatus) => STATUSES.find((s) => s.value === v)?.label}</SelectValue>
+                            <SelectValue>{(v: LeadStatus) => { const s = STATUSES.find((s) => s.value === v); return s && t(s.th, s.en, s.zh); }}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {STATUSES.map((s) => (
-                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                              <SelectItem key={s.value} value={s.value}>{t(s.th, s.en, s.zh)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

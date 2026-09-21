@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLanguage } from "@/store/language";
 import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
@@ -25,15 +26,17 @@ function todayStr() {
 
 const BOARD_COLUMNS: {
   key: string;
-  label: string;
+  th: string;
+  en: string;
+  zh: string;
   statuses: LeadStatus[];
   header: string;
   body: string;
 }[] = [
-  { key: "A", label: "คอนเฟิร์ม / จ่ายเงินแล้ว", statuses: ["converted"], header: "bg-emerald-600", body: "bg-emerald-50/60 border-emerald-200" },
-  { key: "B", label: "รออนุมัติ (ส่งใบเสนอราคาแล้ว)", statuses: ["quoted"], header: "bg-amber-500", body: "bg-amber-50/60 border-amber-200" },
-  { key: "C", label: "ยังไม่ได้ตอบกลับ", statuses: ["new", "followed_1", "followed_2plus", "engaged"], header: "bg-orange-500", body: "bg-orange-50/60 border-orange-200" },
-  { key: "D", label: "ปฏิเสธ", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
+  { key: "A", th: "คอนเฟิร์ม / จ่ายเงินแล้ว", en: "Confirmed / Paid", zh: "已确认/已付款", statuses: ["converted"], header: "bg-emerald-600", body: "bg-emerald-50/60 border-emerald-200" },
+  { key: "B", th: "รออนุมัติ (ส่งใบเสนอราคาแล้ว)", en: "Pending Approval (Quote Sent)", zh: "待批准（已发报价单）", statuses: ["quoted"], header: "bg-amber-500", body: "bg-amber-50/60 border-amber-200" },
+  { key: "C", th: "ยังไม่ได้ตอบกลับ", en: "No Response Yet", zh: "尚未回复", statuses: ["new", "followed_1", "followed_2plus", "engaged"], header: "bg-orange-500", body: "bg-orange-50/60 border-orange-200" },
+  { key: "D", th: "ปฏิเสธ", en: "Rejected", zh: "已拒绝", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
 ];
 
 const emptyForm = {
@@ -60,6 +63,7 @@ const emptyForm = {
 };
 
 export default function KpiPage() {
+  const { t } = useLanguage();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -127,7 +131,7 @@ export default function KpiPage() {
       if (res.ok) {
         setForm((f) => ({ ...f, profile_image_url: data.url }));
       } else {
-        alert(data.error || "อัปโหลดรูปไม่สำเร็จ");
+        alert(data.error || t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
       }
     } finally {
       setUploadingPhoto(false);
@@ -165,7 +169,7 @@ export default function KpiPage() {
       }
       setDialogOpen(false);
     } else {
-      alert(data.error || "บันทึกไม่สำเร็จ");
+      alert(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
     }
   }
 
@@ -182,15 +186,15 @@ export default function KpiPage() {
       setLeads((ls) => ls.map((l) => (l.id === lead.id ? data.lead : l)));
     } else {
       setLeads(prevLeads);
-      alert("อัปเดตสถานะไม่สำเร็จ");
+      alert(t("อัปเดตสถานะไม่สำเร็จ", "Status update failed", "状态更新失败"));
     }
   }
 
   async function deleteLead(id: number) {
-    if (!confirm("ลบรายการติดตามนี้ใช่หรือไม่?")) return;
+    if (!confirm(t("ลบรายการติดตามนี้ใช่หรือไม่?", "Delete this tracked lead?", "确定要删除此跟进记录吗？"))) return;
     const res = await fetch(`/api/admin/leads/${id}`, { method: "DELETE" });
     if (res.ok) setLeads((ls) => ls.filter((l) => l.id !== id));
-    else alert("ลบไม่สำเร็จ");
+    else alert(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
   }
 
   // ── KPIs ──────────────────────────────────────────────────────────
@@ -227,12 +231,12 @@ export default function KpiPage() {
   const channelData = useMemo(
     () =>
       CHANNELS.map((c) => ({
-        channel: c.label,
+        channel: t(c.th, c.en, c.zh),
         count: leads.filter((l) => l.channel === c.value).length,
         converted: leads.filter((l) => l.channel === c.value && l.status === "converted").length,
         color: c.color,
       })),
-    [leads]
+    [leads, t]
   );
 
   const topSkus = useMemo(() => {
@@ -258,13 +262,14 @@ export default function KpiPage() {
         const converted = rows.filter((l) => l.status === "converted");
         const deals = converted.filter((l) => l.deal_value != null).map((l) => l.deal_value as number);
         return {
-          label: s.label,
+          key: s.value,
+          label: t(s.th, s.en, s.zh),
           count: rows.length,
           convertedCount: converted.length,
           aov: deals.length ? deals.reduce((a, b) => a + b, 0) / deals.length : null,
         };
       }),
-    [leads]
+    [leads, t]
   );
 
   function exportExcel() {
@@ -281,13 +286,13 @@ export default function KpiPage() {
           Channel: l.channel,
           Segment: l.segment,
           SKU: l.sku || "",
-          สถานะ: statusMeta(l.status).label,
+          สถานะ: statusMeta(l.status).th,
           ช่องทางติดต่อ: l.contact_method || "",
           "ไอดี/เบอร์ติดต่อ": l.contact_id || "",
           "รายละเอียดลูกค้า": l.customer_details || "",
-          "ติดต่อทางโทรศัพท์แล้ว": YES_NO_UNKNOWN.find((o) => o.value === l.phone_contacted)?.label || "",
-          "มีแปลนออฟฟิศ": YES_NO_UNKNOWN.find((o) => o.value === l.has_office_plan)?.label || "",
-          "จะมาโชว์รูม": YES_NO_UNKNOWN.find((o) => o.value === l.will_visit_showroom)?.label || "",
+          "ติดต่อทางโทรศัพท์แล้ว": YES_NO_UNKNOWN.find((o) => o.value === l.phone_contacted)?.th || "",
+          "มีแปลนออฟฟิศ": YES_NO_UNKNOWN.find((o) => o.value === l.has_office_plan)?.th || "",
+          "จะมาโชว์รูม": YES_NO_UNKNOWN.find((o) => o.value === l.will_visit_showroom)?.th || "",
           "ต้องการใช้ภายในวันที่": l.needed_by_date || "",
           หมายเหตุ: l.notes,
           ติดตามครั้งถัดไป: l.next_followup_date || "",
@@ -327,18 +332,20 @@ export default function KpiPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">KPI ติดตามลูกค้า</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">ติดตามลีดรายวัน แปลงเป็นออเดอร์ วัดผลแต่ละ channel</p>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("KPI ติดตามลูกค้า", "Lead Tracker KPI", "客户跟进KPI")}</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">
+            {t("ติดตามลีดรายวัน แปลงเป็นออเดอร์ วัดผลแต่ละ channel", "Track daily leads, convert to orders, measure each channel", "每日跟踪线索，转化为订单，衡量各渠道表现")}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload size={14} className="mr-1.5" /> นำเข้าจาก Excel
+            <Upload size={14} className="mr-1.5" /> {t("นำเข้าจาก Excel", "Import from Excel", "从Excel导入")}
           </Button>
           <Button size="sm" variant="outline" onClick={exportExcel} disabled={leads.length === 0}>
-            <Download size={14} className="mr-1.5" /> Export Excel
+            <Download size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
           <Button size="sm" onClick={openAdd}>
-            <Plus size={14} className="mr-1.5" /> เพิ่มลีด
+            <Plus size={14} className="mr-1.5" /> {t("เพิ่มลีด", "Add Lead", "添加线索")}
           </Button>
         </div>
       </div>
@@ -352,12 +359,12 @@ export default function KpiPage() {
       {/* ── KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Leads",     value: kpi.total,                                              sub: "▲ 20%/เดือน เป้าหมาย" },
-          { label: "Follow-up Rate",  value: `${kpi.followUpRate.toFixed(0)}%`,                       sub: "เป้า ≥ 80%" },
-          { label: "Response Rate",   value: `${kpi.responseRate.toFixed(0)}%`,                       sub: "เป้า ≥ 30%" },
-          { label: "Conversion Rate", value: `${kpi.conversionRate.toFixed(0)}%`,                     sub: "เป้า 10–15%" },
-          { label: "Cycle Time",      value: kpi.avgCycleDays != null ? `${kpi.avgCycleDays.toFixed(0)} วัน` : "-", sub: "เป้า ≤ 14 วัน" },
-          { label: "AOV",             value: kpi.aov != null ? kpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: "บาท/ออเดอร์" },
+          { label: "Total Leads",     value: kpi.total,                                              sub: t("▲ 20%/เดือน เป้าหมาย", "▲ 20%/mo target", "▲ 20%/月 目标") },
+          { label: t("อัตราติดตาม", "Follow-up Rate", "跟进率"),  value: `${kpi.followUpRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 80%", "Target ≥ 80%", "目标 ≥ 80%") },
+          { label: t("อัตราตอบรับ", "Response Rate", "回复率"),   value: `${kpi.responseRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 30%", "Target ≥ 30%", "目标 ≥ 30%") },
+          { label: t("อัตราปิดการขาย", "Conversion Rate", "转化率"), value: `${kpi.conversionRate.toFixed(0)}%`,                     sub: t("เป้า 10–15%", "Target 10–15%", "目标 10–15%") },
+          { label: t("ระยะเวลาปิดดีล", "Cycle Time", "成交周期"),      value: kpi.avgCycleDays != null ? `${kpi.avgCycleDays.toFixed(0)} ${t("วัน", "days", "天")}` : "-", sub: t("เป้า ≤ 14 วัน", "Target ≤ 14 days", "目标 ≤ 14天") },
+          { label: "AOV",             value: kpi.aov != null ? kpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: t("บาท/ออเดอร์", "THB/order", "泰铢/订单") },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl shadow-sm p-4">
             <p className="text-xs text-[#6B6B6B]">{c.label}</p>
@@ -370,9 +377,9 @@ export default function KpiPage() {
       {/* ── Channel chart + side panels ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-4">Leads ต่อ Channel</p>
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")}</p>
           {leads.length === 0 ? (
-            <p className="text-sm text-[#9CA3AF] text-center py-16">ยังไม่มีข้อมูล</p>
+            <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={channelData} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
@@ -387,8 +394,8 @@ export default function KpiPage() {
                     return (
                       <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
                         <p className="font-semibold text-[#1A1A1A]">{d.channel}</p>
-                        <p className="text-[#6B6B6B]">Leads: {d.count}</p>
-                        <p className="text-[#6B6B6B]">ปิดการขาย: {d.converted}</p>
+                        <p className="text-[#6B6B6B]">{t("ลีด", "Leads", "线索数")}: {d.count}</p>
+                        <p className="text-[#6B6B6B]">{t("ปิดการขาย", "Converted", "成交")}: {d.converted}</p>
                       </div>
                     );
                   }}
@@ -410,10 +417,10 @@ export default function KpiPage() {
             <p className="text-sm font-semibold text-[#1A1A1A] mb-3">B2B vs B2C</p>
             <div className="space-y-2">
               {segmentBreakdown.map((s) => (
-                <div key={s.label} className="flex items-center justify-between text-xs">
+                <div key={s.key} className="flex items-center justify-between text-xs">
                   <span className="text-[#6B6B6B]">{s.label}</span>
                   <span className="text-[#1A1A1A] font-medium">
-                    {s.count} ลีด · ปิด {s.convertedCount} · AOV {s.aov != null ? s.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-"}
+                    {s.count} {t("ลีด", "leads", "条线索")} · {t("ปิด", "closed", "成交")} {s.convertedCount} · AOV {s.aov != null ? s.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-"}
                   </span>
                 </div>
               ))}
@@ -422,15 +429,15 @@ export default function KpiPage() {
 
           {/* Top SKUs */}
           <div className="bg-white rounded-xl shadow-sm p-5">
-            <p className="text-sm font-semibold text-[#1A1A1A] mb-3">SKU ขายดี (ปิดการขาย)</p>
+            <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("SKU ขายดี (ปิดการขาย)", "Top SKUs (Converted)", "热销SKU（已成交）")}</p>
             {topSkus.length === 0 ? (
-              <p className="text-xs text-[#9CA3AF]">ยังไม่มีดีลที่ปิด</p>
+              <p className="text-xs text-[#9CA3AF]">{t("ยังไม่มีดีลที่ปิด", "No closed deals yet", "暂无已成交订单")}</p>
             ) : (
               <div className="space-y-1.5">
                 {topSkus.map(([sku, count]) => (
                   <div key={sku} className="flex items-center justify-between text-xs">
                     <span className="font-mono text-[#1A1A1A]">{sku}</span>
-                    <span className="text-[#6B6B6B]">{count} ดีล</span>
+                    <span className="text-[#6B6B6B]">{count} {t("ดีล", "deals", "单")}</span>
                   </div>
                 ))}
               </div>
@@ -440,14 +447,17 @@ export default function KpiPage() {
           {/* Lost reasons */}
           {lostReasons.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
-              <p className="text-sm font-semibold text-[#1A1A1A] mb-3">เหตุผลที่เสียดีล</p>
+              <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("เหตุผลที่เสียดีล", "Lost Deal Reasons", "流失原因")}</p>
               <div className="space-y-1.5">
-                {lostReasons.map(([reason, count]) => (
-                  <div key={reason} className="flex items-center justify-between text-xs">
-                    <span className="text-[#6B6B6B]">{LOST_REASONS.find((r) => r.value === reason)?.label || reason}</span>
-                    <span className="text-[#1A1A1A] font-medium">{count}</span>
-                  </div>
-                ))}
+                {lostReasons.map(([reason, count]) => {
+                  const r = LOST_REASONS.find((r) => r.value === reason);
+                  return (
+                    <div key={reason} className="flex items-center justify-between text-xs">
+                      <span className="text-[#6B6B6B]">{r ? t(r.th, r.en, r.zh) : reason}</span>
+                      <span className="text-[#1A1A1A] font-medium">{count}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -456,17 +466,17 @@ export default function KpiPage() {
 
       {/* ── Status board ─────────────────────────────────────────── */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">กำลังโหลด...</div>
+        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">{t("กำลังโหลด...", "Loading...", "加载中...")}</div>
       ) : leads.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
-          ยังไม่มีลีด — กด &quot;เพิ่มลีด&quot; เพื่อเริ่มบันทึก
+          {t('ยังไม่มีลีด — กด "เพิ่มลีด" เพื่อเริ่มบันทึก', 'No leads yet — click "Add Lead" to start tracking', '暂无线索 — 点击"添加线索"开始记录')}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
           {boardGroups.map((col) => (
             <div key={col.key} className={`rounded-xl border overflow-hidden ${col.body}`}>
               <div className={`${col.header} text-white px-4 py-2.5 flex items-center justify-between`}>
-                <p className="text-sm font-semibold">{col.label}</p>
+                <p className="text-sm font-semibold">{t(col.th, col.en, col.zh)}</p>
                 <span className="text-xs font-bold bg-white/25 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
                   {col.leads.length}
                 </span>
@@ -474,7 +484,7 @@ export default function KpiPage() {
 
               <div className="p-2.5 space-y-2.5 max-h-[70vh] overflow-y-auto">
                 {col.leads.length === 0 ? (
-                  <p className="text-xs text-[#9CA3AF] text-center py-6">ไม่มีรายการ</p>
+                  <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
                 ) : (
                   col.leads.map((lead) => {
                     const overdue =
@@ -496,10 +506,10 @@ export default function KpiPage() {
                             </div>
                           </div>
                           <div className="flex gap-0.5 shrink-0">
-                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label="แก้ไข">
+                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(lead)} aria-label={t("แก้ไข", "Edit", "编辑")}>
                               <Pencil size={13} />
                             </Button>
-                            <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label="ลบ">
+                            <Button size="icon-sm" variant="ghost" onClick={() => deleteLead(lead.id)} aria-label={t("ลบ", "Delete", "删除")}>
                               <Trash2 size={13} className="text-red-500" />
                             </Button>
                           </div>
@@ -507,7 +517,10 @@ export default function KpiPage() {
 
                         <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
                           <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">
-                            {CHANNELS.find((c) => c.value === lead.channel)?.label || lead.channel}
+                            {(() => {
+                              const c = CHANNELS.find((c) => c.value === lead.channel);
+                              return c ? t(c.th, c.en, c.zh) : lead.channel;
+                            })()}
                           </span>
                           {lead.sku && <span className="font-mono bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.sku}</span>}
                           <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.lead_date}</span>
@@ -516,8 +529,8 @@ export default function KpiPage() {
                         {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
 
                         <div className={`text-[10px] ${overdue ? "text-red-600 font-semibold" : "text-[#9CA3AF]"}`}>
-                          ติดตามถัดไป: {lead.next_followup_date || "-"}
-                          {overdue && " ⚠ เลยกำหนด"}
+                          {t("ติดตามถัดไป", "Next follow-up", "下次跟进")}: {lead.next_followup_date || "-"}
+                          {overdue && ` ⚠ ${t("เลยกำหนด", "Overdue", "已逾期")}`}
                         </div>
 
                         <Select value={lead.status} onValueChange={(v) => quickSetStatus(lead, v as LeadStatus)}>
@@ -525,12 +538,12 @@ export default function KpiPage() {
                             size="sm"
                             className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${statusMeta(lead.status).color}`}
                           >
-                            <SelectValue>{(v: LeadStatus) => statusMeta(v).label}</SelectValue>
+                            <SelectValue>{(v: LeadStatus) => { const m = statusMeta(v); return t(m.th, m.en, m.zh); }}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {STATUSES.map((s) => (
                               <SelectItem key={s.value} value={s.value}>
-                                {s.label}
+                                {t(s.th, s.en, s.zh)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -549,7 +562,7 @@ export default function KpiPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl sm:max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editing ? "แก้ไขลีด" : "เพิ่มลีดใหม่"}</DialogTitle>
+            <DialogTitle>{editing ? t("แก้ไขลีด", "Edit Lead", "编辑线索") : t("เพิ่มลีดใหม่", "Add New Lead", "添加新线索")}</DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
@@ -563,7 +576,7 @@ export default function KpiPage() {
                 <label>
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium border rounded-md px-3 py-1.5 cursor-pointer bg-white hover:bg-[#F0EDE6]">
                     {uploadingPhoto ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
-                    {uploadingPhoto ? "กำลังอัปโหลด..." : "อัปโหลดรูป"}
+                    {uploadingPhoto ? t("กำลังอัปโหลด...", "Uploading...", "上传中...") : t("อัปโหลดรูป", "Upload Photo", "上传照片")}
                   </span>
                   <input
                     type="file"
@@ -581,30 +594,30 @@ export default function KpiPage() {
 
               <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
-                  <Label className="text-sm">ชื่อลูกค้า</Label>
+                  <Label className="text-sm">{t("ชื่อลูกค้า", "Customer Name", "客户名称")}</Label>
                   <Input
                     className="mt-1 text-base h-11"
                     value={form.customer_name}
                     onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-                    placeholder="เช่น คุณสมชาย"
+                    placeholder={t("เช่น คุณสมชาย", "e.g. Somchai", "例如：陈先生")}
                   />
                 </div>
                 <div>
-                  <Label className="text-sm">หมายเลขลูกค้า (Customer ID)</Label>
+                  <Label className="text-sm">{t("หมายเลขลูกค้า (Customer ID)", "Customer ID", "客户编号")}</Label>
                   <Input
                     className="mt-1"
                     value={form.customer_id}
                     onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                    placeholder="เช่น C-0012"
+                    placeholder={t("เช่น C-0012", "e.g. C-0012", "例如：C-0012")}
                   />
                 </div>
                 <div>
-                  <Label className="text-sm">ที่อยู่</Label>
+                  <Label className="text-sm">{t("ที่อยู่", "Address", "地址")}</Label>
                   <Input
                     className="mt-1"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="ที่อยู่ลูกค้า/บริษัท"
+                    placeholder={t("ที่อยู่ลูกค้า/บริษัท", "Customer/company address", "客户/公司地址")}
                   />
                 </div>
               </div>
@@ -612,7 +625,7 @@ export default function KpiPage() {
 
             <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>วันที่ติดตาม</Label>
+              <Label>{t("วันที่ติดตาม", "Lead Date", "跟进日期")}</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -622,116 +635,116 @@ export default function KpiPage() {
             </div>
 
             <div>
-              <Label>Channel ต้นทาง</Label>
+              <Label>{t("Channel ต้นทาง", "Source Channel", "来源渠道")}</Label>
               <Select value={form.channel} onValueChange={(v) => setForm({ ...form, channel: v as LeadChannel })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: LeadChannel) => CHANNELS.find((c) => c.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: LeadChannel) => { const c = CHANNELS.find((c) => c.value === v); return c && t(c.th, c.en, c.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CHANNELS.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    <SelectItem key={c.value} value={c.value}>{t(c.th, c.en, c.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Segment</Label>
+              <Label>{t("กลุ่มลูกค้า (Segment)", "Segment", "客户类型")}</Label>
               <Select value={form.segment} onValueChange={(v) => setForm({ ...form, segment: v as LeadSegment })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: LeadSegment) => SEGMENTS.find((s) => s.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: LeadSegment) => { const s = SEGMENTS.find((s) => s.value === v); return s && t(s.th, s.en, s.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {SEGMENTS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    <SelectItem key={s.value} value={s.value}>{t(s.th, s.en, s.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>SKU สินค้าที่สนใจ</Label>
+              <Label>{t("SKU สินค้าที่สนใจ", "Interested SKU", "感兴趣的SKU")}</Label>
               <Input
                 className="mt-1 font-mono"
                 value={form.sku}
                 onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                placeholder="เช่น YN-01-4"
+                placeholder={t("เช่น YN-01-4", "e.g. YN-01-4", "例如：YN-01-4")}
               />
             </div>
             <div>
-              <Label>ช่องทางติดต่อ</Label>
+              <Label>{t("ช่องทางติดต่อ", "Contact Method", "联系方式")}</Label>
               <Select value={form.contact_method} onValueChange={(v) => setForm({ ...form, contact_method: v as LeadContactMethod })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: LeadContactMethod) => CONTACT_METHODS.find((m) => m.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: LeadContactMethod) => { const m = CONTACT_METHODS.find((m) => m.value === v); return m && t(m.th, m.en, m.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CONTACT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    <SelectItem key={m.value} value={m.value}>{t(m.th, m.en, m.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>ไอดี/เบอร์ติดต่อ</Label>
+              <Label>{t("ไอดี/เบอร์ติดต่อ", "Contact ID / Number", "联系ID/号码")}</Label>
               <Input
                 className="mt-1"
                 value={form.contact_id}
                 onChange={(e) => setForm({ ...form, contact_id: e.target.value })}
-                placeholder="LINE ID / WeChat ID / เบอร์โทร"
+                placeholder={t("LINE ID / WeChat ID / เบอร์โทร", "LINE ID / WeChat ID / phone", "LINE ID / 微信号 / 电话")}
               />
             </div>
 
             <div className="col-span-2">
-              <Label>รายละเอียดของลูกค้า</Label>
+              <Label>{t("รายละเอียดของลูกค้า", "Customer Details", "客户详情")}</Label>
               <Textarea
                 className="mt-1"
                 rows={2}
                 value={form.customer_details}
                 onChange={(e) => setForm({ ...form, customer_details: e.target.value })}
-                placeholder="ธุรกิจ, ความต้องการเบื้องต้น, บริบทลูกค้า"
+                placeholder={t("ธุรกิจ, ความต้องการเบื้องต้น, บริบทลูกค้า", "Business, initial needs, customer context", "业务、初步需求、客户背景")}
               />
             </div>
 
             <div>
-              <Label>มีการติดต่อทางโทรศัพท์หรือไม่?</Label>
+              <Label>{t("มีการติดต่อทางโทรศัพท์หรือไม่?", "Contacted by phone?", "是否已电话联系？")}</Label>
               <Select value={form.phone_contacted} onValueChange={(v) => setForm({ ...form, phone_contacted: v as YesNoUnknown })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: YesNoUnknown) => { const o = YES_NO_UNKNOWN.find((o) => o.value === v); return o && t(o.th, o.en, o.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    <SelectItem key={o.value} value={o.value}>{t(o.th, o.en, o.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>มีแปลนออฟฟิศไหม?</Label>
+              <Label>{t("มีแปลนออฟฟิศไหม?", "Has office floor plan?", "是否有办公室平面图？")}</Label>
               <Select value={form.has_office_plan} onValueChange={(v) => setForm({ ...form, has_office_plan: v as YesNoUnknown })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: YesNoUnknown) => { const o = YES_NO_UNKNOWN.find((o) => o.value === v); return o && t(o.th, o.en, o.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    <SelectItem key={o.value} value={o.value}>{t(o.th, o.en, o.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>ลูกค้าจะมาที่โชว์รูมไหม?</Label>
+              <Label>{t("ลูกค้าจะมาที่โชว์รูมไหม?", "Will visit showroom?", "客户会到展厅吗？")}</Label>
               <Select value={form.will_visit_showroom} onValueChange={(v) => setForm({ ...form, will_visit_showroom: v as YesNoUnknown })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                  <SelectValue>{(v: YesNoUnknown) => { const o = YES_NO_UNKNOWN.find((o) => o.value === v); return o && t(o.th, o.en, o.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    <SelectItem key={o.value} value={o.value}>{t(o.th, o.en, o.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>ต้องการใช้เฟอร์นิเจอร์ภายในวันที่</Label>
+              <Label>{t("ต้องการใช้เฟอร์นิเจอร์ภายในวันที่", "Furniture needed by", "所需家具截止日期")}</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -741,14 +754,14 @@ export default function KpiPage() {
             </div>
 
             <div className="col-span-2">
-              <Label>สถานะติดตาม</Label>
+              <Label>{t("สถานะติดตาม", "Follow-up Status", "跟进状态")}</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}>
                 <SelectTrigger className="mt-1 w-full">
-                  <SelectValue>{(v: LeadStatus) => statusMeta(v).label}</SelectValue>
+                  <SelectValue>{(v: LeadStatus) => { const m = statusMeta(v); return t(m.th, m.en, m.zh); }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {STATUSES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    <SelectItem key={s.value} value={s.value}>{t(s.th, s.en, s.zh)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -756,16 +769,19 @@ export default function KpiPage() {
 
             {form.status === "lost" && (
               <div className="col-span-2">
-                <Label>เหตุผลที่เสียลูกค้า</Label>
+                <Label>{t("เหตุผลที่เสียลูกค้า", "Reason Lost", "流失原因")}</Label>
                 <Select value={form.lost_reason} onValueChange={(v) => setForm({ ...form, lost_reason: v ?? "" })}>
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue>
-                      {(v: string) => LOST_REASONS.find((r) => r.value === v)?.label || "เลือกเหตุผล"}
+                      {(v: string) => {
+                        const r = LOST_REASONS.find((r) => r.value === v);
+                        return r ? t(r.th, r.en, r.zh) : t("เลือกเหตุผล", "Select a reason", "选择原因");
+                      }}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {LOST_REASONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      <SelectItem key={r.value} value={r.value}>{t(r.th, r.en, r.zh)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -773,7 +789,7 @@ export default function KpiPage() {
             )}
 
             <div>
-              <Label>วันติดตามครั้งถัดไป</Label>
+              <Label>{t("วันติดตามครั้งถัดไป", "Next Follow-up Date", "下次跟进日期")}</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -782,33 +798,37 @@ export default function KpiPage() {
               />
             </div>
             <div>
-              <Label>มูลค่าดีล (บาท) — ถ้าปิดการขายแล้ว</Label>
+              <Label>{t("มูลค่าดีล (บาท) — ถ้าปิดการขายแล้ว", "Deal Value (THB) — if converted", "订单金额（泰铢）— 如已成交")}</Label>
               <Input
                 type="number"
                 className="mt-1"
                 value={form.deal_value}
                 onChange={(e) => setForm({ ...form, deal_value: e.target.value })}
-                placeholder="เช่น 9900"
+                placeholder={t("เช่น 9900", "e.g. 9900", "例如：9900")}
               />
             </div>
 
             <div className="col-span-2">
-              <Label>ติดตามรายละเอียดเพิ่มเติม</Label>
+              <Label>{t("ติดตามรายละเอียดเพิ่มเติม", "Additional Follow-up Notes", "更多跟进详情")}</Label>
               <Textarea
                 className="mt-1"
                 rows={3}
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="บันทึกการสนทนา / ป้ายกำกับต่อไป"
+                placeholder={t("บันทึกการสนทนา / ป้ายกำกับต่อไป", "Conversation notes / next steps", "对话记录/下一步安排")}
               />
             </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t("ยกเลิก", "Cancel", "取消")}</Button>
             <Button onClick={saveLead} disabled={saving || !form.customer_name.trim()}>
-              {saving ? "กำลังบันทึก..." : editing ? "บันทึกการแก้ไข" : "เพิ่มลีด"}
+              {saving
+                ? t("กำลังบันทึก...", "Saving...", "保存中...")
+                : editing
+                  ? t("บันทึกการแก้ไข", "Save Changes", "保存修改")
+                  : t("เพิ่มลีด", "Add Lead", "添加线索")}
             </Button>
           </DialogFooter>
         </DialogContent>

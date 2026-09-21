@@ -21,6 +21,70 @@ type Row = Pick<
 // gets a full-width band up top; everything else sits in a row underneath.
 const OTHER_STATUSES = STATUS_ORDER.filter((s) => s !== "awaiting_shipment");
 
+// Defined at module scope (not inside ShippingPage) so it keeps a stable
+// component identity across re-renders — nesting it in the page body made
+// every card (and its Select) remount whenever rows/loading changed, which
+// is why the status dropdown would flash the raw enum value instead of its
+// translated label.
+function QuoteCard({
+  r,
+  t,
+  onStatusChange,
+}: {
+  r: Row;
+  t: (th: string, en: string, zh?: string) => string;
+  onStatusChange: (id: number, status: SavedQuoteStatus) => void;
+}) {
+  const deposit = computeDepositAmount(r.items, r.discount_pct, r.vat_pct, r.deposit_pct);
+  return (
+    <div className="bg-[#FAF7F2] rounded-lg p-3 space-y-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium leading-tight truncate">{r.customer_name || "-"}</p>
+          <p className="text-[10px] text-[#9CA3AF] font-mono">{r.doc_no}</p>
+        </div>
+        <Link href={`/admin/quote-builder?open=${r.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+          {t("เปิด", "Open", "打开")}
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
+        <span className="bg-white rounded px-1.5 py-0.5">{t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}</span>
+        <span className="bg-white rounded px-1.5 py-0.5">{t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}</span>
+        <span className="bg-white rounded px-1.5 py-0.5">{r.doc_date}</span>
+      </div>
+
+      {r.shipping_date && (
+        <p className="text-[10px] text-[#6B6B6B]">
+          {t("กำหนดส่ง", "Ship by", "发货日期")}: {r.shipping_date}
+        </p>
+      )}
+      {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
+      {deposit > 0 && (
+        <p className="text-xs font-medium text-[#1A1A1A]">
+          {t("มัดจำ", "Deposit", "定金")}: ฿{fmtMoney(deposit)} ({r.deposit_pct}%)
+        </p>
+      )}
+
+      <Select value={r.status} onValueChange={(v) => onStatusChange(r.id, v as SavedQuoteStatus)}>
+        <SelectTrigger
+          size="sm"
+          className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUS_ORDER.map((s) => (
+            <SelectItem key={s} value={s}>
+              {t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function ShippingPage() {
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
@@ -84,57 +148,6 @@ export default function ShippingPage() {
     [rows]
   );
 
-  function Card({ r }: { r: Row }) {
-    const deposit = computeDepositAmount(r.items, r.discount_pct, r.vat_pct, r.deposit_pct);
-    return (
-      <div className="bg-[#FAF7F2] rounded-lg p-3 space-y-1.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-medium leading-tight truncate">{r.customer_name || "-"}</p>
-            <p className="text-[10px] text-[#9CA3AF] font-mono">{r.doc_no}</p>
-          </div>
-          <Link href={`/admin/quote-builder?open=${r.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
-            {t("เปิด", "Open", "打开")}
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
-          <span className="bg-white rounded px-1.5 py-0.5">{t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}</span>
-          <span className="bg-white rounded px-1.5 py-0.5">{t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}</span>
-          <span className="bg-white rounded px-1.5 py-0.5">{r.doc_date}</span>
-        </div>
-
-        {r.shipping_date && (
-          <p className="text-[10px] text-[#6B6B6B]">
-            {t("กำหนดส่ง", "Ship by", "发货日期")}: {r.shipping_date}
-          </p>
-        )}
-        {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
-        {deposit > 0 && (
-          <p className="text-xs font-medium text-[#1A1A1A]">
-            {t("มัดจำ", "Deposit", "定金")}: ฿{fmtMoney(deposit)} ({r.deposit_pct}%)
-          </p>
-        )}
-
-        <Select value={r.status} onValueChange={(v) => updateStatus(r.id, v as SavedQuoteStatus)}>
-          <SelectTrigger
-            size="sm"
-            className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_ORDER.map((s) => (
-              <SelectItem key={s} value={s}>
-                {t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -178,7 +191,7 @@ export default function ShippingPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {awaitingShipment.map((r) => (
-                    <Card key={r.id} r={r} />
+                    <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />
                   ))}
                 </div>
               )}
@@ -201,7 +214,7 @@ export default function ShippingPage() {
                     {col.rows.length === 0 ? (
                       <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
                     ) : (
-                      col.rows.map((r) => <Card key={r.id} r={r} />)
+                      col.rows.map((r) => <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />)
                     )}
                   </div>
                 </div>

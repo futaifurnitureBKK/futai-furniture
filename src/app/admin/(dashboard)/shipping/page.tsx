@@ -28,17 +28,35 @@ export default function ShippingPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      if (!cancelled) setLoading(true);
+
+    async function fetchRows(showSpinner: boolean) {
+      if (showSpinner && !cancelled) setLoading(true);
       const res = await fetch("/api/admin/saved-quotes");
       const data = await res.json();
       if (!cancelled) {
         if (res.ok) setRows(data.quotes);
         setLoading(false);
       }
-    })();
+    }
+
+    fetchRows(true);
+
+    // Status is often changed from quote-builder on a different tab or a
+    // previous visit to this page — refetch whenever the tab regains focus
+    // instead of trusting whatever we last loaded.
+    function onFocus() {
+      fetchRows(false);
+    }
+    function onVisibility() {
+      if (document.visibilityState === "visible") fetchRows(false);
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

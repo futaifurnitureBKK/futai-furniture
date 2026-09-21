@@ -23,14 +23,6 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
-      {
-        // The shipping page prints a delivery note by loading this page in a
-        // hidden iframe (no visible navigation away). SAMEORIGIN still blocks
-        // every other site from framing it — only pages on this same domain
-        // can, which is what the print flow needs.
-        source: "/admin/quote-builder",
-        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
-      },
     ];
   },
 };

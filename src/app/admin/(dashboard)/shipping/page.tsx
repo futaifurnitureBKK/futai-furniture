@@ -32,10 +32,12 @@ function QuoteCard({
   r,
   t,
   onStatusChange,
+  onPrint,
 }: {
   r: Row;
   t: (th: string, en: string, zh?: string) => string;
   onStatusChange: (id: number, status: SavedQuoteStatus) => void;
+  onPrint: (id: number) => void;
 }) {
   const deposit = computeDepositAmount(r.items, r.discount_pct, r.vat_pct, r.deposit_pct);
   return (
@@ -94,13 +96,14 @@ function QuoteCard({
           ))}
         </SelectContent>
       </Select>
-      <Link
-        href={`/admin/quote-builder?open=${r.id}&print=1`}
+      <button
+        type="button"
+        onClick={() => onPrint(r.id)}
         className={buttonVariants({ size: "icon-sm", variant: "outline" })}
         title={t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
       >
         <Printer size={13} />
-      </Link>
+      </button>
       </div>
     </div>
   );
@@ -154,6 +157,25 @@ export default function ShippingPage() {
       body: JSON.stringify({ status }),
     });
     if (!res.ok) setRows(prev);
+  }
+
+  // Print without leaving this page: load quote-builder (which already
+  // auto-prints on ?print=1) inside a hidden iframe instead of navigating
+  // the whole tab there. The iframe needs real dimensions off-screen —
+  // display:none or 0x0 makes some browsers refuse to render/print it.
+  function printDocument(id: number) {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.top = "-10000px";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "800px";
+    iframe.style.height = "1000px";
+    iframe.style.border = "0";
+    iframe.src = `/admin/quote-builder?open=${id}&print=1`;
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      iframe.remove();
+    }, 60000);
   }
 
   const awaitingShipment = useMemo(
@@ -212,7 +234,7 @@ export default function ShippingPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {awaitingShipment.map((r) => (
-                    <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />
+                    <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} onPrint={printDocument} />
                   ))}
                 </div>
               )}
@@ -235,7 +257,9 @@ export default function ShippingPage() {
                     {col.rows.length === 0 ? (
                       <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
                     ) : (
-                      col.rows.map((r) => <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />)
+                      col.rows.map((r) => (
+                        <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} onPrint={printDocument} />
+                      ))
                     )}
                   </div>
                 </div>

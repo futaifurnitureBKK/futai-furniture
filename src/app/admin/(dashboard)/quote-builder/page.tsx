@@ -1,8 +1,8 @@
 "use client";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -516,6 +516,29 @@ function QuoteBuilderInner() {
     });
   }
 
+  // Print the delivery note in one click without having to switch tabs
+  // first. Switching doc type re-renders the preview, so the actual print
+  // has to wait a tick until that's done — otherwise it'd print whatever
+  // was showing before the switch. A ref (not state) coordinates this since
+  // it's an internal signal, not something the UI renders off of.
+  const pendingDeliveryPrintRef = useRef(false);
+  useEffect(() => {
+    if (docType === "delivery_note" && pendingDeliveryPrintRef.current) {
+      pendingDeliveryPrintRef.current = false;
+      const id = requestAnimationFrame(() => window.print());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [docType]);
+
+  function printDeliveryNote() {
+    if (docType === "delivery_note") {
+      window.print();
+    } else {
+      pendingDeliveryPrintRef.current = true;
+      setDocTypeAndPrefix("delivery_note");
+    }
+  }
+
   function updateItem(id: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
@@ -832,6 +855,9 @@ function QuoteBuilderInner() {
               <FileSpreadsheet size={14} className="mr-1.5" />
             )}
             {generatingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
+          </Button>
+          <Button variant="outline" onClick={printDeliveryNote}>
+            <Truck size={14} className="mr-1.5" /> {t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
           </Button>
           <Button onClick={() => window.print()}>
             <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}

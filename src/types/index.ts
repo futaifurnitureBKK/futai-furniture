@@ -53,6 +53,21 @@ export type SavedQuoteDocType = "quotation" | "invoice" | "delivery_note";
 export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
 export type SavedQuoteStatus = "pending" | "in_progress" | "confirmed" | "awaiting_shipment" | "completed";
 export type SavedQuoteChannel = "facebook" | "shopee" | "tiktok" | "other";
+export type PaymentMethod = "cash" | "transfer" | "credit_card" | "cheque" | "other";
+export type PaymentType = "deposit" | "additional" | "full" | "other";
+
+export interface SavedQuotePayment {
+  id: number;
+  quote_id: number;
+  paid_date: string;
+  amount: number;
+  percent: number | null;
+  payment_type: PaymentType;
+  method: PaymentMethod;
+  slip_url: string | null;
+  note: string | null;
+  created_at: string;
+}
 
 export interface SavedQuoteItem {
   name: string;
@@ -83,6 +98,7 @@ export interface SavedQuote {
   shipping_date: string | null;
   contact_person: string;
   contact_phone: string;
+  salesperson: string | null;
   discount_pct: number;
   vat_pct: number;
   deposit_pct: number;

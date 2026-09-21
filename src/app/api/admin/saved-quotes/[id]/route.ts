@@ -17,6 +17,7 @@ const EDITABLE_FIELDS = [
   "shipping_date",
   "contact_person",
   "contact_phone",
+  "salesperson",
   "discount_pct",
   "vat_pct",
   "deposit_pct",

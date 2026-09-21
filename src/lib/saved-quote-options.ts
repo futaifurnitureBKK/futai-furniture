@@ -1,4 +1,4 @@
-import type { SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuoteItem } from "@/types";
+import type { SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuoteItem, PaymentMethod, PaymentType } from "@/types";
 
 export interface TriText {
   th: string;
@@ -28,6 +28,27 @@ export const CHANNEL_META: Record<SavedQuoteChannel, { th: string; en: string; z
   other:    { th: "อื่นๆ",    en: "Other",    zh: "其他",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
 };
 export const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok", "other"];
+
+// Who's assigned to look after this order — a fixed roster the company
+// keeps, not free text, so it stays consistent across quotes.
+export const SALESPEOPLE = ["Jacob", "Kan", "Xiaoying", "P'Jane", "P'NEE"];
+
+export const PAYMENT_METHOD_META: Record<PaymentMethod, TriText> = {
+  cash:        { th: "เงินสด",     en: "Cash",           zh: "现金" },
+  transfer:    { th: "โอนเงิน",    en: "Bank Transfer",  zh: "银行转账" },
+  credit_card: { th: "บัตรเครดิต", en: "Credit Card",    zh: "信用卡" },
+  cheque:      { th: "เช็ค",       en: "Cheque",         zh: "支票" },
+  other:       { th: "อื่นๆ",      en: "Other",          zh: "其他" },
+};
+export const PAYMENT_METHOD_ORDER: PaymentMethod[] = ["cash", "transfer", "credit_card", "cheque", "other"];
+
+export const PAYMENT_TYPE_META: Record<PaymentType, TriText> = {
+  deposit:    { th: "เงินมัดจำ",       en: "Deposit",           zh: "定金" },
+  additional: { th: "ชำระเพิ่มเติม",   en: "Additional Payment", zh: "追加付款" },
+  full:       { th: "ชำระเต็มจำนวน",   en: "Full Payment",      zh: "全额付款" },
+  other:      { th: "อื่นๆ",           en: "Other",             zh: "其他" },
+};
+export const PAYMENT_TYPE_ORDER: PaymentType[] = ["deposit", "additional", "full", "other"];
 
 // Mirrors the pricing math in quote-builder: subtotal -> discount -> VAT ->
 // grand total -> deposit. Kept here so any page listing saved quotes can

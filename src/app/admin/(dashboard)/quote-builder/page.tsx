@@ -16,8 +16,11 @@ import {
 } from "@/components/ui/select";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
-import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
-import { STATUS_META, STATUS_ORDER, CHANNEL_META, CHANNEL_ORDER } from "@/lib/saved-quote-options";
+import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuotePayment, PaymentMethod, PaymentType } from "@/types";
+import {
+  STATUS_META, STATUS_ORDER, CHANNEL_META, CHANNEL_ORDER,
+  SALESPEOPLE, PAYMENT_METHOD_META, PAYMENT_METHOD_ORDER, PAYMENT_TYPE_META, PAYMENT_TYPE_ORDER,
+} from "@/lib/saved-quote-options";
 import type ExcelJS from "exceljs";
 
 type DocType = SavedQuoteDocType;
@@ -128,6 +131,7 @@ const TXT = {
     en: "This document is valid for 30 days from the issue date.",
     zh: "报价有效期30天。",
   },
+  salesperson:  { th: "ผู้ดูแลออเดอร์",             en: "Sales",                  zh: "负责人" },
   sellerSign:   { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
   buyerSign:    { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
   receiverSign: { th: "ลายเซ็นผู้รับสินค้า",       en: "Received By",            zh: "收货人签名" },
@@ -357,6 +361,171 @@ function ImageUploadTile({ image, onChange }: { image: string | null; onChange: 
   );
 }
 
+function emptyPaymentForm() {
+  return {
+    paid_date: todayStr(),
+    amount: "",
+    percent: "",
+    payment_type: "deposit" as PaymentType,
+    method: "transfer" as PaymentMethod,
+    slip_url: null as string | null,
+    note: "",
+  };
+}
+
+// Deposit/payment tracking for a saved quote — attach a slip, log the %,
+// method, etc. Only meaningful once the quote has an id, since payments
+// belong to a specific saved record.
+function PaymentsSection({ quoteId }: { quoteId: number | null }) {
+  const { t } = useLanguage();
+  const [payments, setPayments] = useState<SavedQuotePayment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(emptyPaymentForm());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!quoteId) {
+        if (!cancelled) setPayments([]);
+        return;
+      }
+      setLoading(true);
+      const res = await fetch(`/api/admin/saved-quotes/${quoteId}/payments`);
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) setPayments(data.payments);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteId]);
+
+  async function addPayment() {
+    if (!quoteId) return;
+    setSaving(true);
+    const res = await fetch(`/api/admin/saved-quotes/${quoteId}/payments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paid_date: form.paid_date,
+        amount: Number(form.amount) || 0,
+        percent: form.percent === "" ? null : Number(form.percent),
+        payment_type: form.payment_type,
+        method: form.method,
+        slip_url: form.slip_url,
+        note: form.note,
+      }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      setPayments((prev) => [...prev, data.payment]);
+      setForm(emptyPaymentForm());
+      toast.success(t("บันทึกการชำระเงินแล้ว", "Payment saved", "已保存付款记录"));
+    } else {
+      toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    }
+  }
+
+  async function removePayment(id: number) {
+    if (!quoteId) return;
+    const prev = payments;
+    setPayments((list) => list.filter((p) => p.id !== id));
+    const res = await fetch(`/api/admin/saved-quotes/${quoteId}/payments/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setPayments(prev);
+      toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
+    }
+  }
+
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <p className="text-sm font-semibold text-[#1A1A1A]">{t("การชำระเงิน", "Payments", "付款记录")}</p>
+
+      {!quoteId ? (
+        <p className="text-xs text-[#9CA3AF]">
+          {t("บันทึกใบนี้ก่อน ถึงจะเพิ่มรายการชำระเงินได้", "Save this document first to add payments", "请先保存文件才能添加付款记录")}
+        </p>
+      ) : (
+        <>
+          {payments.length > 0 && (
+            <div className="space-y-2">
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-start gap-2 border border-[#E8E5E0] rounded-lg p-2.5">
+                  {p.slip_url && (
+                    <a href={p.slip_url} target="_blank" rel="noreferrer" className="relative w-12 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                      <Image src={p.slip_url} alt="" fill sizes="48px" className="object-cover" />
+                    </a>
+                  )}
+                  <div className="flex-1 min-w-0 text-xs">
+                    <p className="font-medium text-[#1A1A1A]">
+                      ฿{fmtMoney(p.amount)}
+                      {p.percent != null && <span className="text-[#6B6B6B]"> ({p.percent}%)</span>}
+                      <span className="text-[#6B6B6B]"> · {t(PAYMENT_TYPE_META[p.payment_type].th, PAYMENT_TYPE_META[p.payment_type].en, PAYMENT_TYPE_META[p.payment_type].zh)}</span>
+                    </p>
+                    <p className="text-[#6B6B6B]">
+                      {p.paid_date} · {t(PAYMENT_METHOD_META[p.method].th, PAYMENT_METHOD_META[p.method].en, PAYMENT_METHOD_META[p.method].zh)}
+                    </p>
+                    {p.note && <p className="text-[#9CA3AF]">{p.note}</p>}
+                  </div>
+                  <button type="button" onClick={() => removePayment(p.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600 shrink-0">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <p className="text-right text-xs text-[#6B6B6B]">
+                {t("ชำระแล้วรวม", "Total paid", "已付合计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(totalPaid)}</span>
+              </p>
+            </div>
+          )}
+          {loading && <p className="text-xs text-[#9CA3AF]">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>}
+
+          <div className="border border-dashed border-[#E8E5E0] rounded-lg p-3 space-y-2">
+            <div className="flex gap-2">
+              <ImageUploadTile image={form.slip_url} onChange={(url) => setForm((f) => ({ ...f, slip_url: url }))} />
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                <Input type="date" className="h-8 text-xs" value={form.paid_date} onChange={(e) => setForm((f) => ({ ...f, paid_date: e.target.value }))} />
+                <Input type="number" className="h-8 text-xs" placeholder={t("จำนวนเงิน", "Amount", "金额")} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Input type="number" className="h-8 text-xs" placeholder="%" value={form.percent} onChange={(e) => setForm((f) => ({ ...f, percent: e.target.value }))} />
+              <Select value={form.payment_type} onValueChange={(v) => setForm((f) => ({ ...f, payment_type: v as PaymentType }))}>
+                <SelectTrigger size="sm" className="h-8 text-xs">
+                  <SelectValue>{(v: PaymentType) => t(PAYMENT_TYPE_META[v].th, PAYMENT_TYPE_META[v].en, PAYMENT_TYPE_META[v].zh)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_TYPE_ORDER.map((v) => (
+                    <SelectItem key={v} value={v}>{t(PAYMENT_TYPE_META[v].th, PAYMENT_TYPE_META[v].en, PAYMENT_TYPE_META[v].zh)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={form.method} onValueChange={(v) => setForm((f) => ({ ...f, method: v as PaymentMethod }))}>
+                <SelectTrigger size="sm" className="h-8 text-xs">
+                  <SelectValue>{(v: PaymentMethod) => t(PAYMENT_METHOD_META[v].th, PAYMENT_METHOD_META[v].en, PAYMENT_METHOD_META[v].zh)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHOD_ORDER.map((v) => (
+                    <SelectItem key={v} value={v}>{t(PAYMENT_METHOD_META[v].th, PAYMENT_METHOD_META[v].en, PAYMENT_METHOD_META[v].zh)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="button" size="sm" className="w-full" disabled={saving || !form.amount} onClick={addPayment}>
+              <Plus size={13} className="mr-1" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("เพิ่มรายการชำระเงิน", "Add Payment", "添加付款记录")}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function QuoteBuilderInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
@@ -372,6 +541,7 @@ function QuoteBuilderInner() {
   const [shippingDate, setShippingDate] = useState("");
   const [customerContact, setCustomerContact] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [salesperson, setSalesperson] = useState("");
   const [discountPct, setDiscountPct] = useState(0);
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
@@ -425,6 +595,7 @@ function QuoteBuilderInner() {
     setShippingDate("");
     setCustomerContact("");
     setCustomerPhone("");
+    setSalesperson("");
     setDiscountPct(0);
     setVatPct(7);
     setDepositPct(50);
@@ -446,6 +617,7 @@ function QuoteBuilderInner() {
       shipping_date: shippingDate || null,
       contact_person: customerContact,
       contact_phone: customerPhone,
+      salesperson: salesperson || null,
       discount_pct: discountPct,
       vat_pct: vatPct,
       deposit_pct: depositPct,
@@ -501,6 +673,7 @@ function QuoteBuilderInner() {
     setShippingDate(q.shipping_date || "");
     setCustomerContact(q.contact_person);
     setCustomerPhone(q.contact_phone);
+    setSalesperson(q.salesperson || "");
     setDiscountPct(q.discount_pct ?? 0);
     setVatPct(q.vat_pct);
     setDepositPct(q.deposit_pct);
@@ -1195,6 +1368,20 @@ function QuoteBuilderInner() {
                 <Label>{t("หมายเลขโทรศัพท์", "Phone", "电话")}</Label>
                 <Input className="mt-1" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
               </div>
+              <div className="col-span-2">
+                <Label>{t("ผู้ดูแลออเดอร์", "Sales / Order Owner", "负责人")}</Label>
+                <Select value={salesperson || "__none"} onValueChange={(v) => setSalesperson(!v || v === "__none" ? "" : v)}>
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue>{(v: string) => (v === "__none" ? t("ยังไม่ระบุ", "Not set", "未设置") : v)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">{t("ยังไม่ระบุ", "Not set", "未设置")}</SelectItem>
+                    {SALESPEOPLE.map((name) => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -1324,6 +1511,8 @@ function QuoteBuilderInner() {
               </div>
             </div>
           )}
+
+          <PaymentsSection quoteId={savedId} />
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
@@ -1509,6 +1698,10 @@ function QuoteBuilderInner() {
                 </tr>
               </tbody>
             </table>
+
+            {salesperson && (
+              <p className="text-[10px] text-[#1A1A1A] mb-2">{L(TXT.salesperson)}: {salesperson}</p>
+            )}
 
             {!isDeliveryNote && (
               <>

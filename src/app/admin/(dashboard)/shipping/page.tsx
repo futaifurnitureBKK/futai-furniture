@@ -48,17 +48,20 @@ function QuoteCard({
         </Link>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
-        <span className="bg-white rounded px-1.5 py-0.5">{t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}</span>
-        <span className="bg-white rounded px-1.5 py-0.5">{t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}</span>
-        <span className="bg-white rounded px-1.5 py-0.5">{r.doc_date}</span>
-      </div>
-
       {r.shipping_date && (
-        <p className="text-[10px] text-[#6B6B6B]">
+        <p className="text-sm font-bold text-purple-700">
           {t("กำหนดส่ง", "Ship by", "发货日期")}: {r.shipping_date}
         </p>
       )}
+
+      <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
+        <span className="bg-white rounded px-1.5 py-0.5">{t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}</span>
+        <span className="bg-white rounded px-1.5 py-0.5">{t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}</span>
+        <span className="bg-white rounded px-1.5 py-0.5">
+          {t("สร้าง", "Created", "创建")} {r.doc_date}
+        </span>
+      </div>
+
       {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
       {deposit > 0 && (
         <p className="text-xs font-medium text-[#1A1A1A]">

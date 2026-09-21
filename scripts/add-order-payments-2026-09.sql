@@ -17,3 +17,8 @@ create table if not exists saved_quote_payments (
 );
 
 create index if not exists saved_quote_payments_quote_id_idx on saved_quote_payments (quote_id);
+
+-- Locked down like saved_quotes: no anon/public policies. Only the
+-- service-role key (used server-side in src/app/api/admin/saved-quotes/**)
+-- can read or write this table.
+alter table saved_quote_payments enable row level security;

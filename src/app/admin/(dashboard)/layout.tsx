@@ -24,12 +24,12 @@ import { useLanguage } from "@/store/language";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const NAV = [
+  { href: "/admin/shipping",          labelTh: "จัดส่งสินค้า",  labelEn: "Shipping",     labelZh: "发货",       icon: Truck },
   { href: "/admin",                   labelTh: "Dashboard",    labelEn: "Dashboard",    labelZh: "仪表盘",     icon: LayoutDashboard },
   { href: "/admin/pos",               labelTh: "POS",          labelEn: "POS",          labelZh: "收银台",     icon: MonitorPlay },
   { href: "/admin/orders",            labelTh: "คำสั่งซื้อ",   labelEn: "Orders",       labelZh: "订单",       icon: ShoppingBag },
   { href: "/admin/quotes",            labelTh: "ใบเสนอราคา",  labelEn: "Quotes",       labelZh: "报价单",     icon: FileText },
   { href: "/admin/quote-builder",     labelTh: "สร้างใบเสนอราคา", labelEn: "Quote Builder", labelZh: "生成报价单", icon: Receipt },
-  { href: "/admin/shipping",          labelTh: "จัดส่งสินค้า",  labelEn: "Shipping",     labelZh: "发货",       icon: Truck },
   { href: "/admin/kpi",               labelTh: "KPI ติดตามลูกค้า", labelEn: "Lead Tracker", labelZh: "客户跟进",   icon: Target },
   { href: "/admin/products",          labelTh: "สินค้า",       labelEn: "Products",     labelZh: "产品",       icon: Package },
   { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus },

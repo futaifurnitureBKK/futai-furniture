@@ -38,9 +38,11 @@ export const PAYMENT_METHOD_META: Record<PaymentMethod, TriText> = {
   transfer:    { th: "โอนเงิน",    en: "Bank Transfer",  zh: "银行转账" },
   credit_card: { th: "บัตรเครดิต", en: "Credit Card",    zh: "信用卡" },
   cheque:      { th: "เช็ค",       en: "Cheque",         zh: "支票" },
+  alipay:      { th: "Alipay",     en: "Alipay",         zh: "支付宝" },
+  wechat:      { th: "WeChat Pay", en: "WeChat Pay",     zh: "微信支付" },
   other:       { th: "อื่นๆ",      en: "Other",          zh: "其他" },
 };
-export const PAYMENT_METHOD_ORDER: PaymentMethod[] = ["cash", "transfer", "credit_card", "cheque", "other"];
+export const PAYMENT_METHOD_ORDER: PaymentMethod[] = ["cash", "transfer", "credit_card", "cheque", "alipay", "wechat", "other"];
 
 export const PAYMENT_TYPE_META: Record<PaymentType, TriText> = {
   deposit:    { th: "เงินมัดจำ",       en: "Deposit",           zh: "定金" },

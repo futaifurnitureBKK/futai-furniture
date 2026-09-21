@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Printer, UserRound, FileText, MapPin, CalendarDays, Phone, CheckCircle2, Search, ChevronRight } from "lucide-react";
+import { Printer, UserRound, FileText, MapPin, CalendarDays, Phone, CheckCircle2, Search, ChevronRight, StickyNote } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -19,7 +19,7 @@ type PaymentRow = Pick<SavedQuotePayment, "id" | "paid_date" | "amount" | "perce
 type Row = Pick<
   SavedQuote,
   | "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel"
-  | "shipping_date" | "shipping_address" | "contact_person" | "contact_phone" | "salesperson"
+  | "shipping_date" | "shipping_address" | "contact_person" | "contact_phone" | "salesperson" | "notes"
   | "items" | "discount_pct" | "vat_pct" | "deposit_pct" | "updated_at"
 > & { saved_quote_payments: PaymentRow[] };
 
@@ -115,6 +115,8 @@ function QuoteCard({
           </div>
         </div>
       )}
+
+      {r.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2 italic">{r.notes}</p>}
 
       <div className="flex items-center gap-1.5">
       <Select value={r.status} onValueChange={(v) => onStatusChange(r.id, v as SavedQuoteStatus)}>
@@ -302,6 +304,13 @@ function AwaitingShipmentCard({
           {t("ยังไม่มีการบันทึกการชำระเงิน", "No payment recorded yet", "尚无付款记录")}
         </div>
       )}
+
+      <div className="bg-[#FAF7F2] rounded-xl px-2.5 py-2">
+        <p className="text-[8.5px] uppercase tracking-wide text-[#9CA3AF] flex items-center gap-1">
+          <StickyNote size={10} /> {t("หมายเหตุ", "Note", "备注")}
+        </p>
+        <p className="text-xs text-[#1A1A1A] mt-0.5 whitespace-pre-line line-clamp-3">{r.notes || "-"}</p>
+      </div>
 
       <div className="flex items-center gap-2 pt-0.5">
         <Link

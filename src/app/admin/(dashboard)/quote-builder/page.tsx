@@ -541,6 +541,7 @@ function QuoteBuilderInner() {
   const [customerContact, setCustomerContact] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [salesperson, setSalesperson] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
   const [discountPct, setDiscountPct] = useState(0);
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
@@ -595,6 +596,7 @@ function QuoteBuilderInner() {
     setCustomerContact("");
     setCustomerPhone("");
     setSalesperson("");
+    setOrderNotes("");
     setDiscountPct(0);
     setVatPct(7);
     setDepositPct(50);
@@ -617,6 +619,7 @@ function QuoteBuilderInner() {
       contact_person: customerContact,
       contact_phone: customerPhone,
       salesperson: salesperson || null,
+      notes: orderNotes,
       discount_pct: discountPct,
       vat_pct: vatPct,
       deposit_pct: depositPct,
@@ -673,6 +676,7 @@ function QuoteBuilderInner() {
     setCustomerContact(q.contact_person);
     setCustomerPhone(q.contact_phone);
     setSalesperson(q.salesperson || "");
+    setOrderNotes(q.notes || "");
     setDiscountPct(q.discount_pct ?? 0);
     setVatPct(q.vat_pct);
     setDepositPct(q.deposit_pct);
@@ -1380,6 +1384,16 @@ function QuoteBuilderInner() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>{t("หมายเหตุ", "Note", "备注")}</Label>
+                <Textarea
+                  className="mt-1"
+                  rows={2}
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder={t("บันทึกภายใน เช่น เงื่อนไขพิเศษ", "Internal note, e.g. special terms", "内部备注，如特殊条款")}
+                />
               </div>
             </div>
           </div>

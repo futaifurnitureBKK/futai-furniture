@@ -99,6 +99,7 @@ export interface SavedQuote {
   contact_person: string;
   contact_phone: string;
   salesperson: string | null;
+  notes: string;
   discount_pct: number;
   vat_pct: number;
   deposit_pct: number;

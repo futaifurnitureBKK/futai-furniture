@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("saved_quotes")
-    .select("id, doc_type, doc_no, customer_name, doc_date, status, archived, channel, shipping_date, shipping_address, contact_person, contact_phone, items, discount_pct, vat_pct, deposit_pct, updated_at")
+    .select(
+      "id, doc_type, doc_no, customer_name, doc_date, status, archived, channel, shipping_date, shipping_address, contact_person, contact_phone, salesperson, items, discount_pct, vat_pct, deposit_pct, updated_at, saved_quote_payments(id, paid_date, amount, percent, payment_type, method, slip_url)"
+    )
     .eq("archived", archived)
     .order("updated_at", { ascending: false });
   if (error) {

@@ -1,23 +1,26 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Printer } from "lucide-react";
+import Image from "next/image";
+import { Printer, UserRound } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/store/language";
 import {
-  STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS, computeDepositAmount, fmtMoney,
+  STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS, PAYMENT_TYPE_META, computeDepositAmount, fmtMoney,
 } from "@/lib/saved-quote-options";
-import type { SavedQuote, SavedQuoteStatus } from "@/types";
+import type { SavedQuote, SavedQuoteStatus, SavedQuotePayment } from "@/types";
+
+type PaymentRow = Pick<SavedQuotePayment, "id" | "paid_date" | "amount" | "percent" | "payment_type" | "method" | "slip_url">;
 
 type Row = Pick<
   SavedQuote,
   | "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel"
-  | "shipping_date" | "shipping_address" | "contact_person" | "contact_phone"
+  | "shipping_date" | "shipping_address" | "contact_person" | "contact_phone" | "salesperson"
   | "items" | "discount_pct" | "vat_pct" | "deposit_pct" | "updated_at"
->;
+> & { saved_quote_payments: PaymentRow[] };
 
 // The "awaiting shipment" status is what this page exists to answer, so it
 // gets a full-width band up top; everything else sits in a row underneath.
@@ -62,6 +65,11 @@ function QuoteCard({
         <span className="bg-white rounded px-1.5 py-0.5">
           {t("สร้าง", "Created", "创建")} {r.doc_date}
         </span>
+        {r.salesperson && (
+          <span className="bg-indigo-50 text-indigo-700 rounded px-1.5 py-0.5 inline-flex items-center gap-1 font-medium">
+            <UserRound size={10} /> {r.salesperson}
+          </span>
+        )}
       </div>
 
       {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
@@ -78,6 +86,33 @@ function QuoteCard({
         <p className="text-xs font-medium text-[#1A1A1A]">
           {t("มัดจำ", "Deposit", "定金")}: ฿{fmtMoney(deposit)} ({r.deposit_pct}%)
         </p>
+      )}
+
+      {r.saved_quote_payments && r.saved_quote_payments.length > 0 && (
+        <div className="bg-emerald-50 rounded-md px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] uppercase tracking-wide text-emerald-700/70">{t("ชำระเงินแล้ว", "Paid", "已付款")}</p>
+            <p className="text-xs font-bold text-emerald-700">
+              ฿{fmtMoney(r.saved_quote_payments.reduce((sum, p) => sum + p.amount, 0))}
+            </p>
+          </div>
+          <div className="flex gap-1.5 flex-wrap mt-1">
+            {r.saved_quote_payments
+              .filter((p) => p.slip_url)
+              .map((p) => (
+                <a
+                  key={p.id}
+                  href={p.slip_url as string}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`฿${fmtMoney(p.amount)} · ${p.paid_date} · ${t(PAYMENT_TYPE_META[p.payment_type].th, PAYMENT_TYPE_META[p.payment_type].en, PAYMENT_TYPE_META[p.payment_type].zh)}`}
+                  className="relative w-9 h-9 rounded overflow-hidden border border-white shadow-sm shrink-0 hover:opacity-80 transition-opacity"
+                >
+                  <Image src={p.slip_url as string} alt="" fill sizes="36px" className="object-cover" />
+                </a>
+              ))}
+          </div>
+        </div>
       )}
 
       <div className="flex items-center gap-1.5">

@@ -164,9 +164,7 @@ function AwaitingShipmentCard({
   const remaining = Math.max(grandTotal - totalPaid, 0);
   const paidPct = grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0;
   const remainingPct = grandTotal > 0 ? 100 - paidPct : 0;
-  const latestPayment = r.saved_quote_payments.length
-    ? [...r.saved_quote_payments].sort((a, b) => (a.paid_date < b.paid_date ? 1 : -1))[0]
-    : null;
+  const sortedPayments = [...r.saved_quote_payments].sort((a, b) => (a.paid_date < b.paid_date ? 1 : -1));
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-[#E8E5E0] p-4 space-y-3">
@@ -270,34 +268,46 @@ function AwaitingShipmentCard({
         </div>
       </div>
 
-      {latestPayment ? (
-        <div className="bg-emerald-50 rounded-xl p-2.5 flex items-center gap-2.5">
-          {latestPayment.slip_url && (
-            <a
-              href={latestPayment.slip_url}
-              target="_blank"
-              rel="noreferrer"
-              className="relative w-11 h-11 rounded-lg overflow-hidden border border-white shadow-sm shrink-0"
-            >
-              <Image src={latestPayment.slip_url} alt="" fill sizes="44px" className="object-cover" />
-            </a>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[#1A1A1A]">{t("หลักฐานการชำระเงิน", "Payment Evidence", "付款凭证")}</p>
-            <p className="text-[11px] text-emerald-700 flex items-center gap-1 mt-0.5">
-              <CheckCircle2 size={11} /> {t("ชำระแล้ว", "Paid", "已付款")} {latestPayment.paid_date}
-            </p>
-          </div>
-          {latestPayment.slip_url && (
-            <a
-              href={latestPayment.slip_url}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ size: "sm", variant: "outline", className: "shrink-0" })}
-            >
-              <Search size={12} className="mr-1" /> {t("ดูหลักฐาน", "View", "查看")}
-            </a>
-          )}
+      {sortedPayments.length > 0 ? (
+        <div className="bg-emerald-50 rounded-xl p-2.5 space-y-1.5">
+          <p className="text-xs font-semibold text-[#1A1A1A] flex items-center gap-1">
+            <CheckCircle2 size={12} className="text-emerald-600" /> {t("หลักฐานการชำระเงิน", "Payment Evidence", "付款凭证")}
+          </p>
+          {sortedPayments.map((p) => (
+            <div key={p.id} className="flex items-center gap-2.5 bg-white/70 rounded-lg p-1.5">
+              {p.slip_url ? (
+                <a
+                  href={p.slip_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="relative w-10 h-10 rounded-lg overflow-hidden border border-white shadow-sm shrink-0"
+                >
+                  <Image src={p.slip_url} alt="" fill sizes="40px" className="object-cover" />
+                </a>
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-[#F5F3EF] shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-[#1A1A1A]">
+                  ฿{fmtMoney(p.amount)}{p.percent != null && ` (${p.percent}%)`}
+                </p>
+                <p className="text-[10px] text-emerald-700">
+                  {p.paid_date} · {t(PAYMENT_TYPE_META[p.payment_type].th, PAYMENT_TYPE_META[p.payment_type].en, PAYMENT_TYPE_META[p.payment_type].zh)}
+                </p>
+              </div>
+              {p.slip_url && (
+                <a
+                  href={p.slip_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ size: "icon-sm", variant: "outline", className: "shrink-0" })}
+                  title={t("ดูหลักฐาน", "View", "查看")}
+                >
+                  <Search size={12} />
+                </a>
+              )}
+            </div>
+          ))}
         </div>
       ) : (
         <div className="bg-[#F5F3EF] rounded-xl p-2.5 text-center text-xs text-[#9CA3AF]">

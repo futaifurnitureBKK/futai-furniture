@@ -5,25 +5,24 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS } from "@/lib/saved-quote-options";
+import { useLanguage } from "@/store/language";
+import {
+  STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS, computeDepositAmount, fmtMoney,
+} from "@/lib/saved-quote-options";
 import type { SavedQuote, SavedQuoteStatus } from "@/types";
-
-// This page exists to answer "what needs shipping" — lead with that
-// column and give it more room than the rest.
-const DISPLAY_ORDER: SavedQuoteStatus[] = [
-  "awaiting_shipment",
-  "confirmed",
-  "in_progress",
-  "pending",
-  "completed",
-];
 
 type Row = Pick<
   SavedQuote,
-  "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel" | "shipping_date" | "shipping_address" | "updated_at"
+  | "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel"
+  | "shipping_date" | "shipping_address" | "items" | "discount_pct" | "vat_pct" | "deposit_pct" | "updated_at"
 >;
 
+// The "awaiting shipment" status is what this page exists to answer, so it
+// gets a full-width band up top; everything else sits in a row underneath.
+const OTHER_STATUSES = STATUS_ORDER.filter((s) => s !== "awaiting_shipment");
+
 export default function ShippingPage() {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,108 +53,143 @@ export default function ShippingPage() {
     if (!res.ok) setRows(prev);
   }
 
-  const columns = useMemo(
+  const awaitingShipment = useMemo(
     () =>
-      DISPLAY_ORDER.map((s) => {
-        const colRows = rows.filter((r) => r.status === s);
-        if (s === "awaiting_shipment") {
-          colRows.sort((a, b) => (a.shipping_date || "9999").localeCompare(b.shipping_date || "9999"));
-        }
-        return { key: s, rows: colRows };
-      }),
+      rows
+        .filter((r) => r.status === "awaiting_shipment")
+        .sort((a, b) => (a.shipping_date || "9999").localeCompare(b.shipping_date || "9999")),
     [rows]
   );
+
+  const otherColumns = useMemo(
+    () => OTHER_STATUSES.map((s) => ({ key: s, rows: rows.filter((r) => r.status === s) })),
+    [rows]
+  );
+
+  function Card({ r }: { r: Row }) {
+    const deposit = computeDepositAmount(r.items, r.discount_pct, r.vat_pct, r.deposit_pct);
+    return (
+      <div className="bg-[#FAF7F2] rounded-lg p-3 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-tight truncate">{r.customer_name || "-"}</p>
+            <p className="text-[10px] text-[#9CA3AF] font-mono">{r.doc_no}</p>
+          </div>
+          <Link href={`/admin/quote-builder?open=${r.id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+            {t("เปิด", "Open", "打开")}
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
+          <span className="bg-white rounded px-1.5 py-0.5">{t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}</span>
+          <span className="bg-white rounded px-1.5 py-0.5">{t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}</span>
+          <span className="bg-white rounded px-1.5 py-0.5">{r.doc_date}</span>
+        </div>
+
+        {r.shipping_date && (
+          <p className="text-[10px] text-[#6B6B6B]">
+            {t("กำหนดส่ง", "Ship by", "发货日期")}: {r.shipping_date}
+          </p>
+        )}
+        {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
+        {deposit > 0 && (
+          <p className="text-xs font-medium text-[#1A1A1A]">
+            {t("มัดจำ", "Deposit", "定金")}: ฿{fmtMoney(deposit)} ({r.deposit_pct}%)
+          </p>
+        )}
+
+        <Select value={r.status} onValueChange={(v) => updateStatus(r.id, v as SavedQuoteStatus)}>
+          <SelectTrigger
+            size="sm"
+            className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_ORDER.map((s) => (
+              <SelectItem key={s} value={s}>
+                {t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">จัดส่งสินค้า</h1>
+        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดส่งสินค้า", "Shipping", "发货")}</h1>
         <p className="text-sm text-[#6B6B6B] mt-0.5">
-          ติดตามสถานะใบเสนอราคา/ใบแจ้งหนี้/ใบส่งของ ตั้งแต่รอตอบกลับจนถึงจัดส่งเสร็จ
+          {t(
+            "ติดตามสถานะใบเสนอราคา/ใบแจ้งหนี้/ใบส่งของ ตั้งแต่รอตอบกลับจนถึงจัดส่งเสร็จ",
+            "Track quotation/invoice/delivery note status from awaiting response through to shipped",
+            "跟踪报价单/发票/送货单状态，从待回复到发货完成"
+          )}
         </p>
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">กำลังโหลด...</div>
+        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
+          {t("กำลังโหลด...", "Loading...", "加载中...")}
+        </div>
       ) : rows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
-          ยังไม่มีเอกสาร — สร้างได้ที่หน้า &quot;สร้างใบเสนอราคา&quot;
+          {t(
+            'ยังไม่มีเอกสาร — สร้างได้ที่หน้า "สร้างใบเสนอราคา"',
+            'No documents yet — create one from "Quote Builder"',
+            '暂无文件 — 请到"生成报价单"页面创建'
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-start">
-          {columns.map((col) => {
-            const meta = STATUS_META[col.key];
-            const isMain = col.key === "awaiting_shipment";
-            return (
-              <div
-                key={col.key}
-                className={`rounded-xl border overflow-hidden bg-white ${
-                  isMain ? "xl:col-span-2 ring-2 ring-purple-300" : ""
-                }`}
-              >
-                <div className={`px-4 py-3 flex items-center justify-between ${meta.color}`}>
-                  <p className={isMain ? "text-base font-bold" : "text-sm font-semibold"}>{meta.th}</p>
-                  <span className="text-xs font-bold bg-black/10 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
-                    {col.rows.length}
-                  </span>
+        <div className="space-y-4">
+          {/* Awaiting shipment — full width, top */}
+          <div className="rounded-xl border-2 border-purple-300 bg-white overflow-hidden">
+            <div className={`px-4 py-3 flex items-center justify-between ${STATUS_META.awaiting_shipment.color}`}>
+              <p className="text-base font-bold">
+                {t(STATUS_META.awaiting_shipment.th, STATUS_META.awaiting_shipment.en, STATUS_META.awaiting_shipment.zh)}
+              </p>
+              <span className="text-xs font-bold bg-black/10 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                {awaitingShipment.length}
+              </span>
+            </div>
+            <div className="p-3 max-h-[55vh] overflow-y-auto">
+              {awaitingShipment.length === 0 ? (
+                <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {awaitingShipment.map((r) => (
+                    <Card key={r.id} r={r} />
+                  ))}
                 </div>
+              )}
+            </div>
+          </div>
 
-                <div
-                  className={`p-2.5 gap-2.5 max-h-[70vh] overflow-y-auto ${
-                    isMain ? "grid grid-cols-1 sm:grid-cols-2 content-start" : "space-y-2.5"
-                  }`}
-                >
-                  {col.rows.length === 0 ? (
-                    <p className="text-xs text-[#9CA3AF] text-center py-6 col-span-full">ไม่มีรายการ</p>
-                  ) : (
-                    col.rows.map((r) => (
-                      <div key={r.id} className="bg-[#FAF7F2] rounded-lg p-3 space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium leading-tight truncate">{r.customer_name || "-"}</p>
-                            <p className="text-[10px] text-[#9CA3AF] font-mono">{r.doc_no}</p>
-                          </div>
-                          <Link
-                            href={`/admin/quote-builder?open=${r.id}`}
-                            className={buttonVariants({ size: "sm", variant: "outline" })}
-                          >
-                            เปิด
-                          </Link>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-[#6B6B6B]">
-                          <span className="bg-white rounded px-1.5 py-0.5">{DOC_LABELS[r.doc_type].th}</span>
-                          <span className="bg-white rounded px-1.5 py-0.5">{CHANNEL_META[r.channel].th}</span>
-                          <span className="bg-white rounded px-1.5 py-0.5">{r.doc_date}</span>
-                        </div>
-
-                        {r.shipping_date && <p className="text-[10px] text-[#6B6B6B]">กำหนดส่ง: {r.shipping_date}</p>}
-                        {r.shipping_address && (
-                          <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>
-                        )}
-
-                        <Select value={r.status} onValueChange={(v) => updateStatus(r.id, v as SavedQuoteStatus)}>
-                          <SelectTrigger
-                            size="sm"
-                            className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUS_ORDER.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {STATUS_META[s].th}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ))
-                  )}
+          {/* Other statuses — row underneath */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+            {otherColumns.map((col) => {
+              const meta = STATUS_META[col.key];
+              return (
+                <div key={col.key} className="rounded-xl border overflow-hidden bg-white">
+                  <div className={`px-4 py-2.5 flex items-center justify-between ${meta.color}`}>
+                    <p className="text-sm font-semibold">{t(meta.th, meta.en, meta.zh)}</p>
+                    <span className="text-xs font-bold bg-black/10 rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                      {col.rows.length}
+                    </span>
+                  </div>
+                  <div className="p-2.5 space-y-2.5 max-h-[60vh] overflow-y-auto">
+                    {col.rows.length === 0 ? (
+                      <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
+                    ) : (
+                      col.rows.map((r) => <Card key={r.id} r={r} />)
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

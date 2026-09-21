@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("saved_quotes")
-    .select("id, doc_type, doc_no, customer_name, doc_date, status, archived, channel, shipping_date, shipping_address, updated_at")
+    .select("id, doc_type, doc_no, customer_name, doc_date, status, archived, channel, shipping_date, shipping_address, items, discount_pct, vat_pct, deposit_pct, updated_at")
     .eq("archived", archived)
     .order("updated_at", { ascending: false });
   if (error) {

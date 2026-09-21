@@ -1,4 +1,4 @@
-import type { SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
+import type { SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuoteItem } from "@/types";
 
 export interface TriText {
   th: string;
@@ -28,3 +28,22 @@ export const CHANNEL_META: Record<SavedQuoteChannel, { th: string; en: string; z
   other:    { th: "อื่นๆ",    en: "Other",    zh: "其他",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
 };
 export const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok", "other"];
+
+// Mirrors the pricing math in quote-builder: subtotal -> discount -> VAT ->
+// grand total -> deposit. Kept here so any page listing saved quotes can
+// show the deposit amount without re-deriving the formula.
+export function computeDepositAmount(
+  items: SavedQuoteItem[],
+  discountPct: number,
+  vatPct: number,
+  depositPct: number
+): number {
+  const subtotal = items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
+  const afterDiscount = subtotal - subtotal * (discountPct / 100);
+  const grandTotal = afterDiscount + afterDiscount * (vatPct / 100);
+  return grandTotal * (depositPct / 100);
+}
+
+export function fmtMoney(n: number): string {
+  return n.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}

@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
@@ -15,28 +16,12 @@ import {
 } from "@/components/ui/select";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { useLanguage } from "@/store/language";
-import type { SavedQuote, SavedQuoteItem, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
+import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel } from "@/types";
+import { STATUS_META, STATUS_ORDER, CHANNEL_META, CHANNEL_ORDER } from "@/lib/saved-quote-options";
 import type ExcelJS from "exceljs";
 
-type DocType = "quotation" | "invoice" | "delivery_note";
+type DocType = SavedQuoteDocType;
 type LangMode = "th-en-zh" | "th-en" | "th-zh";
-
-const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string; color: string }> = {
-  pending:            { th: "รอการตอบกลับ",       en: "Awaiting Response", zh: "待回复",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
-  in_progress:        { th: "กำลังดำเนินการ",     en: "In Progress",       zh: "进行中",     color: "bg-blue-100 text-blue-700" },
-  confirmed:          { th: "คอนเฟิร์ม/รอชำระ",   en: "Confirmed / Awaiting Payment", zh: "已确认/待付款", color: "bg-yellow-100 text-yellow-700" },
-  awaiting_shipment:  { th: "รอจัดส่ง",           en: "Awaiting Shipment", zh: "待发货",     color: "bg-purple-100 text-purple-700" },
-  completed:          { th: "จัดส่งเสร็จแล้ว",     en: "Shipped / Completed", zh: "已发货/完成", color: "bg-green-100 text-green-700" },
-};
-const STATUS_ORDER: SavedQuoteStatus[] = ["pending", "in_progress", "confirmed", "awaiting_shipment", "completed"];
-
-const CHANNEL_META: Record<SavedQuoteChannel, { th: string; en: string; zh: string; color: string }> = {
-  facebook: { th: "Facebook", en: "Facebook", zh: "Facebook", color: "bg-blue-100 text-blue-700" },
-  shopee:   { th: "Shopee",   en: "Shopee",   zh: "Shopee",   color: "bg-orange-100 text-orange-700" },
-  tiktok:   { th: "TikTok",   en: "TikTok",   zh: "TikTok",   color: "bg-[#1A1A1A]/10 text-[#1A1A1A]" },
-  other:    { th: "อื่นๆ",    en: "Other",    zh: "其他",     color: "bg-[#E8E5E0] text-[#6B6B6B]" },
-};
-const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok", "other"];
 
 interface TriText {
   th: string;
@@ -297,8 +282,9 @@ function ImageUploadTile({ image, onChange }: { image: string | null; onChange: 
   );
 }
 
-export default function QuoteBuilderPage() {
+function QuoteBuilderInner() {
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [docType, setDocType] = useState<DocType>("quotation");
   const [langMode, setLangMode] = useState<LangMode>("th-en-zh");
   const [docNo, setDocNo] = useState(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
@@ -454,6 +440,15 @@ export default function QuoteBuilderPage() {
     );
     setListOpen(false);
   }
+
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId) return;
+    (async () => {
+      await loadQuote(Number(openId));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   async function updateSavedStatus(id: number, status: SavedQuoteStatus) {
     const prev = savedList;
@@ -1410,5 +1405,13 @@ export default function QuoteBuilderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function QuoteBuilderPage() {
+  return (
+    <Suspense fallback={null}>
+      <QuoteBuilderInner />
+    </Suspense>
   );
 }

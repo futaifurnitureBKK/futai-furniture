@@ -901,7 +901,9 @@ function QuoteBuilderInner() {
                           size="sm"
                           className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${CHANNEL_META[q.channel].color}`}
                         >
-                          <SelectValue />
+                          <SelectValue>
+                            {(v: SavedQuoteChannel) => t(CHANNEL_META[v].th, CHANNEL_META[v].en, CHANNEL_META[v].zh)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {CHANNEL_ORDER.map((c) => (
@@ -918,7 +920,9 @@ function QuoteBuilderInner() {
                           size="sm"
                           className={`h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[q.status].color}`}
                         >
-                          <SelectValue />
+                          <SelectValue>
+                            {(v: SavedQuoteStatus) => t(STATUS_META[v].th, STATUS_META[v].en, STATUS_META[v].zh)}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {STATUS_ORDER.map((s) => (
@@ -1127,7 +1131,7 @@ function QuoteBuilderInner() {
                         }}
                       >
                         <SelectTrigger size="sm" className="h-8 text-xs">
-                          <SelectValue />
+                          <SelectValue>{(v: string) => `${v} ${t("ที่นั่ง", "seats", "座")}`}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {SEAT_OPTIONS.map((n) => (

@@ -525,7 +525,7 @@ export default function KpiPage() {
                             size="sm"
                             className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${statusMeta(lead.status).color}`}
                           >
-                            <SelectValue />
+                            <SelectValue>{(v: LeadStatus) => statusMeta(v).label}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {STATUSES.map((s) => (
@@ -624,7 +624,9 @@ export default function KpiPage() {
             <div>
               <Label>Channel ต้นทาง</Label>
               <Select value={form.channel} onValueChange={(v) => setForm({ ...form, channel: v as LeadChannel })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: LeadChannel) => CHANNELS.find((c) => c.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {CHANNELS.map((c) => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
@@ -635,7 +637,9 @@ export default function KpiPage() {
             <div>
               <Label>Segment</Label>
               <Select value={form.segment} onValueChange={(v) => setForm({ ...form, segment: v as LeadSegment })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: LeadSegment) => SEGMENTS.find((s) => s.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {SEGMENTS.map((s) => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
@@ -656,7 +660,9 @@ export default function KpiPage() {
             <div>
               <Label>ช่องทางติดต่อ</Label>
               <Select value={form.contact_method} onValueChange={(v) => setForm({ ...form, contact_method: v as LeadContactMethod })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: LeadContactMethod) => CONTACT_METHODS.find((m) => m.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {CONTACT_METHODS.map((m) => (
                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
@@ -688,7 +694,9 @@ export default function KpiPage() {
             <div>
               <Label>มีการติดต่อทางโทรศัพท์หรือไม่?</Label>
               <Select value={form.phone_contacted} onValueChange={(v) => setForm({ ...form, phone_contacted: v as YesNoUnknown })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -699,7 +707,9 @@ export default function KpiPage() {
             <div>
               <Label>มีแปลนออฟฟิศไหม?</Label>
               <Select value={form.has_office_plan} onValueChange={(v) => setForm({ ...form, has_office_plan: v as YesNoUnknown })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -710,7 +720,9 @@ export default function KpiPage() {
             <div>
               <Label>ลูกค้าจะมาที่โชว์รูมไหม?</Label>
               <Select value={form.will_visit_showroom} onValueChange={(v) => setForm({ ...form, will_visit_showroom: v as YesNoUnknown })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: YesNoUnknown) => YES_NO_UNKNOWN.find((o) => o.value === v)?.label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {YES_NO_UNKNOWN.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -731,7 +743,9 @@ export default function KpiPage() {
             <div className="col-span-2">
               <Label>สถานะติดตาม</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: LeadStatus) => statusMeta(v).label}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {STATUSES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
@@ -744,7 +758,11 @@ export default function KpiPage() {
               <div className="col-span-2">
                 <Label>เหตุผลที่เสียลูกค้า</Label>
                 <Select value={form.lost_reason} onValueChange={(v) => setForm({ ...form, lost_reason: v ?? "" })}>
-                  <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="เลือกเหตุผล" /></SelectTrigger>
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue>
+                      {(v: string) => LOST_REASONS.find((r) => r.value === v)?.label || "เลือกเหตุผล"}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {LOST_REASONS.map((r) => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>

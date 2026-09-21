@@ -71,7 +71,7 @@ function QuoteCard({
           size="sm"
           className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
         >
-          <SelectValue />
+          <SelectValue>{(v: SavedQuoteStatus) => t(STATUS_META[v].th, STATUS_META[v].en, STATUS_META[v].zh)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {STATUS_ORDER.map((s) => (

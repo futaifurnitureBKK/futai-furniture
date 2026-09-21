@@ -348,7 +348,9 @@ export function ImportLeadsDialog({
                           value={r.channel}
                           onValueChange={(v) => updateRow(r.key, { channel: v as LeadChannel })}
                         >
-                          <SelectTrigger size="sm" className="h-7 text-xs w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger size="sm" className="h-7 text-xs w-[110px]">
+                            <SelectValue>{(v: LeadChannel) => CHANNELS.find((c) => c.value === v)?.label}</SelectValue>
+                          </SelectTrigger>
                           <SelectContent>
                             {CHANNELS.map((c) => (
                               <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
@@ -361,7 +363,9 @@ export function ImportLeadsDialog({
                           value={r.segment}
                           onValueChange={(v) => updateRow(r.key, { segment: v as LeadSegment })}
                         >
-                          <SelectTrigger size="sm" className="h-7 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger size="sm" className="h-7 text-xs w-[130px]">
+                            <SelectValue>{(v: LeadSegment) => SEGMENTS.find((s) => s.value === v)?.label}</SelectValue>
+                          </SelectTrigger>
                           <SelectContent>
                             {SEGMENTS.map((s) => (
                               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
@@ -374,7 +378,9 @@ export function ImportLeadsDialog({
                           value={r.status}
                           onValueChange={(v) => updateRow(r.key, { status: v as LeadStatus })}
                         >
-                          <SelectTrigger size="sm" className="h-7 text-xs w-[160px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger size="sm" className="h-7 text-xs w-[160px]">
+                            <SelectValue>{(v: LeadStatus) => STATUSES.find((s) => s.value === v)?.label}</SelectValue>
+                          </SelectTrigger>
                           <SelectContent>
                             {STATUSES.map((s) => (
                               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>

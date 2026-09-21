@@ -65,10 +65,11 @@ function QuoteCard({
 
       {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
       {(r.contact_person || r.contact_phone) && (
-        <p className="text-xs text-[#6B6B6B]">
-          {t("ผู้รับ", "Recipient", "收件人")}: {r.contact_person || "-"}
-          {r.contact_phone && ` · ${r.contact_phone}`}
-        </p>
+        <div className="bg-white rounded-md px-2 py-1.5">
+          <p className="text-[9px] uppercase tracking-wide text-[#9CA3AF]">{t("ผู้รับ", "Recipient", "收件人")}</p>
+          <p className="text-sm font-bold text-[#1A1A1A] leading-tight">{r.contact_person || "-"}</p>
+          {r.contact_phone && <p className="text-sm font-mono font-semibold text-[#1A1A1A] leading-tight">{r.contact_phone}</p>}
+        </div>
       )}
       {deposit > 0 && (
         <p className="text-xs font-medium text-[#1A1A1A]">

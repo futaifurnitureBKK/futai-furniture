@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Printer } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -77,10 +78,11 @@ function QuoteCard({
         </p>
       )}
 
+      <div className="flex items-center gap-1.5">
       <Select value={r.status} onValueChange={(v) => onStatusChange(r.id, v as SavedQuoteStatus)}>
         <SelectTrigger
           size="sm"
-          className={`w-full h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
+          className={`flex-1 h-auto min-h-0 rounded border-0 px-2 py-1 text-xs font-medium ${STATUS_META[r.status].color}`}
         >
           <SelectValue>{(v: SavedQuoteStatus) => t(STATUS_META[v].th, STATUS_META[v].en, STATUS_META[v].zh)}</SelectValue>
         </SelectTrigger>
@@ -92,6 +94,14 @@ function QuoteCard({
           ))}
         </SelectContent>
       </Select>
+      <Link
+        href={`/admin/quote-builder?open=${r.id}&print=1`}
+        className={buttonVariants({ size: "icon-sm", variant: "outline" })}
+        title={t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
+      >
+        <Printer size={13} />
+      </Link>
+      </div>
     </div>
   );
 }

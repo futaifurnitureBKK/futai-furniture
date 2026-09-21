@@ -446,6 +446,7 @@ function QuoteBuilderInner() {
     if (!openId) return;
     (async () => {
       await loadQuote(Number(openId));
+      if (searchParams.get("print") === "1") printDeliveryNote();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);

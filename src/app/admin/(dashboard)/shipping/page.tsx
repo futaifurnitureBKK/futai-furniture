@@ -14,7 +14,8 @@ import type { SavedQuote, SavedQuoteStatus } from "@/types";
 type Row = Pick<
   SavedQuote,
   | "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "status" | "channel"
-  | "shipping_date" | "shipping_address" | "items" | "discount_pct" | "vat_pct" | "deposit_pct" | "updated_at"
+  | "shipping_date" | "shipping_address" | "contact_person" | "contact_phone"
+  | "items" | "discount_pct" | "vat_pct" | "deposit_pct" | "updated_at"
 >;
 
 // The "awaiting shipment" status is what this page exists to answer, so it
@@ -63,6 +64,12 @@ function QuoteCard({
       </div>
 
       {r.shipping_address && <p className="text-xs text-[#6B6B6B] line-clamp-2">{r.shipping_address}</p>}
+      {(r.contact_person || r.contact_phone) && (
+        <p className="text-xs text-[#6B6B6B]">
+          {t("ผู้รับ", "Recipient", "收件人")}: {r.contact_person || "-"}
+          {r.contact_phone && ` · ${r.contact_phone}`}
+        </p>
+      )}
       {deposit > 0 && (
         <p className="text-xs font-medium text-[#1A1A1A]">
           {t("มัดจำ", "Deposit", "定金")}: ฿{fmtMoney(deposit)} ({r.deposit_pct}%)

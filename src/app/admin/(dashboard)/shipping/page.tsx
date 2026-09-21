@@ -2,14 +2,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Printer, UserRound } from "lucide-react";
+import { Printer, UserRound, FileText, MapPin, CalendarDays, Phone, CheckCircle2, Search, ChevronRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/store/language";
 import {
-  STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS, PAYMENT_TYPE_META, computeDepositAmount, fmtMoney,
+  STATUS_META, STATUS_ORDER, CHANNEL_META, DOC_LABELS, PAYMENT_TYPE_META,
+  computeDepositAmount, computeGrandTotal, fmtMoney,
 } from "@/lib/saved-quote-options";
 import type { SavedQuote, SavedQuoteStatus, SavedQuotePayment } from "@/types";
 
@@ -143,6 +144,183 @@ function QuoteCard({
   );
 }
 
+// Richer card just for the "awaiting shipment" band — that's the status
+// this whole page exists to answer, so it gets the full order-summary
+// treatment (totals, payment evidence, contacts) instead of the compact
+// tile used for the other columns.
+function AwaitingShipmentCard({
+  r,
+  t,
+  onStatusChange,
+}: {
+  r: Row;
+  t: (th: string, en: string, zh?: string) => string;
+  onStatusChange: (id: number, status: SavedQuoteStatus) => void;
+}) {
+  const grandTotal = computeGrandTotal(r.items, r.discount_pct, r.vat_pct);
+  const totalPaid = r.saved_quote_payments.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = Math.max(grandTotal - totalPaid, 0);
+  const paidPct = grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0;
+  const remainingPct = grandTotal > 0 ? 100 - paidPct : 0;
+  const latestPayment = r.saved_quote_payments.length
+    ? [...r.saved_quote_payments].sort((a, b) => (a.paid_date < b.paid_date ? 1 : -1))[0]
+    : null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-[#E8E5E0] p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+            <FileText size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] uppercase tracking-wide text-[#9CA3AF]">{t("เลขที่ใบสั่งซื้อ", "Order No.", "订单号")}</p>
+            <p className="text-sm font-bold text-[#1A1A1A] font-mono truncate">{r.doc_no}</p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <Select value={r.status} onValueChange={(v) => onStatusChange(r.id, v as SavedQuoteStatus)}>
+            <SelectTrigger
+              size="sm"
+              className={`h-auto min-h-0 rounded-full border-0 px-2.5 py-1 text-xs font-semibold ${STATUS_META[r.status].color}`}
+            >
+              <SelectValue>{(v: SavedQuoteStatus) => t(STATUS_META[v].th, STATUS_META[v].en, STATUS_META[v].zh)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_ORDER.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[9px] text-[#9CA3AF] mt-1">{t("สร้างเมื่อ", "Created", "创建于")} {r.doc_date}</p>
+          {r.salesperson && <p className="text-[9px] text-indigo-600 font-medium">{t("โดย", "By", "由")} {r.salesperson}</p>}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-base font-bold text-[#1A1A1A] leading-snug truncate">{r.customer_name || "-"}</p>
+        {r.shipping_address && (
+          <p className="text-xs text-[#9CA3AF] flex items-start gap-1 mt-0.5">
+            <MapPin size={12} className="mt-0.5 shrink-0" />
+            <span className="line-clamp-1">{r.shipping_address}</span>
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {r.shipping_date && (
+          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 rounded-full px-2.5 py-1 text-[11px] font-semibold">
+            <CalendarDays size={11} /> {t("กำหนดส่ง", "Ship by", "发货日期")}: {r.shipping_date}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1 bg-[#F5F3EF] border border-[#E8E5E0] rounded-full px-2.5 py-1 text-[11px] text-[#6B6B6B]">
+          {t(DOC_LABELS[r.doc_type].th, DOC_LABELS[r.doc_type].en, DOC_LABELS[r.doc_type].zh)}
+        </span>
+        <span className="inline-flex items-center gap-1 bg-[#F5F3EF] border border-[#E8E5E0] rounded-full px-2.5 py-1 text-[11px] text-[#6B6B6B]">
+          {t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 divide-x divide-[#E8E5E0] border border-[#E8E5E0] rounded-xl overflow-hidden text-center">
+        <div className="p-2.5">
+          <p className="text-[9px] text-[#9CA3AF]">{t("ยอดสั่งซื้อทั้งหมด", "Total Order", "订单总额")}</p>
+          <p className="text-base font-bold text-[#1A1A1A]">฿{fmtMoney(grandTotal)}</p>
+          <p className="text-[8.5px] text-[#9CA3AF]">{t("(รวมภาษีแล้ว)", "(incl. tax)", "（含税）")}</p>
+        </div>
+        <div className="p-2.5 bg-emerald-50">
+          <p className="text-[9px] text-emerald-700/70">{t("ชำระแล้ว", "Paid", "已付款")}</p>
+          <p className="text-base font-bold text-emerald-700">฿{fmtMoney(totalPaid)}</p>
+          <p className="text-[8.5px] text-emerald-700/70">({paidPct}%)</p>
+        </div>
+        <div className="p-2.5 bg-red-50">
+          <p className="text-[9px] text-red-700/70">{t("ค้างชำระ", "Outstanding", "尚欠")}</p>
+          <p className="text-base font-bold text-red-700">฿{fmtMoney(remaining)}</p>
+          <p className="text-[8.5px] text-red-700/70">({remainingPct}%)</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-[#FAF7F2] rounded-xl px-2.5 py-2">
+          <p className="text-[8.5px] uppercase tracking-wide text-[#9CA3AF] flex items-center gap-1">
+            <UserRound size={10} /> {t("ผู้รับ / ผู้ติดต่อ", "Recipient", "收件人")}
+          </p>
+          <div className="flex items-center justify-between gap-1 mt-0.5">
+            <p className="text-sm font-bold text-[#1A1A1A] truncate">{r.contact_person || "-"}</p>
+            {r.contact_phone && (
+              <a
+                href={`tel:${r.contact_phone}`}
+                className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#6B6B6B] shrink-0"
+                title={r.contact_phone}
+              >
+                <Phone size={11} />
+              </a>
+            )}
+          </div>
+          {r.contact_phone && <p className="text-xs font-mono text-[#6B6B6B]">{r.contact_phone}</p>}
+        </div>
+        <div className="bg-[#FAF7F2] rounded-xl px-2.5 py-2">
+          <p className="text-[8.5px] uppercase tracking-wide text-[#9CA3AF] flex items-center gap-1">
+            <UserRound size={10} /> {t("ผู้ดูแลออเดอร์", "Order Owner", "负责人")}
+          </p>
+          <p className="text-sm font-bold text-[#1A1A1A] mt-0.5 truncate">{r.salesperson || "-"}</p>
+        </div>
+      </div>
+
+      {latestPayment ? (
+        <div className="bg-emerald-50 rounded-xl p-2.5 flex items-center gap-2.5">
+          {latestPayment.slip_url && (
+            <a
+              href={latestPayment.slip_url}
+              target="_blank"
+              rel="noreferrer"
+              className="relative w-11 h-11 rounded-lg overflow-hidden border border-white shadow-sm shrink-0"
+            >
+              <Image src={latestPayment.slip_url} alt="" fill sizes="44px" className="object-cover" />
+            </a>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-[#1A1A1A]">{t("หลักฐานการชำระเงิน", "Payment Evidence", "付款凭证")}</p>
+            <p className="text-[11px] text-emerald-700 flex items-center gap-1 mt-0.5">
+              <CheckCircle2 size={11} /> {t("ชำระแล้ว", "Paid", "已付款")} {latestPayment.paid_date}
+            </p>
+          </div>
+          {latestPayment.slip_url && (
+            <a
+              href={latestPayment.slip_url}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ size: "sm", variant: "outline", className: "shrink-0" })}
+            >
+              <Search size={12} className="mr-1" /> {t("ดูหลักฐาน", "View", "查看")}
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="bg-[#F5F3EF] rounded-xl p-2.5 text-center text-xs text-[#9CA3AF]">
+          {t("ยังไม่มีการบันทึกการชำระเงิน", "No payment recorded yet", "尚无付款记录")}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-0.5">
+        <Link
+          href={`/admin/quote-builder?open=${r.id}&print=1`}
+          className={buttonVariants({ variant: "outline", className: "flex-1" })}
+        >
+          <Printer size={14} className="mr-1.5" /> {t("พิมพ์", "Print", "打印")}
+        </Link>
+        <Link
+          href={`/admin/quote-builder?open=${r.id}`}
+          className={buttonVariants({ className: "flex-1 bg-[#1A1A1A] text-white hover:bg-black" })}
+        >
+          {t("จัดการคำสั่งซื้อ", "Manage Order", "管理订单")} <ChevronRight size={14} className="ml-1" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function ShippingPage() {
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
@@ -243,13 +421,13 @@ export default function ShippingPage() {
                 {awaitingShipment.length}
               </span>
             </div>
-            <div className="p-3 max-h-[55vh] overflow-y-auto">
+            <div className="p-3 max-h-[85vh] overflow-y-auto">
               {awaitingShipment.length === 0 ? (
                 <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีรายการ", "No items", "暂无")}</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
                   {awaitingShipment.map((r) => (
-                    <QuoteCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />
+                    <AwaitingShipmentCard key={r.id} r={r} t={t} onStatusChange={updateStatus} />
                   ))}
                 </div>
               )}

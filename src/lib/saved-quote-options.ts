@@ -51,18 +51,21 @@ export const PAYMENT_TYPE_META: Record<PaymentType, TriText> = {
 export const PAYMENT_TYPE_ORDER: PaymentType[] = ["deposit", "additional", "full", "other"];
 
 // Mirrors the pricing math in quote-builder: subtotal -> discount -> VAT ->
-// grand total -> deposit. Kept here so any page listing saved quotes can
-// show the deposit amount without re-deriving the formula.
+// grand total. Kept here so any page listing saved quotes can show totals
+// without re-deriving the formula.
+export function computeGrandTotal(items: SavedQuoteItem[], discountPct: number, vatPct: number): number {
+  const subtotal = items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
+  const afterDiscount = subtotal - subtotal * (discountPct / 100);
+  return afterDiscount + afterDiscount * (vatPct / 100);
+}
+
 export function computeDepositAmount(
   items: SavedQuoteItem[],
   discountPct: number,
   vatPct: number,
   depositPct: number
 ): number {
-  const subtotal = items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0);
-  const afterDiscount = subtotal - subtotal * (discountPct / 100);
-  const grandTotal = afterDiscount + afterDiscount * (vatPct / 100);
-  return grandTotal * (depositPct / 100);
+  return computeGrandTotal(items, discountPct, vatPct) * (depositPct / 100);
 }
 
 export function fmtMoney(n: number): string {

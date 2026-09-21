@@ -131,7 +131,6 @@ const TXT = {
     en: "This document is valid for 30 days from the issue date.",
     zh: "报价有效期30天。",
   },
-  salesperson:  { th: "ผู้ดูแลออเดอร์",             en: "Sales",                  zh: "负责人" },
   sellerSign:   { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
   buyerSign:    { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
   receiverSign: { th: "ลายเซ็นผู้รับสินค้า",       en: "Received By",            zh: "收货人签名" },
@@ -1698,10 +1697,6 @@ function QuoteBuilderInner() {
                 </tr>
               </tbody>
             </table>
-
-            {salesperson && (
-              <p className="text-[10px] text-[#1A1A1A] mb-2">{L(TXT.salesperson)}: {salesperson}</p>
-            )}
 
             {!isDeliveryNote && (
               <>

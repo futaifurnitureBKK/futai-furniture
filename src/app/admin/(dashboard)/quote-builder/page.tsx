@@ -34,7 +34,7 @@ interface TriText {
 
 interface LineItem {
   id: string;
-  name: string;
+  name: string
   sku: string;
   size: string;
   qty: number;
@@ -134,6 +134,7 @@ const TXT = {
   sellerSign:   { th: "ผู้ขาย (ประทับตราบริษัท)", en: "Seller (Company Stamp)", zh: "销售方（盖章）" },
   buyerSign:    { th: "ผู้ซื้อ (ประทับตราบริษัท)", en: "Buyer (Company Stamp)",  zh: "采购方（盖章）" },
   receiverSign: { th: "ลายเซ็นผู้รับสินค้า",       en: "Received By",            zh: "收货人签名" },
+  senderSign:   { th: "ลายเซ็นผู้ส่งของ",          en: "Delivered By",           zh: "送货人签名" },
 } satisfies Record<string, TriText>;
 
 function joinLang(langMode: LangMode, t: TriText): string {
@@ -1040,7 +1041,7 @@ function QuoteBuilderInner() {
 
     // Signature(s)
     if (isDeliveryNote) {
-      mergedRow(`${L(TXT.receiverSign)} :`);
+      splitRow(`${L(TXT.senderSign)} :`, `${L(TXT.receiverSign)} :`);
     } else {
       splitRow(`${L(TXT.sellerSign)} :`, `${L(TXT.buyerSign)} :`);
     }
@@ -1737,7 +1738,8 @@ function QuoteBuilderInner() {
             )}
 
             {isDeliveryNote ? (
-              <div className="no-break text-[10px] text-[#1A1A1A] pt-2">
+              <div className="no-break grid grid-cols-2 gap-8 text-[10px] text-[#1A1A1A] pt-2">
+                <p className="whitespace-pre-line h-16">{L(TXT.senderSign)} :</p>
                 <p className="whitespace-pre-line h-16">{L(TXT.receiverSign)} :</p>
               </div>
             ) : (

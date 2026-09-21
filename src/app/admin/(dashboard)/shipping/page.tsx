@@ -68,8 +68,10 @@ function QuoteCard({
       {(r.contact_person || r.contact_phone) && (
         <div className="bg-white rounded-md px-2 py-1.5">
           <p className="text-[9px] uppercase tracking-wide text-[#9CA3AF]">{t("ผู้รับ", "Recipient", "收件人")}</p>
-          <p className="text-sm font-bold text-[#1A1A1A] leading-tight">{r.contact_person || "-"}</p>
-          {r.contact_phone && <p className="text-sm font-mono font-semibold text-[#1A1A1A] leading-tight">{r.contact_phone}</p>}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-sm font-bold text-[#1A1A1A] leading-tight">{r.contact_person || "-"}</p>
+            {r.contact_phone && <p className="text-sm font-mono font-semibold text-[#1A1A1A] leading-tight">{r.contact_phone}</p>}
+          </div>
         </div>
       )}
       {deposit > 0 && (

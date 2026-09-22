@@ -555,6 +555,19 @@ function QuoteBuilderInner() {
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
+  const [listSearch, setListSearch] = useState("");
+  const [listDateFrom, setListDateFrom] = useState("");
+  const [listDateTo, setListDateTo] = useState("");
+
+  const filteredSavedList = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    return savedList.filter((row) => {
+      if (q && !row.customer_name.toLowerCase().includes(q)) return false;
+      if (listDateFrom && row.doc_date < listDateFrom) return false;
+      if (listDateTo && row.doc_date > listDateTo) return false;
+      return true;
+    });
+  }, [savedList, listSearch, listDateFrom, listDateTo]);
 
   const L = (t: TriText) => joinLang(langMode, t);
 
@@ -1159,6 +1172,44 @@ function QuoteBuilderInner() {
               )}
             </Button>
           </div>
+
+          <div className="flex flex-wrap items-end gap-2 mb-3">
+            <div className="flex-1 min-w-[180px]">
+              <Label className="text-xs">{t("ค้นหาชื่อบริษัท/ลูกค้า", "Search company / customer", "搜索公司/客户名称")}</Label>
+              <div className="relative mt-1">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <Input
+                  className="pl-8 h-8 text-sm"
+                  value={listSearch}
+                  onChange={(e) => setListSearch(e.target.value)}
+                  placeholder={t("พิมพ์ชื่อบริษัทหรือลูกค้า...", "Type a company or customer name...", "输入公司或客户名称...")}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">{t("ตั้งแต่วันที่", "From date", "起始日期")}</Label>
+              <Input type="date" className="mt-1 h-8 text-sm" value={listDateFrom} onChange={(e) => setListDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">{t("ถึงวันที่", "To date", "截止日期")}</Label>
+              <Input type="date" className="mt-1 h-8 text-sm" value={listDateTo} onChange={(e) => setListDateTo(e.target.value)} />
+            </div>
+            {(listSearch || listDateFrom || listDateTo) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                onClick={() => {
+                  setListSearch("");
+                  setListDateFrom("");
+                  setListDateTo("");
+                }}
+              >
+                <X size={13} className="mr-1" /> {t("ล้างตัวกรอง", "Clear filters", "清除筛选")}
+              </Button>
+            )}
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
@@ -1178,16 +1229,18 @@ function QuoteBuilderInner() {
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
-              ) : savedList.length === 0 ? (
+              ) : filteredSavedList.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
-                    {showArchived
-                      ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
-                      : t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")}
+                    {savedList.length === 0
+                      ? showArchived
+                        ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
+                        : t("ยังไม่มีเอกสารที่บันทึกไว้", "No saved documents yet", "暂无已保存的文件")
+                      : t("ไม่พบเอกสารที่ตรงกับตัวกรอง", "No documents match your filters", "没有符合筛选条件的文件")}
                   </TableCell>
                 </TableRow>
               ) : (
-                savedList.map((q) => (
+                filteredSavedList.map((q) => (
                   <TableRow key={q.id} className="hover:bg-[#FAF7F2]/50">
                     <TableCell className="text-sm font-mono">{q.doc_no}</TableCell>
                     <TableCell className="text-xs">

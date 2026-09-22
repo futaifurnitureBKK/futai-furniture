@@ -405,6 +405,10 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
 
   async function addPayment() {
     if (!quoteId) return;
+    if (!form.amount || Number(form.amount) <= 0) {
+      toast.error(t("กรุณาใส่จำนวนเงิน", "Please enter an amount", "请输入金额"));
+      return;
+    }
     setSaving(true);
     const res = await fetch(`/api/admin/saved-quotes/${quoteId}/payments`, {
       method: "POST",
@@ -516,7 +520,7 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="button" size="sm" className="w-full" disabled={saving || !form.amount} onClick={addPayment}>
+            <Button type="button" size="sm" className="w-full" disabled={saving} onClick={addPayment}>
               <Plus size={13} className="mr-1" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("เพิ่มรายการชำระเงิน", "Add Payment", "添加付款记录")}
             </Button>
           </div>

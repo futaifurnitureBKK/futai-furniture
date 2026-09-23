@@ -1700,7 +1700,7 @@ function QuoteBuilderInner() {
                         <td className="border border-[#1A1A1A] p-1 text-right font-medium">{fmtMoney(it.qty * it.unitPrice)}</td>
                       </>
                     )}
-                    <td className="border border-[#1A1A1A] p-1 text-left">
+                    <td className="border border-[#1A1A1A] p-1 text-left text-[#C8102E] font-medium">
                       {it.remark}
                       {it.remarkImage && (
                         <div className="relative w-full h-16 mt-1">

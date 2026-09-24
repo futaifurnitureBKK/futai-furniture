@@ -19,6 +19,7 @@ const EDITABLE_FIELDS = [
   "contact_phone",
   "salesperson",
   "notes",
+  "terms_text",
   "discount_pct",
   "vat_pct",
   "deposit_pct",

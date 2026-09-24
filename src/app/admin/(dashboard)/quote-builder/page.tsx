@@ -143,6 +143,15 @@ function joinLang(langMode: LangMode, t: TriText): string {
   return `${t.th} / ${t.zh}`;
 }
 
+// The default "Terms of Sale" text, seeded from TXT.term1-4 in whichever
+// language(s) are selected. Once saved, it's just plain editable text per
+// document — editing it no longer regenerates from the language toggle.
+function defaultTermsText(langMode: LangMode): string {
+  return [TXT.term1, TXT.term2, TXT.term3, TXT.term4]
+    .map((t, i) => `${i + 1}. ${joinLang(langMode, t)}`)
+    .join("\n");
+}
+
 function newLine(): LineItem {
   return {
     id: Math.random().toString(36).slice(2),
@@ -547,6 +556,7 @@ function QuoteBuilderInner() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [salesperson, setSalesperson] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [termsText, setTermsText] = useState(() => defaultTermsText("th-en-zh"));
   const [discountPct, setDiscountPct] = useState(0);
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
@@ -615,6 +625,7 @@ function QuoteBuilderInner() {
     setCustomerPhone("");
     setSalesperson("");
     setOrderNotes("");
+    setTermsText(defaultTermsText("th-en-zh"));
     setDiscountPct(0);
     setVatPct(7);
     setDepositPct(50);
@@ -638,6 +649,7 @@ function QuoteBuilderInner() {
       contact_phone: customerPhone,
       salesperson: salesperson || null,
       notes: orderNotes,
+      terms_text: termsText,
       discount_pct: discountPct,
       vat_pct: vatPct,
       deposit_pct: depositPct,
@@ -695,6 +707,7 @@ function QuoteBuilderInner() {
     setCustomerPhone(q.contact_phone);
     setSalesperson(q.salesperson || "");
     setOrderNotes(q.notes || "");
+    setTermsText(q.terms_text || defaultTermsText(q.lang_mode));
     setDiscountPct(q.discount_pct ?? 0);
     setVatPct(q.vat_pct);
     setDepositPct(q.deposit_pct);
@@ -1043,7 +1056,7 @@ function QuoteBuilderInner() {
     // Terms + bank (quotation/invoice only, matches the PDF)
     if (!isDeliveryNote) {
       mergedRow("TERMS OF SALE AND OTHER COMMENTS", { bold: true, align: "center", fill: PEACH, border: true });
-      [L(TXT.term1), L(TXT.term2), L(TXT.term3), L(TXT.term4)].forEach((line, i) => mergedRow(`${i + 1}. ${line}`, { size: 9, border: true }));
+      termsText.split("\n").forEach((line) => mergedRow(line, { size: 9, border: true }));
       nextRow();
 
       mergedRow("Bank Account (THB)", { bold: true, align: "center", fill: PEACH, border: true });
@@ -1583,6 +1596,18 @@ function QuoteBuilderInner() {
             </div>
           )}
 
+          {!isDeliveryNote && (
+            <div className="bg-white rounded-xl shadow-sm p-5 space-y-2">
+              <Label>{t("เงื่อนไขการขาย (แสดงในเอกสาร)", "Terms of Sale (shown on document)", "销售条款（显示在文件上）")}</Label>
+              <Textarea
+                className="font-mono text-xs"
+                rows={6}
+                value={termsText}
+                onChange={(e) => setTermsText(e.target.value)}
+              />
+            </div>
+          )}
+
           <PaymentsSection quoteId={savedId} />
         </div>
 
@@ -1775,10 +1800,9 @@ function QuoteBuilderInner() {
                 <div className="no-break mb-2 text-[9.5px] text-[#1A1A1A] border border-[#1A1A1A]">
                   <p className="font-semibold text-center py-1" style={{ backgroundColor: "#F8CAAC" }}>TERMS OF SALE AND OTHER COMMENTS</p>
                   <div className="p-1.5 space-y-0.5">
-                    <p>1. {L(TXT.term1)}</p>
-                    <p>2. {L(TXT.term2)}</p>
-                    <p>3. {L(TXT.term3)}</p>
-                    <p>4. {L(TXT.term4)}</p>
+                    {termsText.split("\n").map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
                   </div>
                 </div>
 

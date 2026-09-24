@@ -53,6 +53,7 @@ type PayMethod = "transfer" | "quote";
 ═══════════════════════════════════════════════════════════ */
 export default function POSPage() {
   const { t } = useLanguage();
+  const nm = (x: { name_th: string; name_en: string; name_zh: string }) => t(x.name_th, x.name_en, x.name_zh);
   const [query, setQuery]           = useState("");
   const [catFilter, setCatFilter]   = useState<string | null>(null);
   const [cart, setCart]             = useState<POSItem[]>([]);
@@ -72,6 +73,7 @@ export default function POSPage() {
       !q ||
       p.name_th.toLowerCase().includes(q) ||
       p.name_en.toLowerCase().includes(q) ||
+      (p.name_zh || "").toLowerCase().includes(q) ||
       p.sku.toLowerCase().includes(q);
     return matchCat && matchQ;
   }), [query, catFilter]);
@@ -146,7 +148,7 @@ export default function POSPage() {
                 catFilter === cat.slug ? "bg-[#C8102E] text-white" : "bg-white border border-[#E8E5E0] text-[#6B6B6B] hover:border-[#C8102E]"
               }`}
             >
-              {cat.name_th}
+              {nm(cat)}
             </button>
           ))}
         </div>
@@ -167,7 +169,7 @@ export default function POSPage() {
                   {/* Image */}
                   <div className="relative aspect-square bg-[#F5F3EF]">
                     {p.images[0] ? (
-                      <Image src={p.images[0]} alt={p.name_th} fill sizes="150px" className="object-contain p-2" />
+                      <Image src={p.images[0]} alt={nm(p)} fill sizes="150px" className="object-contain p-2" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <ShoppingBag size={24} className="text-[#C8C5BE]" />
@@ -182,7 +184,7 @@ export default function POSPage() {
                   {/* Info */}
                   <div className="p-2">
                     <p className="text-[10px] text-[#9B9B9B] font-mono">{p.sku}</p>
-                    <p className="text-xs text-[#1A1A1A] font-medium leading-snug line-clamp-2 mt-0.5">{p.name_th}</p>
+                    <p className="text-xs text-[#1A1A1A] font-medium leading-snug line-clamp-2 mt-0.5">{nm(p)}</p>
                     <p className="text-xs font-semibold mt-1 text-[#C8102E]">
                       {p.price ? `฿${p.price.toLocaleString()}` : t("ตามใบเสนอ", "Quote on request", "按报价")}
                     </p>
@@ -230,11 +232,11 @@ export default function POSPage() {
                 <div key={item.product.sku} className="flex gap-2 items-center py-2 border-b border-[#F0EDE8] last:border-0">
                   <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-[#F5F3EF] shrink-0">
                     {item.product.images[0] && (
-                      <Image src={item.product.images[0]} alt={item.product.name_th} fill sizes="40px" className="object-contain" />
+                      <Image src={item.product.images[0]} alt={nm(item.product)} fill sizes="40px" className="object-contain" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[#1A1A1A] line-clamp-1">{item.product.name_th}</p>
+                    <p className="text-xs font-medium text-[#1A1A1A] line-clamp-1">{nm(item.product)}</p>
                     <p className="text-[10px] text-[#9B9B9B]">{item.product.sku}</p>
                     {item.product.price ? (
                       <p className="text-xs text-[#C8102E] font-semibold">฿{(item.product.price * item.quantity).toLocaleString()}</p>
@@ -387,7 +389,7 @@ export default function POSPage() {
                   <div className="text-xs text-[#6B6B6B] space-y-1 border-t border-[#E8E5E0] pt-3">
                     {cart.map((i) => (
                       <div key={i.product.sku} className="flex justify-between">
-                        <span className="truncate mr-2">{i.product.name_th} ×{i.quantity}</span>
+                        <span className="truncate mr-2">{nm(i.product)} ×{i.quantity}</span>
                         <span>{i.product.price ? `฿${(i.product.price * i.quantity).toLocaleString()}` : "-"}</span>
                       </div>
                     ))}
@@ -443,7 +445,7 @@ export default function POSPage() {
                       {cart.map((i) => (
                         <tr key={i.product.sku} className="border-b border-[#F0EDE8]">
                           <td className="py-1.5">
-                            <p className="font-medium text-[#1A1A1A] leading-snug">{i.product.name_th}</p>
+                            <p className="font-medium text-[#1A1A1A] leading-snug">{nm(i.product)}</p>
                             <p className="text-[#9B9B9B]">{i.product.sku}</p>
                           </td>
                           <td className="text-center py-1.5">{i.quantity}</td>

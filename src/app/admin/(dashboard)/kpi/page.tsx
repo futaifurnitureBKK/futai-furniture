@@ -25,6 +25,21 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
+const RANGES: { key: RangeKey; days: number | null }[] = [
+  { key: "1D", days: 1 },
+  { key: "5D", days: 5 },
+  { key: "1M", days: 30 },
+  { key: "5M", days: 150 },
+  { key: "ALL", days: null },
+];
+
+function daysAgoStr(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
 const BOARD_COLUMNS: {
   key: string;
   th: string;
@@ -75,7 +90,8 @@ export default function KpiPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [range, setRange] = useState<RangeKey>("1M");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
   useEffect(() => {
@@ -288,45 +304,58 @@ export default function KpiPage() {
     [leads]
   );
 
-  // Last 30 calendar days, one bar per day — click a bar (or pick a date)
-  // to see exactly which leads came in that day.
+  // One bar per day over the chosen range. Clicking a bar (or picking a date)
+  // narrows the platform chart + lead list to that day; changing the range
+  // clears it so they cover the whole range again.
+  const rangeStart = useMemo(() => {
+    const days = RANGES.find((r) => r.key === range)?.days;
+    if (days != null) return daysAgoStr(days - 1);
+    const earliest = leads.reduce((min, l) => (l.lead_date < min ? l.lead_date : min), todayStr());
+    return earliest;
+  }, [range, leads]);
+
   const dateData = useMemo(() => {
+    const counts = new Map<string, number>();
+    leads.forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
     const days: { date: string; count: number }[] = [];
-    const now = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
+    const end = new Date(todayStr());
+    for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().slice(0, 10);
-      days.push({ date: dateStr, count: leads.filter((l) => l.lead_date === dateStr).length });
+      days.push({ date: dateStr, count: counts.get(dateStr) || 0 });
     }
     return days;
-  }, [leads]);
+  }, [leads, rangeStart]);
 
-  const leadsOnSelectedDate = useMemo(
-    () => leads.filter((l) => l.lead_date === selectedDate),
-    [leads, selectedDate]
+  const leadsInScope = useMemo(
+    () =>
+      leads.filter((l) =>
+        selectedDate ? l.lead_date === selectedDate : l.lead_date >= rangeStart && l.lead_date <= todayStr()
+      ),
+    [leads, selectedDate, rangeStart]
   );
 
-  const channelOnSelectedDate = useMemo(
+  const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+
+  const channelInScope = useMemo(
     () =>
       CHANNELS.map((c) => ({
         value: c.value,
         label: t(c.th, c.en, c.zh),
         color: c.color,
-        count: leadsOnSelectedDate.filter((l) => l.channel === c.value).length,
+        count: leadsInScope.filter((l) => l.channel === c.value).length,
       })).filter((c) => c.count > 0),
-    [leadsOnSelectedDate, t]
+    [leadsInScope, t]
   );
 
   const channelData = useMemo(
     () =>
       CHANNELS.map((c) => ({
         channel: t(c.th, c.en, c.zh),
-        count: leads.filter((l) => l.channel === c.value && l.lead_date === selectedDate).length,
-        converted: leads.filter((l) => l.channel === c.value && l.lead_date === selectedDate && l.status === "converted").length,
+        count: leadsInScope.filter((l) => l.channel === c.value).length,
+        converted: leadsInScope.filter((l) => l.channel === c.value && l.status === "converted").length,
         color: c.color,
       })),
-    [leads, t, selectedDate]
+    [leadsInScope, t]
   );
 
   const topSkus = useMemo(() => {
@@ -472,15 +501,15 @@ export default function KpiPage() {
       <div className="bg-white rounded-xl shadow-sm p-5">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <p className="text-sm font-semibold text-[#1A1A1A]">
-            {t("ลีดรายวัน (30 วันล่าสุด)", "Leads by Date (Last 30 Days)", "每日线索（近30天）")}
+            {t("ลีดรายวัน", "Leads by Date", "每日线索")}
           </p>
           <div className="flex items-center gap-2">
             <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
             <Input
               type="date"
               className="h-8 w-auto text-xs"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              value={selectedDate ?? ""}
+              onChange={(e) => setSelectedDate(e.target.value || null)}
             />
           </div>
         </div>
@@ -507,7 +536,7 @@ export default function KpiPage() {
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
-                    interval={3}
+                    interval={Math.max(0, Math.ceil(dateData.length / 8) - 1)}
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                   <Tooltip
@@ -525,18 +554,35 @@ export default function KpiPage() {
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={20}>
                     {dateData.map((d) => (
-                      <Cell key={d.date} fill={d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
+                      <Cell key={d.date} fill={!selectedDate || d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      setRange(r.key);
+                      setSelectedDate(null);
+                    }}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                    }`}
+                  >
+                    {r.key}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="border-t xl:border-t-0 xl:border-l border-[#E8E5E0] pt-4 xl:pt-0 xl:pl-4">
               <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
-                {t("ลีดวันที่", "Leads on", "线索日期")} {selectedDate} ({leadsOnSelectedDate.length})
+                {t("ลีด", "Leads", "线索")} {scopeLabel} ({leadsInScope.length})
               </p>
-              {leadsOnSelectedDate.length === 0 ? (
+              {leadsInScope.length === 0 ? (
                 <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีลีดในวันนี้", "No leads on this date", "该日期无线索")}</p>
               ) : (
                 <>
@@ -545,14 +591,14 @@ export default function KpiPage() {
                     {t("Leads ต่อ Channel (มาจาก platform ไหน)", "Leads by Channel (which platform)", "各渠道线索数（来自哪个平台）")}
                   </p>
                   <div className="space-y-1">
-                    {channelOnSelectedDate.map((c) => (
+                    {channelInScope.map((c) => (
                       <div key={c.value} className="flex items-center gap-2 text-xs">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
                         <span className="w-16 shrink-0 text-[#1A1A1A]">{c.label}</span>
                         <div className="flex-1 h-2 bg-[#F0EDE6] rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full"
-                            style={{ width: `${(c.count / leadsOnSelectedDate.length) * 100}%`, backgroundColor: c.color }}
+                            style={{ width: `${(c.count / leadsInScope.length) * 100}%`, backgroundColor: c.color }}
                           />
                         </div>
                         <span className="font-semibold text-[#1A1A1A] w-5 text-right">{c.count}</span>
@@ -561,7 +607,7 @@ export default function KpiPage() {
                   </div>
                 </div>
                 <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
-                  {leadsOnSelectedDate.map((lead) => {
+                  {leadsInScope.map((lead) => {
                     const c = CHANNELS.find((c) => c.value === lead.channel);
                     const m = statusMeta(lead.status);
                     return (
@@ -601,7 +647,7 @@ export default function KpiPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-4">
-            {t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")} · {t("วันที่", "on", "日期")} {selectedDate}
+            {t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")} · {scopeLabel}
           </p>
           {leads.length === 0 ? (
             <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>

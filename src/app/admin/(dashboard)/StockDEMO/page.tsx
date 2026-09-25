@@ -341,7 +341,7 @@ export default function StockDemoPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-[#FAF7F2]">
-              <TableHead className="text-xs w-16">{t("รูป", "Photo", "图片")}</TableHead>
+              <TableHead className="text-xs w-32">{t("รูป", "Photo", "图片")}</TableHead>
               <TableHead className="text-xs">{t("รหัสสินค้า", "Code", "编号")}</TableHead>
               <TableHead className="text-xs">{t("ขนาด / ราคา (฿)", "Size / Price (฿)", "尺寸 / 价格(฿)")}</TableHead>
               <TableHead className="text-xs w-24">{t("พร้อมขาย", "Available", "可售")}</TableHead>
@@ -370,9 +370,14 @@ export default function StockDemoPage() {
                 return (
                   <TableRow key={p.no} className="hover:bg-[#FAF7F2]/50 align-top">
                     <TableCell>
-                      <div className="relative w-12 h-12 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
-                        {p.image && <Image src={p.image} alt={p.code} fill sizes="48px" unoptimized className="object-contain" />}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openDetail(p)}
+                        className="relative block w-28 h-28 rounded-lg bg-white overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E] transition-colors"
+                        aria-label={p.code}
+                      >
+                        {p.image && <Image src={p.image} alt={p.code} fill sizes="112px" unoptimized className="object-contain" />}
+                      </button>
                     </TableCell>
                     <TableCell>
                       <p className="text-sm font-mono font-medium">{p.code}</p>
@@ -440,9 +445,15 @@ export default function StockDemoPage() {
 
           {detail && (
             <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-1">
-              <div className="flex gap-4">
-                <div className="relative w-32 h-32 shrink-0 rounded-lg bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
-                  {detail.image && <Image src={detail.image} alt={detail.code} fill sizes="128px" unoptimized className="object-contain" />}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative w-full sm:w-72 aspect-square shrink-0 rounded-lg bg-white overflow-hidden border border-[#E8E5E0]">
+                  {detail.image ? (
+                    <Image src={detail.image} alt={detail.code} fill sizes="288px" unoptimized className="object-contain" />
+                  ) : (
+                    <p className="absolute inset-0 flex items-center justify-center text-xs text-[#9CA3AF]">
+                      {t("ยังไม่มีรูป", "No photo yet", "暂无图片")}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 overflow-x-auto">
                   <Table>

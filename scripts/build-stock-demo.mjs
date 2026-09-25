@@ -118,9 +118,9 @@ for (const a of drawing.matchAll(/<xdr:twoCellAnchor[\s\S]*?<\/xdr:twoCellAnchor
   const buf = await zip.file(`xl/media/${relMap[rid]}`).async("nodebuffer");
   const name = `p${no}.jpg`;
   await sharp(buf)
-    .resize(320, 320, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
+    .resize(640, 640, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
     .flatten({ background: "#ffffff" })
-    .jpeg({ quality: 72, mozjpeg: true })
+    .jpeg({ quality: 76, mozjpeg: true })
     .toFile(path.join(outDir, name));
   p.image = `/stock-demo/${name}`;
   imgCount++;

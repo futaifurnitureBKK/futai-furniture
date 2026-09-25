@@ -295,15 +295,6 @@ export default function KpiPage() {
     return { total, followed, followUpRate, responseRate, conversionRate, avgCycleDays, aov, revenue };
   }, [leads]);
 
-  const boardGroups = useMemo(
-    () =>
-      BOARD_COLUMNS.map((col) => ({
-        ...col,
-        leads: leads.filter((l) => col.statuses.includes(l.status)),
-      })),
-    [leads]
-  );
-
   // One bar per day over the chosen range. Clicking a bar (or picking a date)
   // narrows the platform chart + lead list to that day; changing the range
   // clears it so they cover the whole range again.
@@ -335,6 +326,16 @@ export default function KpiPage() {
   );
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+
+  // The status board follows the chosen range / selected date too.
+  const boardGroups = useMemo(
+    () =>
+      BOARD_COLUMNS.map((col) => ({
+        ...col,
+        leads: leadsInScope.filter((l) => col.statuses.includes(l.status)),
+      })),
+    [leadsInScope]
+  );
 
   const channelInScope = useMemo(
     () =>
@@ -605,36 +606,6 @@ export default function KpiPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
-                  {leadsInScope.map((lead) => {
-                    const c = CHANNELS.find((c) => c.value === lead.channel);
-                    const m = statusMeta(lead.status);
-                    return (
-                      <button
-                        key={lead.id}
-                        type="button"
-                        onClick={() => openEdit(lead)}
-                        className="w-full text-left flex items-center justify-between gap-2 bg-[#FAF7F2] hover:bg-[#F0EDE6] rounded-lg px-2.5 py-1.5 text-xs transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-[#1A1A1A] truncate">{lead.customer_name}</p>
-                          <p className="text-[10px] text-[#9CA3AF]">
-                            {c ? t(c.th, c.en, c.zh) : lead.channel}
-                            {lead.sku ? ` · ${lead.sku}` : ""}
-                          </p>
-                        </div>
-                        {lead.owner && (
-                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700">
-                            {lead.owner}
-                          </span>
-                        )}
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${m.color}`}>
-                          {t(m.th, m.en, m.zh)}
-                        </span>
-                      </button>
-                    );
-                  })}
                 </div>
                 </>
               )}

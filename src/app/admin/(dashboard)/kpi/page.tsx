@@ -512,11 +512,12 @@ export default function KpiPage() {
           <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">
           {/* Leads by date */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
             <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("ลีดรายวัน", "Leads by Date", "每日线索")}</p>
-            <ResponsiveContainer width="100%" height={240}>
+            <div className="flex-1 min-h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dateData}
                 margin={{ top: 20, right: 8, left: -20, bottom: 0 }}
@@ -556,6 +557,7 @@ export default function KpiPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
             <div className="flex items-center justify-center gap-1.5 mt-2">
               {RANGES.map((r) => (
                 <button
@@ -576,11 +578,12 @@ export default function KpiPage() {
           </div>
 
           {/* Leads by channel */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
             <p className="text-sm font-semibold text-[#1A1A1A] mb-4">
               {t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")} · {scopeLabel}
             </p>
-            <ResponsiveContainer width="100%" height={240}>
+            <div className="flex-1 min-h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={channelData} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="#E8E5E0" />
                 <XAxis dataKey="channel" tick={{ fontSize: 12, fill: "#6B6B6B" }} axisLine={{ stroke: "#E8E5E0" }} tickLine={false} />
@@ -607,6 +610,7 @@ export default function KpiPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Date picker + owner summary + platform split */}

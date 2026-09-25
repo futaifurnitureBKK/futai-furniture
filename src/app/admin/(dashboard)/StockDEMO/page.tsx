@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Search, Download, Eye, EyeOff, RotateCcw, PackageSearch } from "lucide-react";
+import { Search, Download, Eye, EyeOff, RotateCcw, PackageSearch, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,9 @@ interface Variant {
   dims: { w: number; d: number | null; h: number | null } | null;
   price: number | null;
   note: string;
+  label?: string;
+  round?: boolean;
+  flag?: string;
 }
 interface Prod {
   no: number;
@@ -91,7 +94,9 @@ function fmt(n: number) {
 }
 
 function sizeLabel(v: Variant) {
-  return v.dims ? `${v.dims.w}*${v.dims.d ?? "-"}*${v.dims.h ?? "-"}` : v.size || "-";
+  const base = v.round ? v.size : v.dims ? `${v.dims.w}*${v.dims.d ?? "-"}*${v.dims.h ?? "-"}` : v.size;
+  if (v.label) return base ? `${v.label}: ${base}` : v.label;
+  return base || "-";
 }
 
 export default function StockDemoPage() {
@@ -195,9 +200,12 @@ export default function StockDemoPage() {
 
   function saveDetail() {
     if (!detail) return;
+    // Only write sizes the user actually changed — otherwise merely opening
+    // and saving the dialog would mark every untouched size as "out of stock".
     const nextV = { ...varStock };
     draftVars.forEach((s, i) => {
-      nextV[vkey(detail.no, i)] = s;
+      const k = vkey(detail.no, i);
+      if (JSON.stringify({ ...emptyVar, ...varStock[k] }) !== JSON.stringify(s)) nextV[k] = s;
     });
     persist(nextV, { ...prodInfo, [detail.no]: draftInfo });
     setDetail(null);
@@ -425,7 +433,14 @@ export default function StockDemoPage() {
                           </>
                         )}
                         <TableCell className="text-xs text-[#6B6B6B]">
-                          <p className="font-mono">{sizeLabel(v)}</p>
+                          <p className="font-mono">
+                            {sizeLabel(v)}
+                            {v.flag && (
+                              <span title={v.flag} className="ml-1.5 inline-flex align-middle text-amber-600">
+                                <TriangleAlert size={12} />
+                              </span>
+                            )}
+                          </p>
                           <p className="font-semibold text-[#1A1A1A]">
                             {v.price != null ? fmt(v.price) : <span className="font-normal text-[#9CA3AF]">{t("ยังไม่มีราคา", "No price yet", "暂无价格")}</span>}
                             {v.note && <span className="ml-1.5 font-normal text-[#9CA3AF]">· {v.note}</span>}
@@ -437,7 +452,7 @@ export default function StockDemoPage() {
                               type="number"
                               min={0}
                               className="h-8 w-20 text-xs"
-                              value={s ? info[f] : ""}
+                              value={info[f] || ""}
                               placeholder="0"
                               onChange={(e) => patchVar(p.no, i, { [f]: num(e.target.value) })}
                             />
@@ -547,6 +562,11 @@ export default function StockDemoPage() {
                           <TableRow key={i}>
                             <TableCell className="text-xs">
                               <p className="font-mono">{sizeLabel(v)}</p>
+                              {v.flag && (
+                                <p className="text-amber-700 flex items-start gap-1 max-w-[16rem]">
+                                  <TriangleAlert size={11} className="mt-0.5 shrink-0" /> {v.flag}
+                                </p>
+                              )}
                               <p className="text-[#6B6B6B]">
                                 {v.price != null ? `฿${fmt(v.price)}` : "-"}
                                 {v.note && ` · ${v.note}`}
@@ -554,7 +574,7 @@ export default function StockDemoPage() {
                             </TableCell>
                             {(["available", "reserved", "defective", "reorderPoint"] as const).map((f) => (
                               <TableCell key={f}>
-                                <Input type="number" min={0} className="h-8 w-20 text-xs" value={d[f]} onChange={(e) => patchDraftVar(i, { [f]: num(e.target.value) })} />
+                                <Input type="number" min={0} className="h-8 w-20 text-xs" value={d[f] || ""} placeholder="0" onChange={(e) => patchDraftVar(i, { [f]: num(e.target.value) })} />
                               </TableCell>
                             ))}
                             <TableCell>

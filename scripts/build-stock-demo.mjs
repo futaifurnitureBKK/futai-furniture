@@ -32,12 +32,39 @@ const CATEGORIES = {
 const clean = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
 
 function normSize(raw) {
-  const s = clean(raw).replace(/\s*mm$/i, "");
+  let s = clean(raw).replace(/\s*mm$/i, "");
   if (!s) return { size: "", dims: null };
+
+  // "Table: 1800*800*750" / "Chair-1: 680*585*960" → component label + size
+  let label = "";
+  const lm = s.match(/^([A-Za-z][A-Za-z\- ]*\d*)\s*:\s*(.+)$/);
+  if (lm) {
+    label = lm[1].trim();
+    s = lm[2].trim();
+  }
+
+  // diameter × height, e.g. Φ700*740, Ø1200*750
+  const rm = s.match(/^[ΦφØø⌀]\s*(\d+(?:\.\d+)?)\s*[*x×]\s*(\d+(?:\.\d+)?)$/);
+  if (rm) {
+    const dia = Number(rm[1]);
+    return { size: `Ø${dia}*${rm[2]}`, dims: { w: dia, d: dia, h: Number(rm[2]) }, label, round: true };
+  }
+
+  // letter-tagged in any order, e.g. "D545*W540* H790"
+  const tags = [...s.matchAll(/([WDHwdh])\s*(\d+(?:\.\d+)?)/g)];
+  if (tags.length >= 2 && new Set(tags.map((t) => t[1].toUpperCase())).size === tags.length && /^[\sWDHwdh\d.*x×]+$/.test(s)) {
+    const pick = (k) => {
+      const t = tags.find((t) => t[1].toUpperCase() === k);
+      return t ? Number(t[2]) : null;
+    };
+    const [w, d, h] = [pick("W"), pick("D"), pick("H")];
+    return { size: [w, d, h].filter((x) => x != null).join("*"), dims: { w: w ?? 0, d, h }, label };
+  }
+
   const m = s.match(/^(?:W)?(\d+(?:\.\d+)?)\s*[W]?\s*[*x×]\s*(?:D)?(\d+(?:\.\d+)?)\s*[D]?\s*(?:[*x×]\s*(?:H)?(\d+(?:\.\d+)?)\s*[H]?)?$/i);
-  if (!m) return { size: s, dims: null };
+  if (!m) return { size: s, dims: null, label };
   const [w, d, h] = [m[1], m[2], m[3]].map((x) => (x == null ? null : Number(x)));
-  return { size: [w, d, h].filter((x) => x != null).join("*"), dims: { w, d, h } };
+  return { size: [w, d, h].filter((x) => x != null).join("*"), dims: { w, d, h }, label };
 }
 
 const wb = XLSX.readFile(file, { cellStyles: false });
@@ -68,18 +95,37 @@ rows.forEach((r, i) => {
   }
   if (!cur) return;
   rowToNo.set(excelRow, cur.no);
-  const { size, dims } = normSize(r[4]);
+  const { size, dims, label, round } = normSize(r[4]);
   const price = typeof r[5] === "number" ? r[5] : null;
   const note = clean(r[6]);
-  const label = clean(r[4]) && !dims ? clean(r[4]) : "";
   const variant = { size, dims, price, note };
-  // drop exact duplicate lines (same size/price/note) inside a product
-  const dup = cur.variants.some((v) => v.size === variant.size && v.price === variant.price && v.note === variant.note);
+  if (label) variant.label = label;
+  if (round) variant.round = true;
+
+  // Source cells worth a human double-check (kept, but flagged in the UI).
+  const flags = [];
+  if (!dims && /\d+\s*[*x×]\s*\d+\s*[*x×]\s*\d+\s*[*x×]\s*\d+/.test(size)) flags.push("ขนาดมี 4 ตัวเลข — ตรวจสอบกับไฟล์ต้นทาง");
+  if (dims?.h != null && dims.h < 200 && /chair|sofa/.test(cur.category) && !/^MM-/i.test(cur.code)) flags.push(`ความสูง ${dims.h} มม. ดูผิดปกติสำหรับเก้าอี้/โซฟา — อาจพิมพ์ตกเลข`);
+  if (flags.length) {
+    variant.flag = flags.join("; ");
+    issues.push(`row ${excelRow}: ${cur.code} → ${variant.flag}`);
+  }
+
+  // drop exact duplicate lines (same label/size/price/note) inside a product
+  const dup = cur.variants.some(
+    (v) => v.size === variant.size && (v.label ?? "") === (variant.label ?? "") && v.price === variant.price && v.note === variant.note
+  );
   if (dup) {
     issues.push(`row ${excelRow}: duplicate variant of ${cur.code} removed`);
     return;
   }
-  if (label) variant.size = label;
+  // two size-less lines with different prices can't be told apart
+  const clash = cur.variants.find((v) => !v.size && !variant.size && !v.label && v.note === variant.note && v.price !== variant.price);
+  if (clash) {
+    variant.flag = "มี 2 แถวที่ไม่ระบุขนาด/ตัวเลือก แต่ราคาต่างกัน — ตรวจสอบกับไฟล์ต้นทาง";
+    clash.flag = variant.flag;
+    issues.push(`row ${excelRow}: ${cur.code} ${variant.flag}`);
+  }
   cur.variants.push(variant);
 });
 

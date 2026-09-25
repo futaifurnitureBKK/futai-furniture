@@ -23,6 +23,7 @@ const EDITABLE_FIELDS = [
   "next_followup_date",
   "deal_value",
   "lost_reason",
+  "owner",
 ] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

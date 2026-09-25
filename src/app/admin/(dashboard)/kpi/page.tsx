@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/store/language";
 import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
+import { SALESPEOPLE } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
 
 function todayStr() {
@@ -60,6 +61,7 @@ const emptyForm = {
   next_followup_date: "",
   deal_value: "",
   lost_reason: "",
+  owner: "",
 };
 
 export default function KpiPage() {
@@ -125,6 +127,7 @@ export default function KpiPage() {
       next_followup_date: lead.next_followup_date || "",
       deal_value: lead.deal_value != null ? String(lead.deal_value) : "",
       lost_reason: lead.lost_reason || "",
+      owner: lead.owner || "",
     });
     setLastSavedAt(null);
     setDialogOpen(true);
@@ -160,6 +163,7 @@ export default function KpiPage() {
       next_followup_date: f.next_followup_date || null,
       deal_value: f.deal_value ? Number(f.deal_value) : null,
       lost_reason: f.status === "lost" ? f.lost_reason || null : null,
+      owner: f.owner || null,
     };
   }
 
@@ -574,6 +578,11 @@ export default function KpiPage() {
                             {lead.sku ? ` · ${lead.sku}` : ""}
                           </p>
                         </div>
+                        {lead.owner && (
+                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700">
+                            {lead.owner}
+                          </span>
+                        )}
                         <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${m.color}`}>
                           {t(m.th, m.en, m.zh)}
                         </span>
@@ -740,6 +749,9 @@ export default function KpiPage() {
                           </span>
                           {lead.sku && <span className="font-mono bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.sku}</span>}
                           <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.lead_date}</span>
+                          {lead.owner && (
+                            <span className="bg-indigo-50 text-indigo-700 font-semibold rounded px-1.5 py-0.5">{lead.owner}</span>
+                          )}
                         </div>
 
                         {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
@@ -974,6 +986,21 @@ export default function KpiPage() {
                 value={form.needed_by_date}
                 onChange={(e) => setForm({ ...form, needed_by_date: e.target.value })}
               />
+            </div>
+
+            <div className="col-span-2">
+              <Label>{t("ผู้ดูแลลีด", "Lead Owner", "负责人")}</Label>
+              <Select value={form.owner || "__none"} onValueChange={(v) => setForm({ ...form, owner: !v || v === "__none" ? "" : v })}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue>{(v: string) => (v === "__none" ? t("ยังไม่ระบุ", "Not set", "未设置") : v)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">{t("ยังไม่ระบุ", "Not set", "未设置")}</SelectItem>
+                  {SALESPEOPLE.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2">

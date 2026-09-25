@@ -44,6 +44,7 @@ export interface Lead {
   next_followup_date: string | null;
   deal_value: number | null;
   lost_reason: string | null;
+  owner: string | null;
   converted_at: string | null;
   created_at: string;
   updated_at: string;

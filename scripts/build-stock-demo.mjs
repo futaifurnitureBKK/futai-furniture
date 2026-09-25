@@ -126,6 +126,32 @@ for (const a of drawing.matchAll(/<xdr:twoCellAnchor[\s\S]*?<\/xdr:twoCellAnchor
   imgCount++;
 }
 
+// Size-variant rows of the same model (e.g. NXLH66A-36/-42/-48) only carry a
+// photo on the first row. Reuse the nearest previous photo when the code
+// clearly belongs to the same series (long shared prefix, or the JQ-G / LX-
+// series whose suffix is the width in mm). Different models stay photo-less.
+const commonPrefix = (a, b) => {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i].toLowerCase() === b[i].toLowerCase()) i++;
+  return i;
+};
+let shared = 0;
+products.forEach((p, i) => {
+  if (p.image) return;
+  for (let j = i - 1; j >= 0 && j >= i - 6; j--) {
+    const q = products[j];
+    if (!q.image || q.category !== p.category) continue;
+    const pre = commonPrefix(p.code, q.code);
+    if (pre >= 5 || (pre >= 4 && /^(JQ-G|LX-)/i.test(p.code))) {
+      p.image = q.image;
+      p.imageShared = true;
+      shared++;
+    }
+    break;
+  }
+});
+console.log(`images shared from same-series sibling=${shared}`);
+
 const output = {
   categories: Object.values(CATEGORIES),
   products,

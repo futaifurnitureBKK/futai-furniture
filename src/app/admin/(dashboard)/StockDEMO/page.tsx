@@ -29,6 +29,7 @@ interface Prod {
   code: string;
   category: string;
   image?: string;
+  imageShared?: boolean;
   variants: Variant[];
 }
 interface Cat {
@@ -382,6 +383,9 @@ export default function StockDemoPage() {
                     <TableCell>
                       <p className="text-sm font-mono font-medium">{p.code}</p>
                       <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
+                      {p.imageShared && (
+                        <p className="text-[10px] text-[#9CA3AF] italic">{t("รูปจากรุ่นเดียวกัน", "photo from same model", "图片取自同款")}</p>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-[#6B6B6B]">
                       <p>{p.variants[0]?.size || "-"}{p.variants.length > 1 && ` +${p.variants.length - 1}`}</p>

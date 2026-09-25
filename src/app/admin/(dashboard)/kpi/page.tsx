@@ -55,6 +55,8 @@ const BOARD_COLUMNS: {
   { key: "D", th: "ปฏิเสธ", en: "Rejected", zh: "已拒绝", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
 ];
 
+const NO_OWNER = "__none";
+
 const emptyForm = {
   lead_date: todayStr(),
   customer_id: "",
@@ -92,6 +94,7 @@ export default function KpiPage() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
   useEffect(() => {
@@ -305,9 +308,12 @@ export default function KpiPage() {
     return earliest;
   }, [range, leads]);
 
+  const matchesOwner = (l: Lead) =>
+    ownerFilter === "all" ? true : ownerFilter === NO_OWNER ? !l.owner : l.owner === ownerFilter;
+
   const dateData = useMemo(() => {
     const counts = new Map<string, number>();
-    leads.forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
+    leads.filter(matchesOwner).forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
     const days: { date: string; count: number }[] = [];
     const end = new Date(todayStr());
     for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
@@ -315,15 +321,40 @@ export default function KpiPage() {
       days.push({ date: dateStr, count: counts.get(dateStr) || 0 });
     }
     return days;
-  }, [leads, rangeStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, rangeStart, ownerFilter]);
 
-  const leadsInScope = useMemo(
+  // Leads inside the chosen date scope, before the owner filter is applied —
+  // the per-owner summary is computed from these.
+  const rangeLeads = useMemo(
     () =>
       leads.filter((l) =>
         selectedDate ? l.lead_date === selectedDate : l.lead_date >= rangeStart && l.lead_date <= todayStr()
       ),
     [leads, selectedDate, rangeStart]
   );
+
+  const leadsInScope = useMemo(
+    () => rangeLeads.filter(matchesOwner),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rangeLeads, ownerFilter]
+  );
+
+  const ownerSummary = useMemo(() => {
+    const names = [...SALESPEOPLE, NO_OWNER];
+    return names.map((name) => {
+      const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
+      const converted = rows.filter((l) => l.status === "converted");
+      const revenue = converted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0);
+      return {
+        name,
+        count: rows.length,
+        converted: converted.length,
+        rate: rows.length ? (converted.length / rows.length) * 100 : 0,
+        revenue,
+      };
+    });
+  }, [rangeLeads]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
 
@@ -504,7 +535,16 @@ export default function KpiPage() {
           <p className="text-sm font-semibold text-[#1A1A1A]">
             {t("ลีดรายวัน", "Leads by Date", "每日线索")}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {ownerFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => setOwnerFilter("all")}
+                className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 hover:bg-indigo-100"
+              >
+                {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
+              </button>
+            )}
             <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
             <Input
               type="date"
@@ -612,6 +652,56 @@ export default function KpiPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── By owner ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm p-5">
+        <div className="flex items-center justify-between flex-wrap gap-1 mb-3">
+          <p className="text-sm font-semibold text-[#1A1A1A]">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")} · {scopeLabel}</p>
+          <p className="text-[10px] text-[#9CA3AF]">{t("กดชื่อเพื่อกรองกราฟและบอร์ดด้านล่างเฉพาะคนนั้น", "Click a name to filter the charts and board to that person", "点击姓名可仅筛选该负责人的图表和看板")}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
+                <th className="py-1.5 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
+                <th className="py-1.5 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
+                <th className="py-1.5 font-medium text-right">{t("ปิดการขาย", "Closed", "成交")}</th>
+                <th className="py-1.5 font-medium text-right">{t("อัตราปิด", "Close rate", "成交率")}</th>
+                <th className="py-1.5 font-medium text-right">{t("ยอดขาย (บาท)", "Revenue (THB)", "销售额（泰铢）")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                onClick={() => setOwnerFilter("all")}
+                className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
+              >
+                <td className="py-1.5">{t("ทุกคน", "Everyone", "全部")}</td>
+                <td className="py-1.5 text-right">{rangeLeads.length}</td>
+                <td className="py-1.5 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
+                <td className="py-1.5 text-right">
+                  {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
+                </td>
+                <td className="py-1.5 text-right">
+                  {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                </td>
+              </tr>
+              {ownerSummary.map((o) => (
+                <tr
+                  key={o.name}
+                  onClick={() => setOwnerFilter(ownerFilter === o.name ? "all" : o.name)}
+                  className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
+                >
+                  <td className="py-1.5">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
+                  <td className="py-1.5 text-right">{o.count}</td>
+                  <td className="py-1.5 text-right">{o.converted}</td>
+                  <td className="py-1.5 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
+                  <td className="py-1.5 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ── Channel chart + side panels ──────────────────────────── */}

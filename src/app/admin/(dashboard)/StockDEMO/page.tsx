@@ -81,6 +81,11 @@ const SEED_STOCK: Record<string, VarStock> = Object.fromEntries(
 );
 const emptyProd: ProdInfo = { description: "", color: "", material: "", boxesPerItem: 1 };
 
+// Models with no price on any size are made-to-order / custom — they get their
+// own group instead of sitting in their product category (showroom samples excepted).
+const CUSTOM = "custom";
+const isCustom = (p: Prod) => p.category !== "sample" && p.variants.every((v) => v.price == null);
+
 const vkey = (p: Prod, i: number) => p.variants[i]?.key ?? `${p.no}:${i}`;
 
 type StatusKey = "ok" | "low" | "out" | "untracked";
@@ -162,7 +167,10 @@ export default function StockDemoPage() {
 
   const catCounts = useMemo(() => {
     const m = new Map<string, number>();
-    PRODUCTS.forEach((p) => m.set(p.category, (m.get(p.category) || 0) + 1));
+    PRODUCTS.forEach((p) => {
+      const k = isCustom(p) ? CUSTOM : p.category;
+      m.set(k, (m.get(k) || 0) + 1);
+    });
     return m;
   }, []);
 
@@ -172,7 +180,7 @@ export default function StockDemoPage() {
     const q = query.trim().toLowerCase();
     const out: { p: Prod; idxs: number[] }[] = [];
     for (const p of PRODUCTS) {
-      if (cat !== "all" && p.category !== cat) continue;
+      if (cat === CUSTOM ? !isCustom(p) : cat !== "all" && (p.category !== cat || isCustom(p))) continue;
       if (q) {
         const c = CATEGORIES.find((c) => c.key === p.category);
         const hit =
@@ -378,6 +386,13 @@ export default function StockDemoPage() {
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${cat === "all" ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"}`}
           >
             {t("ทั้งหมด", "All", "全部")} ({PRODUCTS.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCat(CUSTOM); setLimit(PAGE); }}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${cat === CUSTOM ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}
+          >
+            {t("สั่งทำ / Custom / 定制", "Custom order / 定制", "定制 / Custom")} ({catCounts.get(CUSTOM) ?? 0})
           </button>
           {CATEGORIES.map((c) => (
             <button

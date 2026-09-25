@@ -319,10 +319,11 @@ export default function KpiPage() {
       CHANNELS.map((c) => ({
         channel: t(c.th, c.en, c.zh),
         count: leads.filter((l) => l.channel === c.value).length,
+        onDate: leads.filter((l) => l.channel === c.value && l.lead_date === selectedDate).length,
         converted: leads.filter((l) => l.channel === c.value && l.status === "converted").length,
         color: c.color,
       })),
-    [leads, t]
+    [leads, t, selectedDate]
   );
 
   const topSkus = useMemo(() => {
@@ -587,7 +588,17 @@ export default function KpiPage() {
       {/* ── Channel chart + side panels ──────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")}</p>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <p className="text-sm font-semibold text-[#1A1A1A]">{t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")}</p>
+            <div className="flex items-center gap-3 text-[11px] text-[#6B6B6B]">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#D9D4CA]" /> {t("ทั้งหมด", "All", "全部")}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#C8102E]" /> {t("วันที่", "On", "日期")} {selectedDate}
+              </span>
+            </div>
+          </div>
           {leads.length === 0 ? (
             <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
           ) : (
@@ -604,17 +615,26 @@ export default function KpiPage() {
                     return (
                       <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
                         <p className="font-semibold text-[#1A1A1A]">{d.channel}</p>
-                        <p className="text-[#6B6B6B]">{t("ลีด", "Leads", "线索数")}: {d.count}</p>
+                        <p className="text-[#6B6B6B]">{t("ลีดทั้งหมด", "All leads", "全部线索")}: {d.count}</p>
+                        <p className="text-[#C8102E]">{t("ลีดวันที่", "Leads on", "线索日期")} {selectedDate}: {d.onDate}</p>
                         <p className="text-[#6B6B6B]">{t("ปิดการขาย", "Converted", "成交")}: {d.converted}</p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={56}>
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
                   {channelData.map((d) => (
                     <Cell key={d.channel} fill={d.color} />
                   ))}
                   <LabelList dataKey="count" position="top" style={{ fontSize: 12, fill: "#1A1A1A", fontWeight: 600 }} />
+                </Bar>
+                <Bar dataKey="onDate" radius={[4, 4, 0, 0]} maxBarSize={40} fill="#C8102E">
+                  <LabelList
+                    dataKey="onDate"
+                    position="top"
+                    formatter={(v: unknown) => (Number(v) > 0 ? String(v) : "")}
+                    style={{ fontSize: 12, fill: "#C8102E", fontWeight: 700 }}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

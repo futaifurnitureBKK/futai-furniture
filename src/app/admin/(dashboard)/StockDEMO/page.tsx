@@ -28,6 +28,7 @@ interface Variant {
   flag?: string;
   key?: string;
   code?: string;
+  fromStock?: boolean;
 }
 interface Prod {
   no: number;
@@ -35,6 +36,7 @@ interface Prod {
   category: string;
   image?: string;
   mergedCodes?: string[];
+  fromStock?: boolean;
   variants: Variant[];
 }
 interface Cat {
@@ -53,6 +55,7 @@ interface VarStock {
   eta: string;
   batch: string;
   landedCost: number | null;
+  note: string;
 }
 // Descriptive info shared by all sizes of one product.
 interface ProdInfo {
@@ -68,8 +71,14 @@ const STORAGE_KEY = "futai-stock-demo-v2";
 const PAGE = 40;
 
 const emptyVar: VarStock = {
-  available: 0, reserved: 0, defective: 0, reorderPoint: 0, location: "", eta: "", batch: "", landedCost: null,
+  available: 0, reserved: 0, defective: 0, reorderPoint: 0, location: "", eta: "", batch: "", landedCost: null, note: "",
 };
+
+// Real numbers from the original stock workbook (库存表格): sellable = warehouse − locked.
+const SEED = ((raw as unknown as { stockSeed?: Record<string, { available: number; reserved: number; note: string }> }).stockSeed ?? {});
+const SEED_STOCK: Record<string, VarStock> = Object.fromEntries(
+  Object.entries(SEED).map(([k, v]) => [k, { ...emptyVar, available: v.available, reserved: v.reserved, note: v.note }])
+);
 const emptyProd: ProdInfo = { description: "", color: "", material: "", boxesPerItem: 1 };
 
 const vkey = (p: Prod, i: number) => p.variants[i]?.key ?? `${p.no}:${i}`;
@@ -103,7 +112,9 @@ function sizeLabel(v: Variant) {
 
 export default function StockDemoPage() {
   const { t } = useLanguage();
-  const [varStock, setVarStock] = useState<Record<string, VarStock>>({});
+  const [edits, setVarStock] = useState<Record<string, VarStock>>({});
+  // seed from the original workbook, overridden by anything edited in this browser
+  const varStock = useMemo(() => ({ ...SEED_STOCK, ...edits }), [edits]);
   const [prodInfo, setProdInfo] = useState<Record<number, ProdInfo>>({});
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string>("all");
@@ -141,7 +152,7 @@ export default function StockDemoPage() {
 
   function patchVar(p: Prod, i: number, change: Partial<VarStock>) {
     const k = vkey(p, i);
-    persist({ ...varStock, [k]: { ...emptyVar, ...varStock[k], ...change } }, prodInfo);
+    persist({ ...edits, [k]: { ...emptyVar, ...varStock[k], ...change } }, prodInfo);
   }
 
   const catLabel = (key: string) => {
@@ -205,7 +216,7 @@ export default function StockDemoPage() {
     if (!detail) return;
     // Only write sizes the user actually changed — otherwise merely opening
     // and saving the dialog would mark every untouched size as "out of stock".
-    const nextV = { ...varStock };
+    const nextV = { ...edits };
     draftVars.forEach((s, i) => {
       const k = vkey(detail, i);
       if (JSON.stringify({ ...emptyVar, ...varStock[k] }) !== JSON.stringify(s)) nextV[k] = s;
@@ -219,7 +230,7 @@ export default function StockDemoPage() {
   }
 
   function resetDemo() {
-    if (!confirm(t("ล้างข้อมูลสต็อกที่กรอกไว้ทั้งหมด (ในเครื่องนี้)?", "Clear all stock data entered (on this device)?", "清除此设备上录入的全部库存数据？"))) return;
+    if (!confirm(t("ยกเลิกการแก้ไขทั้งหมดในเครื่องนี้ และกลับไปใช้ตัวเลขจากไฟล์เดิม?", "Discard all edits on this device and go back to the original file's numbers?", "放弃此设备上的所有修改并恢复为原文件数字？"))) return;
     persist({}, {});
   }
 
@@ -262,6 +273,7 @@ export default function StockDemoPage() {
             Location: s.location,
             ETA: s.eta,
             "Batch / Lot": s.batch,
+            "Stock note": s.note,
             ...(showCost ? { "Landed cost": s.landedCost ?? "" } : {}),
           };
         })
@@ -287,9 +299,9 @@ export default function StockDemoPage() {
           <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("สต็อกสินค้า (DEMO)", "Stock (DEMO)", "库存（演示）")}</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">
             {t(
-              "ข้อมูลสินค้านำเข้าจากไฟล์ Excel — สต็อกนับแยกตามแต่ละขนาด ตัวเลขที่กรอกเก็บไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น",
-              "Product data imported from the Excel file — stock is tracked per size; numbers you enter are saved in this browser only",
-              "产品数据来自Excel文件——库存按每个尺寸分别统计；录入的数字仅保存在此浏览器中"
+              "สินค้า/ราคา/รูปจากไฟล์รหัสสินค้า และตัวเลขสต็อกเริ่มต้นจากตารางสต็อกเดิม (库存表格) — นับแยกตามขนาด ตัวเลขที่แก้ไขเก็บไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น",
+              "Products/prices/photos from the product-code file; starting stock from the original stock sheet (库存表格) — tracked per size; your edits are saved in this browser only",
+              "产品/价格/图片来自编号文件，初始库存来自原库存表格（库存表格）——按尺寸统计；修改仅保存在此浏览器中"
             )}
           </p>
         </div>
@@ -302,7 +314,7 @@ export default function StockDemoPage() {
             <Download size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
           <Button size="sm" variant="ghost" onClick={resetDemo}>
-            <RotateCcw size={14} className="mr-1.5" /> {t("ล้างข้อมูลที่กรอก", "Clear entries", "清除录入")}
+            <RotateCcw size={14} className="mr-1.5" /> {t("รีเซ็ตกลับเป็นข้อมูลไฟล์เดิม", "Reset to original file", "恢复为原文件数据")}
           </Button>
         </div>
       </div>
@@ -430,6 +442,9 @@ export default function StockDemoPage() {
                             <TableCell rowSpan={idxs.length} className="align-top">
                               <p className="text-sm font-mono font-medium">{p.code}</p>
                               <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
+                              {p.fromStock && (
+                                <p className="text-[10px] text-amber-700">{t("มีเฉพาะในตารางสต็อกเดิม (ยังไม่มีในไฟล์รหัสสินค้า)", "only in the old stock sheet (not in the product-code file)", "仅在旧库存表中（编号文件中没有）")}</p>
+                              )}
                               {p.mergedCodes && (
                                 <p className="text-[10px] text-[#9CA3AF] italic">
                                   {t(`รุ่นเดียวกัน ${p.mergedCodes.length} ขนาด/รหัส`, `same model · ${p.mergedCodes.length} sizes/codes`, `同款 · ${p.mergedCodes.length} 个规格/编号`)}
@@ -448,6 +463,10 @@ export default function StockDemoPage() {
                               </span>
                             )}
                           </p>
+                          {info.available < 0 && (
+                            <p className="text-amber-700">{t(`ล็อกเกินของในโกดัง ${fmt(-info.available)} ชิ้น`, `over-locked by ${fmt(-info.available)}`, `锁单超出库存 ${fmt(-info.available)}`)}</p>
+                          )}
+                          {info.note && <p className="text-[10px] text-[#9CA3AF] max-w-[16rem] break-words">🔒 {info.note}</p>}
                           <p className="font-semibold text-[#1A1A1A]">
                             {v.price != null ? fmt(v.price) : <span className="font-normal text-[#9CA3AF]">{t("ยังไม่มีราคา", "No price yet", "暂无价格")}</span>}
                             {v.note && <span className="ml-1.5 font-normal text-[#9CA3AF]">· {v.note}</span>}
@@ -457,7 +476,7 @@ export default function StockDemoPage() {
                           <TableCell key={f}>
                             <Input
                               type="number"
-                              min={0}
+                              step="any"
                               className="h-8 w-20 text-xs"
                               value={info[f] || ""}
                               placeholder="0"
@@ -559,6 +578,7 @@ export default function StockDemoPage() {
                         <TableHead className="text-xs">{t("ตำแหน่ง", "Location", "库位")}</TableHead>
                         <TableHead className="text-xs">ETA</TableHead>
                         <TableHead className="text-xs">{t("ล็อต/ตู้", "Batch", "批次")}</TableHead>
+                        <TableHead className="text-xs">{t("หมายเหตุสต็อก / ลูกค้าที่ล็อก", "Stock note / locked for", "库存备注/锁单客户")}</TableHead>
                         {showCost && <TableHead className="text-xs text-[#C8102E]">{t("ต้นทุน", "Landed cost", "到岸成本")}</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -593,6 +613,9 @@ export default function StockDemoPage() {
                             </TableCell>
                             <TableCell>
                               <Input className="h-8 w-28 text-xs" value={d.batch} onChange={(e) => patchDraftVar(i, { batch: e.target.value })} />
+                            </TableCell>
+                            <TableCell>
+                              <Input className="h-8 w-56 text-xs" value={d.note} onChange={(e) => patchDraftVar(i, { note: e.target.value })} />
                             </TableCell>
                             {showCost && (
                               <TableCell>

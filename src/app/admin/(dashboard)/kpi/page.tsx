@@ -400,31 +400,6 @@ export default function KpiPage() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   }, [leads]);
 
-  const lostReasons = useMemo(() => {
-    const counts = new Map<string, number>();
-    leads.forEach((l) => {
-      if (l.status === "lost" && l.lost_reason) counts.set(l.lost_reason, (counts.get(l.lost_reason) || 0) + 1);
-    });
-    return [...counts.entries()];
-  }, [leads]);
-
-  const segmentBreakdown = useMemo(
-    () =>
-      SEGMENTS.map((s) => {
-        const rows = leads.filter((l) => l.segment === s.value);
-        const converted = rows.filter((l) => l.status === "converted");
-        const deals = converted.filter((l) => l.deal_value != null).map((l) => l.deal_value as number);
-        return {
-          key: s.value,
-          label: t(s.th, s.en, s.zh),
-          count: rows.length,
-          convertedCount: converted.length,
-          aov: deals.length ? deals.reduce((a, b) => a + b, 0) / deals.length : null,
-        };
-      }),
-    [leads, t]
-  );
-
   function exportExcel() {
     // dynamic import keeps the xlsx bundle out of the initial page load
     import("xlsx").then((XLSX) => {
@@ -531,184 +506,80 @@ export default function KpiPage() {
         ))}
       </div>
 
-      {/* ── Leads by date ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <p className="text-sm font-semibold text-[#1A1A1A]">
-            {t("ลีดรายวัน", "Leads by Date", "每日线索")}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            {ownerFilter !== "all" && (
-              <button
-                type="button"
-                onClick={() => setOwnerFilter("all")}
-                className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 hover:bg-indigo-100"
-              >
-                {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
-              </button>
-            )}
-            <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
-            <Input
-              type="date"
-              className="h-8 w-auto text-xs"
-              value={selectedDate ?? ""}
-              onChange={(e) => setSelectedDate(e.target.value || null)}
-            />
-          </div>
-        </div>
-
-        {leads.length === 0 ? (
+      {/* ── Charts + owner summary (one row) ─────────────────────── */}
+      {leads.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-5">
           <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
-        ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={dateData}
-                  margin={{ top: 20, right: 8, left: -20, bottom: 0 }}
-                  onClick={(state) => {
-                    const label = state?.activeLabel;
-                    if (typeof label === "string") setSelectedDate(label);
-                  }}
-                  style={{ cursor: "pointer" }}
-                >
-                  <CartesianGrid vertical={false} stroke="#E8E5E0" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
-                    tick={{ fontSize: 10, fill: "#6B6B6B" }}
-                    axisLine={{ stroke: "#E8E5E0" }}
-                    tickLine={false}
-                    interval={Math.max(0, Math.ceil(dateData.length / 8) - 1)}
-                  />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: "#FAF7F2" }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload as (typeof dateData)[number];
-                      return (
-                        <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
-                          <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
-                          <p className="text-[#6B6B6B]">{t("ลีด", "Leads", "线索数")}: {d.count}</p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={20}>
-                    {dateData.map((d) => (
-                      <Cell key={d.date} fill={!selectedDate || d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="flex items-center justify-center gap-1.5 mt-2">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    onClick={() => {
-                      setRange(r.key);
-                      setSelectedDate(null);
-                    }}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                      range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
-                    }`}
-                  >
-                    {r.key}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t xl:border-t-0 xl:border-l border-[#E8E5E0] pt-4 xl:pt-0 xl:pl-4">
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
-                <table className="w-full text-[11px]">
-                  <thead>
-                    <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
-                      <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
-                      <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
-                      <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
-                      <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
-                      <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      onClick={() => setOwnerFilter("all")}
-                      className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
-                    >
-                      <td className="py-1">{t("ทุกคน", "Everyone", "全部")}</td>
-                      <td className="py-1 text-right">{rangeLeads.length}</td>
-                      <td className="py-1 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
-                      <td className="py-1 text-right">
-                        {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
-                      </td>
-                      <td className="py-1 text-right">
-                        {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
-                      </td>
-                    </tr>
-                    {ownerSummary.map((o) => (
-                      <tr
-                        key={o.name}
-                        onClick={() => setOwnerFilter(ownerFilter === o.name ? "all" : o.name)}
-                        className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
-                      >
-                        <td className="py-1">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
-                        <td className="py-1 text-right">{o.count}</td>
-                        <td className="py-1 text-right">{o.converted}</td>
-                        <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
-                        <td className="py-1 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="text-[10px] text-[#9CA3AF] mt-1">{t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น", "Click a name to filter the charts and board", "点击姓名筛选图表和看板")}</p>
-              </div>
-              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
-                {t("ลีด", "Leads", "线索")} {scopeLabel} ({leadsInScope.length})
-              </p>
-              {leadsInScope.length === 0 ? (
-                <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีลีดในวันนี้", "No leads on this date", "该日期无线索")}</p>
-              ) : (
-                <>
-                <div className="mb-2.5">
-                  <p className="text-[10px] font-semibold text-[#6B6B6B] mb-1">
-                    {t("Leads ต่อ Channel (มาจาก platform ไหน)", "Leads by Channel (which platform)", "各渠道线索数（来自哪个平台）")}
-                  </p>
-                  <div className="space-y-1">
-                    {channelInScope.map((c) => (
-                      <div key={c.value} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                        <span className="w-16 shrink-0 text-[#1A1A1A]">{c.label}</span>
-                        <div className="flex-1 h-2 bg-[#F0EDE6] rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${(c.count / leadsInScope.length) * 100}%`, backgroundColor: c.color }}
-                          />
-                        </div>
-                        <span className="font-semibold text-[#1A1A1A] w-5 text-right">{c.count}</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+          {/* Leads by date */}
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("ลีดรายวัน", "Leads by Date", "每日线索")}</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart
+                data={dateData}
+                margin={{ top: 20, right: 8, left: -20, bottom: 0 }}
+                onClick={(state) => {
+                  const label = state?.activeLabel;
+                  if (typeof label === "string") setSelectedDate(label);
+                }}
+                style={{ cursor: "pointer" }}
+              >
+                <CartesianGrid vertical={false} stroke="#E8E5E0" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
+                  tick={{ fontSize: 10, fill: "#6B6B6B" }}
+                  axisLine={{ stroke: "#E8E5E0" }}
+                  tickLine={false}
+                  interval={Math.max(0, Math.ceil(dateData.length / 6) - 1)}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  cursor={{ fill: "#FAF7F2" }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0].payload as (typeof dateData)[number];
+                    return (
+                      <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
+                        <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                        <p className="text-[#6B6B6B]">{t("ลีด", "Leads", "线索数")}: {d.count}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-                </>
-              )}
+                    );
+                  }}
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={20}>
+                  {dateData.map((d) => (
+                    <Cell key={d.date} fill={!selectedDate || d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-1.5 mt-2">
+              {RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => {
+                    setRange(r.key);
+                    setSelectedDate(null);
+                  }}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                  }`}
+                >
+                  {r.key}
+                </button>
+              ))}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* ── Channel chart + side panels ──────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-4">
-            {t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")} · {scopeLabel}
-          </p>
-          {leads.length === 0 ? (
-            <p className="text-sm text-[#9CA3AF] text-center py-16">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
-          ) : (
+          {/* Leads by channel */}
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <p className="text-sm font-semibold text-[#1A1A1A] mb-4">
+              {t("Leads ต่อ Channel", "Leads by Channel", "各渠道线索数")} · {scopeLabel}
+            </p>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={channelData} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="#E8E5E0" />
@@ -728,7 +599,7 @@ export default function KpiPage() {
                     );
                   }}
                 />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={56}>
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={44}>
                   {channelData.map((d) => (
                     <Cell key={d.channel} fill={d.color} />
                   ))}
@@ -736,61 +607,106 @@ export default function KpiPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          {/* Segment breakdown */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <p className="text-sm font-semibold text-[#1A1A1A] mb-3">B2B vs B2C</p>
-            <div className="space-y-2">
-              {segmentBreakdown.map((s) => (
-                <div key={s.key} className="flex items-center justify-between text-xs">
-                  <span className="text-[#6B6B6B]">{s.label}</span>
-                  <span className="text-[#1A1A1A] font-medium">
-                    {s.count} {t("ลีด", "leads", "条线索")} · {t("ปิด", "closed", "成交")} {s.convertedCount} · AOV {s.aov != null ? s.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-"}
-                  </span>
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Top SKUs */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("SKU ขายดี (ปิดการขาย)", "Top SKUs (Converted)", "热销SKU（已成交）")}</p>
-            {topSkus.length === 0 ? (
-              <p className="text-xs text-[#9CA3AF]">{t("ยังไม่มีดีลที่ปิด", "No closed deals yet", "暂无已成交订单")}</p>
-            ) : (
-              <div className="space-y-1.5">
-                {topSkus.map(([sku, count]) => (
-                  <div key={sku} className="flex items-center justify-between text-xs">
-                    <span className="font-mono text-[#1A1A1A]">{sku}</span>
-                    <span className="text-[#6B6B6B]">{count} {t("ดีล", "deals", "单")}</span>
+          {/* Date picker + owner summary + platform split */}
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <div className="flex items-center justify-end gap-2 flex-wrap">
+              {ownerFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setOwnerFilter("all")}
+                  className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 hover:bg-indigo-100"
+                >
+                  {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
+                </button>
+              )}
+              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
+              <Input
+                type="date"
+                className="h-8 w-auto text-xs"
+                value={selectedDate ?? ""}
+                onChange={(e) => setSelectedDate(e.target.value || null)}
+              />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
+                    <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
+                    <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
+                    <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
+                    <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
+                    <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    onClick={() => setOwnerFilter("all")}
+                    className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
+                  >
+                    <td className="py-1">{t("ทุกคน", "Everyone", "全部")}</td>
+                    <td className="py-1 text-right">{rangeLeads.length}</td>
+                    <td className="py-1 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
+                    <td className="py-1 text-right">
+                      {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
+                    </td>
+                    <td className="py-1 text-right">
+                      {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                    </td>
+                  </tr>
+                  {ownerSummary.map((o) => (
+                    <tr
+                      key={o.name}
+                      onClick={() => setOwnerFilter(ownerFilter === o.name ? "all" : o.name)}
+                      className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
+                    >
+                      <td className="py-1">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
+                      <td className="py-1 text-right">{o.count}</td>
+                      <td className="py-1 text-right">{o.converted}</td>
+                      <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
+                      <td className="py-1 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-[10px] text-[#9CA3AF] mt-1">{t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น", "Click a name to filter the charts and board", "点击姓名筛选图表和看板")}</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
+                {t("ลีด", "Leads", "线索")} {scopeLabel} ({leadsInScope.length})
+              </p>
+              {leadsInScope.length === 0 ? (
+                <p className="text-xs text-[#9CA3AF] text-center py-4">{t("ไม่มีลีดในช่วงนี้", "No leads in this period", "该期间无线索")}</p>
+              ) : (
+                <div>
+                  <p className="text-[10px] font-semibold text-[#6B6B6B] mb-1">
+                    {t("Leads ต่อ Channel (มาจาก platform ไหน)", "Leads by Channel (which platform)", "各渠道线索数（来自哪个平台）")}
+                  </p>
+                  <div className="space-y-1">
+                    {channelInScope.map((c) => (
+                      <div key={c.value} className="flex items-center gap-2 text-xs">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                        <span className="w-16 shrink-0 text-[#1A1A1A]">{c.label}</span>
+                        <div className="flex-1 h-2 bg-[#F0EDE6] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${(c.count / leadsInScope.length) * 100}%`, backgroundColor: c.color }}
+                          />
+                        </div>
+                        <span className="font-semibold text-[#1A1A1A] w-5 text-right">{c.count}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Lost reasons */}
-          {lostReasons.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <p className="text-sm font-semibold text-[#1A1A1A] mb-3">{t("เหตุผลที่เสียดีล", "Lost Deal Reasons", "流失原因")}</p>
-              <div className="space-y-1.5">
-                {lostReasons.map(([reason, count]) => {
-                  const r = LOST_REASONS.find((r) => r.value === reason);
-                  return (
-                    <div key={reason} className="flex items-center justify-between text-xs">
-                      <span className="text-[#6B6B6B]">{r ? t(r.th, r.en, r.zh) : reason}</span>
-                      <span className="text-[#1A1A1A] font-medium">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Status board ─────────────────────────────────────────── */}
       {loading ? (

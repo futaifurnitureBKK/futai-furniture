@@ -620,6 +620,50 @@ export default function KpiPage() {
             </div>
 
             <div className="border-t xl:border-t-0 xl:border-l border-[#E8E5E0] pt-4 xl:pt-0 xl:pl-4">
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
+                      <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
+                      <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
+                      <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
+                      <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
+                      <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      onClick={() => setOwnerFilter("all")}
+                      className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
+                    >
+                      <td className="py-1">{t("ทุกคน", "Everyone", "全部")}</td>
+                      <td className="py-1 text-right">{rangeLeads.length}</td>
+                      <td className="py-1 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
+                      <td className="py-1 text-right">
+                        {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
+                      </td>
+                      <td className="py-1 text-right">
+                        {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                      </td>
+                    </tr>
+                    {ownerSummary.map((o) => (
+                      <tr
+                        key={o.name}
+                        onClick={() => setOwnerFilter(ownerFilter === o.name ? "all" : o.name)}
+                        className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
+                      >
+                        <td className="py-1">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
+                        <td className="py-1 text-right">{o.count}</td>
+                        <td className="py-1 text-right">{o.converted}</td>
+                        <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
+                        <td className="py-1 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-[#9CA3AF] mt-1">{t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น", "Click a name to filter the charts and board", "点击姓名筛选图表和看板")}</p>
+              </div>
               <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
                 {t("ลีด", "Leads", "线索")} {scopeLabel} ({leadsInScope.length})
               </p>
@@ -652,56 +696,6 @@ export default function KpiPage() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── By owner ─────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <div className="flex items-center justify-between flex-wrap gap-1 mb-3">
-          <p className="text-sm font-semibold text-[#1A1A1A]">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")} · {scopeLabel}</p>
-          <p className="text-[10px] text-[#9CA3AF]">{t("กดชื่อเพื่อกรองกราฟและบอร์ดด้านล่างเฉพาะคนนั้น", "Click a name to filter the charts and board to that person", "点击姓名可仅筛选该负责人的图表和看板")}</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
-                <th className="py-1.5 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
-                <th className="py-1.5 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
-                <th className="py-1.5 font-medium text-right">{t("ปิดการขาย", "Closed", "成交")}</th>
-                <th className="py-1.5 font-medium text-right">{t("อัตราปิด", "Close rate", "成交率")}</th>
-                <th className="py-1.5 font-medium text-right">{t("ยอดขาย (บาท)", "Revenue (THB)", "销售额（泰铢）")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                onClick={() => setOwnerFilter("all")}
-                className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
-              >
-                <td className="py-1.5">{t("ทุกคน", "Everyone", "全部")}</td>
-                <td className="py-1.5 text-right">{rangeLeads.length}</td>
-                <td className="py-1.5 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
-                <td className="py-1.5 text-right">
-                  {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
-                </td>
-                <td className="py-1.5 text-right">
-                  {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
-                </td>
-              </tr>
-              {ownerSummary.map((o) => (
-                <tr
-                  key={o.name}
-                  onClick={() => setOwnerFilter(ownerFilter === o.name ? "all" : o.name)}
-                  className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
-                >
-                  <td className="py-1.5">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
-                  <td className="py-1.5 text-right">{o.count}</td>
-                  <td className="py-1.5 text-right">{o.converted}</td>
-                  <td className="py-1.5 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
-                  <td className="py-1.5 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* ── Channel chart + side panels ──────────────────────────── */}

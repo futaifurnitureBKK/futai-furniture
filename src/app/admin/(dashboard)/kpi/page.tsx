@@ -49,10 +49,10 @@ const BOARD_COLUMNS: {
   header: string;
   body: string;
 }[] = [
-  { key: "A", th: "คอนเฟิร์ม / จ่ายเงินแล้ว", en: "Confirmed / Paid", zh: "已确认/已付款", statuses: ["converted"], header: "bg-emerald-600", body: "bg-emerald-50/60 border-emerald-200" },
-  { key: "B", th: "รออนุมัติ (ส่งใบเสนอราคาแล้ว)", en: "Pending Approval (Quote Sent)", zh: "待批准（已发报价单）", statuses: ["quoted"], header: "bg-amber-500", body: "bg-amber-50/60 border-amber-200" },
-  { key: "C", th: "ยังไม่ได้ตอบกลับ", en: "No Response Yet", zh: "尚未回复", statuses: ["new", "followed_1", "followed_2plus", "engaged"], header: "bg-orange-500", body: "bg-orange-50/60 border-orange-200" },
-  { key: "D", th: "ปฏิเสธ", en: "Rejected", zh: "已拒绝", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
+  { key: "A", th: "คอนเฟิร์ม / จ่ายเงินแล้ว", en: "Confirmed / Paid", zh: "已成交", statuses: ["converted"], header: "bg-emerald-600", body: "bg-emerald-50/60 border-emerald-200" },
+  { key: "B", th: "รออนุมัติ (ส่งใบเสนอราคาแล้ว)", en: "Pending Approval (Quote Sent)", zh: "有意向/已发报价表", statuses: ["quoted"], header: "bg-amber-500", body: "bg-amber-50/60 border-amber-200" },
+  { key: "C", th: "ยังไม่ได้ตอบกลับ", en: "No Response Yet", zh: "刚进线客户", statuses: ["new", "followed_1", "followed_2plus", "engaged"], header: "bg-orange-500", body: "bg-orange-50/60 border-orange-200" },
+  { key: "D", th: "ปฏิเสธ", en: "Rejected", zh: "没意向", statuses: ["lost"], header: "bg-red-600", body: "bg-red-50/60 border-red-200" },
 ];
 
 const NO_OWNER = "__none";

@@ -303,6 +303,17 @@ export default function KpiPage() {
     [leads, selectedDate]
   );
 
+  const channelOnSelectedDate = useMemo(
+    () =>
+      CHANNELS.map((c) => ({
+        value: c.value,
+        label: t(c.th, c.en, c.zh),
+        color: c.color,
+        count: leadsOnSelectedDate.filter((l) => l.channel === c.value).length,
+      })).filter((c) => c.count > 0),
+    [leadsOnSelectedDate, t]
+  );
+
   const channelData = useMemo(
     () =>
       CHANNELS.map((c) => ({
@@ -520,6 +531,27 @@ export default function KpiPage() {
               {leadsOnSelectedDate.length === 0 ? (
                 <p className="text-xs text-[#9CA3AF] text-center py-6">{t("ไม่มีลีดในวันนี้", "No leads on this date", "该日期无线索")}</p>
               ) : (
+                <>
+                <div className="mb-2.5">
+                  <p className="text-[10px] font-semibold text-[#6B6B6B] mb-1">
+                    {t("Leads ต่อ Channel (มาจาก platform ไหน)", "Leads by Channel (which platform)", "各渠道线索数（来自哪个平台）")}
+                  </p>
+                  <div className="space-y-1">
+                    {channelOnSelectedDate.map((c) => (
+                      <div key={c.value} className="flex items-center gap-2 text-xs">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                        <span className="w-16 shrink-0 text-[#1A1A1A]">{c.label}</span>
+                        <div className="flex-1 h-2 bg-[#F0EDE6] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${(c.count / leadsOnSelectedDate.length) * 100}%`, backgroundColor: c.color }}
+                          />
+                        </div>
+                        <span className="font-semibold text-[#1A1A1A] w-5 text-right">{c.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
                   {leadsOnSelectedDate.map((lead) => {
                     const c = CHANNELS.find((c) => c.value === lead.channel);
@@ -545,6 +577,7 @@ export default function KpiPage() {
                     );
                   })}
                 </div>
+                </>
               )}
             </div>
           </div>

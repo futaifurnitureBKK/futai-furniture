@@ -341,7 +341,9 @@ export default function KpiPage() {
   );
 
   const ownerSummary = useMemo(() => {
-    const names = [...SALESPEOPLE, NO_OWNER];
+    // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row
+    const legacy = [...new Set(leads.map((l) => l.owner).filter((o): o is string => !!o && !SALESPEOPLE.includes(o)))];
+    const names = [...SALESPEOPLE, ...legacy, NO_OWNER];
     return names.map((name) => {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
@@ -354,7 +356,7 @@ export default function KpiPage() {
         revenue,
       };
     });
-  }, [rangeLeads]);
+  }, [rangeLeads, leads]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
 

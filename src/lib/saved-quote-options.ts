@@ -31,7 +31,7 @@ export const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok
 
 // Who's assigned to look after this order — a fixed roster the company
 // keeps, not free text, so it stays consistent across quotes.
-export const SALESPEOPLE = ["Jacob", "Kan", "Xiaoying", "P'Jane", "P'NEE"];
+export const SALESPEOPLE = ["Kan & J", "Xiaoying", "P'Jane", "P'NEE"];
 
 export const PAYMENT_METHOD_META: Record<PaymentMethod, TriText> = {
   cash:        { th: "เงินสด",     en: "Cash",           zh: "现金" },

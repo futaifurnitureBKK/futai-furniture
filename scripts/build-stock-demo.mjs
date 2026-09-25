@@ -126,6 +126,10 @@ rows.forEach((r, i) => {
     clash.flag = variant.flag;
     issues.push(`row ${excelRow}: ${cur.code} ${variant.flag}`);
   }
+  // Stable id for this size line — stock entered in the demo is keyed by it,
+  // so it survives products being merged below.
+  variant.key = `${cur.no}:${cur.variants.length}`;
+  variant.code = cur.code;
   cur.variants.push(variant);
 });
 
@@ -198,10 +202,31 @@ products.forEach((p, i) => {
 });
 console.log(`images shared from same-series sibling=${shared}`);
 
+// Same model in different sizes = one product with several size rows. Fold
+// every photo-sharing sibling into the product that owns the photo.
+const owners = new Map();
+products.forEach((p) => {
+  if (p.image && !p.imageShared) owners.set(p.image, p);
+});
+const merged = [];
+products.forEach((p) => {
+  const owner = p.imageShared ? owners.get(p.image) : null;
+  if (owner) {
+    owner.variants.push(...p.variants);
+    owner.mergedCodes = [...(owner.mergedCodes ?? [owner.code]), p.code];
+  } else {
+    merged.push(p);
+  }
+});
+merged.forEach((p) => delete p.imageShared);
+console.log(`merged ${products.length - merged.length} sibling products into their base model`);
+
 const output = {
   categories: Object.values(CATEGORIES),
-  products,
+  products: merged,
 };
+products.length = 0;
+products.push(...merged);
 fs.mkdirSync("src/data", { recursive: true });
 fs.writeFileSync("src/data/stock-demo.json", JSON.stringify(output));
 

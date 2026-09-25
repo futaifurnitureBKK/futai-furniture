@@ -26,13 +26,15 @@ interface Variant {
   label?: string;
   round?: boolean;
   flag?: string;
+  key?: string;
+  code?: string;
 }
 interface Prod {
   no: number;
   code: string;
   category: string;
   image?: string;
-  imageShared?: boolean;
+  mergedCodes?: string[];
   variants: Variant[];
 }
 interface Cat {
@@ -70,7 +72,7 @@ const emptyVar: VarStock = {
 };
 const emptyProd: ProdInfo = { description: "", color: "", material: "", boxesPerItem: 1 };
 
-const vkey = (no: number, i: number) => `${no}:${i}`;
+const vkey = (p: Prod, i: number) => p.variants[i]?.key ?? `${p.no}:${i}`;
 
 type StatusKey = "ok" | "low" | "out" | "untracked";
 type StatusFilter = "all" | StatusKey;
@@ -137,8 +139,8 @@ export default function StockDemoPage() {
     }
   }
 
-  function patchVar(no: number, i: number, change: Partial<VarStock>) {
-    const k = vkey(no, i);
+  function patchVar(p: Prod, i: number, change: Partial<VarStock>) {
+    const k = vkey(p, i);
     persist({ ...varStock, [k]: { ...emptyVar, ...varStock[k], ...change } }, prodInfo);
   }
 
@@ -164,13 +166,14 @@ export default function StockDemoPage() {
         const c = CATEGORIES.find((c) => c.key === p.category);
         const hit =
           p.code.toLowerCase().includes(q) ||
+          p.variants.some((v) => (v.code ?? "").toLowerCase().includes(q)) ||
           `${c?.th ?? ""} ${c?.en ?? ""} ${c?.zh ?? ""}`.toLowerCase().includes(q) ||
           p.variants.some((v) => v.size.toLowerCase().includes(q));
         if (!hit) continue;
       }
       const idxs = p.variants
         .map((_, i) => i)
-        .filter((i) => statusFilter === "all" || statusOf(varStock[vkey(p.no, i)]) === statusFilter);
+        .filter((i) => statusFilter === "all" || statusOf(varStock[vkey(p, i)]) === statusFilter);
       if (idxs.length) out.push({ p, idxs });
     }
     return out;
@@ -195,7 +198,7 @@ export default function StockDemoPage() {
   function openDetail(p: Prod) {
     setDetail(p);
     setDraftInfo({ ...emptyProd, ...prodInfo[p.no] });
-    setDraftVars(p.variants.map((_, i) => ({ ...emptyVar, ...varStock[vkey(p.no, i)] })));
+    setDraftVars(p.variants.map((_, i) => ({ ...emptyVar, ...varStock[vkey(p, i)] })));
   }
 
   function saveDetail() {
@@ -204,7 +207,7 @@ export default function StockDemoPage() {
     // and saving the dialog would mark every untouched size as "out of stock".
     const nextV = { ...varStock };
     draftVars.forEach((s, i) => {
-      const k = vkey(detail.no, i);
+      const k = vkey(detail, i);
       if (JSON.stringify({ ...emptyVar, ...varStock[k] }) !== JSON.stringify(s)) nextV[k] = s;
     });
     persist(nextV, { ...prodInfo, [detail.no]: draftInfo });
@@ -242,9 +245,10 @@ export default function StockDemoPage() {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productRows), "Products");
       const variantRows = PRODUCTS.flatMap((p) =>
         p.variants.map((v, i) => {
-          const s = { ...emptyVar, ...varStock[vkey(p.no, i)] };
+          const s = { ...emptyVar, ...varStock[vkey(p, i)] };
           return {
-            Code: p.code,
+            "Model": p.code,
+            Code: v.code ?? p.code,
             Size: v.size,
             W: v.dims?.w ?? "",
             D: v.dims?.d ?? "",
@@ -405,7 +409,7 @@ export default function StockDemoPage() {
                 <Fragment key={p.no}>
                   {idxs.map((i, n) => {
                     const v = p.variants[i];
-                    const s = varStock[vkey(p.no, i)];
+                    const s = varStock[vkey(p, i)];
                     const info = { ...emptyVar, ...s };
                     const st = statusOf(s);
                     const first = n === 0;
@@ -426,13 +430,16 @@ export default function StockDemoPage() {
                             <TableCell rowSpan={idxs.length} className="align-top">
                               <p className="text-sm font-mono font-medium">{p.code}</p>
                               <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
-                              {p.imageShared && (
-                                <p className="text-[10px] text-[#9CA3AF] italic">{t("รูปจากรุ่นเดียวกัน", "photo from same model", "图片取自同款")}</p>
+                              {p.mergedCodes && (
+                                <p className="text-[10px] text-[#9CA3AF] italic">
+                                  {t(`รุ่นเดียวกัน ${p.mergedCodes.length} ขนาด/รหัส`, `same model · ${p.mergedCodes.length} sizes/codes`, `同款 · ${p.mergedCodes.length} 个规格/编号`)}
+                                </p>
                               )}
                             </TableCell>
                           </>
                         )}
                         <TableCell className="text-xs text-[#6B6B6B]">
+                          {p.mergedCodes && <p className="text-sm font-mono font-semibold text-[#1A1A1A]">{v.code}</p>}
                           <p className="font-mono">
                             {sizeLabel(v)}
                             {v.flag && (
@@ -454,7 +461,7 @@ export default function StockDemoPage() {
                               className="h-8 w-20 text-xs"
                               value={info[f] || ""}
                               placeholder="0"
-                              onChange={(e) => patchVar(p.no, i, { [f]: num(e.target.value) })}
+                              onChange={(e) => patchVar(p, i, { [f]: num(e.target.value) })}
                             />
                           </TableCell>
                         ))}
@@ -463,7 +470,7 @@ export default function StockDemoPage() {
                             className="h-8 w-28 text-xs"
                             value={info.location}
                             placeholder={t("เช่น โกดัง1-A2", "e.g. WH1-A2", "如 仓1-A2")}
-                            onChange={(e) => patchVar(p.no, i, { location: e.target.value })}
+                            onChange={(e) => patchVar(p, i, { location: e.target.value })}
                           />
                         </TableCell>
                         <TableCell>
@@ -561,6 +568,7 @@ export default function StockDemoPage() {
                         return (
                           <TableRow key={i}>
                             <TableCell className="text-xs">
+                              {detail.mergedCodes && <p className="font-mono font-semibold">{v.code}</p>}
                               <p className="font-mono">{sizeLabel(v)}</p>
                               {v.flag && (
                                 <p className="text-amber-700 flex items-start gap-1 max-w-[16rem]">

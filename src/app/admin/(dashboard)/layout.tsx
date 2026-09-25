@@ -17,6 +17,7 @@ import {
   Target,
   Receipt,
   Truck,
+  Warehouse,
   Menu,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ const NAV = [
   { href: "/admin/quotes",            labelTh: "ใบเสนอราคา",  labelEn: "Quotes",       labelZh: "报价单",     icon: FileText },
   { href: "/admin/quote-builder",     labelTh: "สร้างใบเสนอราคา", labelEn: "Quote Builder", labelZh: "生成报价单", icon: Receipt },
   { href: "/admin/kpi",               labelTh: "KPI ติดตามลูกค้า", labelEn: "Lead Tracker", labelZh: "客户跟进",   icon: Target },
+  { href: "/admin/StockDEMO",         labelTh: "สต็อก DEMO",  labelEn: "Stock DEMO",   labelZh: "库存 DEMO",  icon: Warehouse },
   { href: "/admin/products",          labelTh: "สินค้า",       labelEn: "Products",     labelZh: "产品",       icon: Package },
   { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus },
   { href: "/admin/categories",        labelTh: "รูปหมวดหมู่",  labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },

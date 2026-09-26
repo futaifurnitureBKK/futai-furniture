@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
 import raw from "@/data/stock-demo.json";
+import topSellersRaw from "@/data/top-sellers.json";
 
 interface Cat {
   key: string;
@@ -80,6 +81,17 @@ interface Movement {
 const CATEGORIES = raw.categories as Cat[];
 const PAGE = 40;
 const CUSTOM = "custom";
+
+interface TopSeller {
+  code: string;
+  qty: number;
+  revenue: number;
+  orders: number;
+  y2025: number;
+  y2026: number;
+}
+const TOP_SELLERS = topSellersRaw.top as TopSeller[];
+const canonCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9一-鿿]/g, "");
 
 type StatusKey = "ok" | "low" | "out" | "untracked";
 type StatusFilter = "all" | StatusKey;
@@ -417,6 +429,22 @@ export default function StockPage() {
     return out;
   }, [products, query, cat, statusFilter, archivedView]);
 
+  // Best sellers (units sold in 2025-2026, from the old sales sheets) with what's left in stock.
+  const bestSellers = useMemo(() => {
+    const byCode = new Map<string, { available: number; sizes: number }>();
+    products.forEach((p) =>
+      activeVariants(p).forEach((v) => {
+        for (const c of new Set([canonCode(v.code), canonCode(p.code)])) {
+          const cur = byCode.get(c) ?? { available: 0, sizes: 0 };
+          cur.available += v.tracked ? v.available : 0;
+          cur.sizes += 1;
+          byCode.set(c, cur);
+        }
+      })
+    );
+    return TOP_SELLERS.slice(0, 10).map((s) => ({ ...s, stock: byCode.get(canonCode(s.code)) ?? null }));
+  }, [products]);
+
   const totals = useMemo(() => {
     let available = 0, reserved = 0, defective = 0, low = 0, out = 0, tracked = 0, sizes = 0;
     products.forEach((p) =>
@@ -579,6 +607,46 @@ export default function StockPage() {
                   <p className="text-[10px] text-[#9CA3AF] mt-1">{c.sub}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {!archivedView && (
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-baseline justify-between flex-wrap gap-1 mb-2">
+                <p className="text-sm font-semibold text-[#1A1A1A]">{t("สินค้าขายดี Top 10", "Best sellers — Top 10", "热销产品 Top 10")}</p>
+                <p className="text-[10px] text-[#9CA3AF]">
+                  {t("นับจากจำนวนที่ขายในไฟล์ยอดขายเดิม ปี 2025–2026 (ไม่รวมของแถม) · กดเพื่อค้นหาในสต็อก", "Units sold in the original 2025–2026 sales sheets (free items excluded) · click to find it in stock", "统计原销售表2025–2026年销量（不含赠品）· 点击可在库存中查找")}
+                </p>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {bestSellers.map((b, i) => {
+                  const tone =
+                    !b.stock ? "border-[#E8E5E0] bg-[#FAF7F2]" : b.stock.available <= 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50";
+                  return (
+                    <button
+                      key={b.code}
+                      type="button"
+                      onClick={() => { setQuery(b.code); setCat("all"); setStatusFilter("all"); setLimit(PAGE); }}
+                      className={`shrink-0 text-left rounded-lg border px-3 py-2 min-w-[150px] hover:shadow-sm transition-shadow ${tone}`}
+                    >
+                      <p className="text-[10px] text-[#9CA3AF]">#{i + 1}</p>
+                      <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{b.code}</p>
+                      <p className="text-[11px] text-[#6B6B6B]">
+                        {t("ขายแล้ว", "Sold", "已售")} <span className="font-semibold text-[#1A1A1A]">{fmt(b.qty)}</span> {t("ชิ้น", "pcs", "件")}
+                      </p>
+                      <p className="text-[11px]">
+                        {b.stock ? (
+                          <span className={b.stock.available <= 0 ? "text-red-600 font-semibold" : "text-green-700 font-semibold"}>
+                            {t("คงเหลือ", "In stock", "库存")} {fmt(b.stock.available)}
+                          </span>
+                        ) : (
+                          <span className="text-[#9CA3AF]">{t("ไม่อยู่ในรายการสต็อก", "not in stock list", "不在库存列表")}</span>
+                        )}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

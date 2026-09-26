@@ -708,6 +708,22 @@ export default function KpiPage() {
                 </div>
               )}
             </div>
+
+            <div>
+              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">{t("SKU ขายดี (ปิดการขาย)", "Top SKUs (Converted)", "热销SKU（已成交）")}</p>
+              {topSkus.length === 0 ? (
+                <p className="text-xs text-[#9CA3AF]">{t("ยังไม่มีดีลที่ปิด", "No closed deals yet", "暂无已成交订单")}</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {topSkus.map(([sku, count]) => (
+                    <div key={sku} className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-[#1A1A1A]">{sku}</span>
+                      <span className="text-[#6B6B6B]">{count} {t("ดีล", "deals", "单")}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

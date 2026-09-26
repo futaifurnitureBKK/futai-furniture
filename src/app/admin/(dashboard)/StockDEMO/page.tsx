@@ -3,8 +3,9 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, Eye, EyeOff, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database,
+  Loader2, Upload, History, Database, RefreshCw,
 } from "lucide-react";
+import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,6 +184,11 @@ export default function StockPage() {
   const [archivedView, setArchivedView] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [seeding, setSeeding] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncApplying, setSyncApplying] = useState(false);
+  const [syncPlan, setSyncPlan] = useState<{ label: string; plan: Plan } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string>("all");
@@ -375,6 +381,42 @@ export default function StockPage() {
     }
   }
 
+  async function openSync() {
+    setSyncOpen(true);
+    setSyncPlan(null);
+    setSyncError(null);
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/admin/stock/sync");
+      const data = await res.json();
+      if (res.ok) setSyncPlan(data);
+      else setSyncError(data.error || "Load failed");
+    } catch {
+      setSyncError("Network error");
+    }
+    setSyncLoading(false);
+  }
+
+  async function applySync() {
+    setSyncApplying(true);
+    const res = await fetch("/api/admin/stock/sync", { method: "POST" });
+    const data = await res.json();
+    setSyncApplying(false);
+    if (res.ok) {
+      toast.success(
+        t(
+          `อัปเดตแล้ว ${data.updated} รายการ, เพิ่มขนาดใหม่ ${data.newVariants}, สินค้าใหม่ ${data.newProducts}`,
+          `Updated ${data.updated}, new sizes ${data.newVariants}, new products ${data.newProducts}`,
+          `已更新 ${data.updated} 项，新增规格 ${data.newVariants}，新增产品 ${data.newProducts}`
+        )
+      );
+      setSyncOpen(false);
+      setReloadTick((n) => n + 1);
+    } else {
+      toast.error(data.error || t("อัปเดตไม่สำเร็จ", "Update failed", "更新失败"));
+    }
+  }
+
   async function seedNow() {
     setSeeding(true);
     const res = await fetch("/api/admin/stock/seed", { method: "POST" });
@@ -538,6 +580,11 @@ export default function StockPage() {
             {showCost ? <EyeOff size={14} className="mr-1.5" /> : <Eye size={14} className="mr-1.5" />}
             {showCost ? t("ซ่อนต้นทุน", "Hide cost", "隐藏成本") : t("โหมดเจ้าของ (ดูต้นทุน)", "Owner mode (show cost)", "老板模式（显示成本）")}
           </Button>
+          {!archivedView && products.length > 0 && (
+            <Button size="sm" variant="outline" onClick={openSync}>
+              <RefreshCw size={14} className="mr-1.5" /> {t("อัปเดตจากไฟล์ล่าสุด", "Update from latest file", "从最新文件更新")}
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={exportExcel} disabled={!products.length}>
             <Download size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
@@ -1034,6 +1081,123 @@ export default function StockPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailId(null)}>{t("ปิด", "Close", "关闭")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── update from the latest stock workbook ── */}
+      <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
+        <DialogContent className="max-w-3xl sm:max-w-3xl max-h-[92vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {t("อัปเดตสต็อกจากไฟล์ล่าสุด", "Update stock from the latest file", "从最新文件更新库存")}
+              {syncPlan && <span className="ml-2 text-sm font-normal text-[#6B6B6B]">{syncPlan.label}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 py-1">
+            {syncLoading && (
+              <p className="text-sm text-[#6B6B6B] py-8 text-center">
+                <Loader2 className="inline animate-spin mr-2" size={16} /> {t("กำลังเทียบกับข้อมูลปัจจุบัน...", "Comparing with the current data...", "正在与当前数据对比...")}
+              </p>
+            )}
+            {syncError && <p className="text-sm text-red-600">{syncError}</p>}
+            {syncPlan && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  {[
+                    { label: t("แถวในไฟล์", "Rows in file", "文件行数"), value: syncPlan.plan.rows, tone: "" },
+                    { label: t("ตัวเลขเปลี่ยน", "Will change", "将更新"), value: syncPlan.plan.updates.length, tone: "text-[#C8102E]" },
+                    { label: t("เหมือนเดิม", "Unchanged", "无变化"), value: syncPlan.plan.unchanged, tone: "" },
+                    { label: t("รายการใหม่", "New items", "新增"), value: syncPlan.plan.newVariants.length + syncPlan.plan.newProducts.length, tone: "" },
+                  ].map((c) => (
+                    <div key={c.label} className="bg-[#FAF7F2] rounded-lg py-2">
+                      <p className="text-[10px] text-[#6B6B6B]">{c.label}</p>
+                      <p className={`text-xl font-bold ${c.tone || "text-[#1A1A1A]"}`}>{c.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {syncPlan.plan.updates.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#1A1A1A] mb-1">{t("รายการที่จะเปลี่ยน", "Changes", "变更明细")}</p>
+                    <div className="border border-[#E8E5E0] rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-[#FAF7F2]">
+                            <TableHead className="text-xs">{t("รหัส / ขนาด", "Code / size", "编号 / 尺寸")}</TableHead>
+                            <TableHead className="text-xs text-right">{t("พร้อมขาย", "Available", "可售")}</TableHead>
+                            <TableHead className="text-xs text-right">{t("จอง/รอส่ง", "Reserved", "已预订")}</TableHead>
+                            <TableHead className="text-xs">{t("หมายเหตุ", "Note", "备注")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {syncPlan.plan.updates.map((u) => (
+                            <TableRow key={u.variantId}>
+                              <TableCell className="text-xs">
+                                <p className="font-mono font-semibold">{u.code}</p>
+                                <p className="text-[#9CA3AF] font-mono">{u.size || "-"}</p>
+                              </TableCell>
+                              <TableCell className="text-xs text-right whitespace-nowrap">
+                                {u.before.available === u.after.available ? fmt(u.after.available) : (
+                                  <><span className="text-[#9CA3AF]">{fmt(u.before.available)}</span> → <span className="font-semibold">{fmt(u.after.available)}</span></>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs text-right whitespace-nowrap">
+                                {u.before.reserved === u.after.reserved ? fmt(u.after.reserved) : (
+                                  <><span className="text-[#9CA3AF]">{fmt(u.before.reserved)}</span> → <span className="font-semibold">{fmt(u.after.reserved)}</span></>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-[11px] text-[#6B6B6B] max-w-[16rem] break-words">
+                                {u.before.note !== u.after.note ? u.after.note || t("(ลบหมายเหตุ)", "(note removed)", "（备注已清除）") : ""}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {(syncPlan.plan.newVariants.length > 0 || syncPlan.plan.newProducts.length > 0) && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#1A1A1A] mb-1">{t("จะเพิ่มใหม่", "Will be added", "将新增")}</p>
+                    <ul className="text-xs text-[#6B6B6B] space-y-0.5">
+                      {syncPlan.plan.newVariants.map((v, i) => (
+                        <li key={`v${i}`}>+ {v.productCode} — {v.size || "-"} ({t("ขนาดใหม่", "new size", "新规格")})</li>
+                      ))}
+                      {syncPlan.plan.newProducts.map((p) => (
+                        <li key={p.code + p.category}>+ {p.code} — {catLabel(p.category)} ({p.variants.length})</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {syncPlan.plan.overLocked.length > 0 && (
+                  <p className="text-xs text-amber-700 flex items-start gap-1">
+                    <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+                    {t("ล็อกเกินของในโกดัง:", "Locked more than in stock:", "锁单超出库存：")} {syncPlan.plan.overLocked.join(", ")}
+                  </p>
+                )}
+                <p className="text-[11px] text-[#9CA3AF]">
+                  {t(
+                    "ไฟล์เป็นตัวตั้ง: ตัวเลขพร้อมขาย/จอง/หมายเหตุในระบบจะถูกแทนที่ด้วยค่าจากไฟล์ (ตำแหน่ง ETA ล็อต ต้นทุนไม่ถูกแตะ) และการเปลี่ยนตัวเลขทุกรายการจะถูกบันทึกในประวัติ",
+                    "The file wins: available / reserved / notes in the system are replaced by the values in the file (location, ETA, batch and cost are untouched), and every number change is logged in the history",
+                    "以文件为准：系统中的可售/预订/备注将被文件数值替换（库位、ETA、批次、成本不变），每项数字变化都会记录在历史中"
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSyncOpen(false)}>{t("ยกเลิก", "Cancel", "取消")}</Button>
+            <Button
+              onClick={applySync}
+              disabled={
+                syncApplying || !syncPlan || (syncPlan.plan.updates.length + syncPlan.plan.newVariants.length + syncPlan.plan.newProducts.length === 0)
+              }
+            >
+              {syncApplying ? t("กำลังอัปเดต...", "Updating...", "更新中...") : t("ยืนยันอัปเดต", "Apply update", "确认更新")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

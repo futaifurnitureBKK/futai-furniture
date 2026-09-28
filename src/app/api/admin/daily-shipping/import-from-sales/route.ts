@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import { isAdminRequest } from "@/lib/admin-auth";
+import type { DailySalesRow } from "@/types";
+
+// Pulls every row already logged in Daily Sales for a given date into the
+// shipping log — the usual flow is "record the sale, then ship it", so this
+// is normally the fastest way to fill this page (no need to re-find the
+// quotation). Remark / consignee / tel. aren't tracked in Daily Sales, so
+// those are left blank for the shipper to fill in by hand.
+export async function POST(req: NextRequest) {
+  if (!(await isAdminRequest(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = await req.json();
+  const { ship_date } = body;
+  if (!ship_date) {
+    return NextResponse.json({ error: "ship_date is required" }, { status: 400 });
+  }
+
+  const db = supabaseAdmin();
+  const { data: salesRows, error: sErr } = await db
+    .from("daily_sales_rows")
+    .select("*")
+    .eq("sale_date", ship_date)
+    .order("sort_order", { ascending: true })
+    .returns<DailySalesRow[]>();
+  if (sErr) {
+    return NextResponse.json({ error: sErr.message }, { status: 400 });
+  }
+  if (!salesRows.length) {
+    return NextResponse.json({ error: "ยังไม่มีรายการยอดขายของวันนี้ใน Daily Sales" }, { status: 400 });
+  }
+
+  const { count } = await db
+    .from("daily_shipping_rows")
+    .select("id", { count: "exact", head: true })
+    .eq("ship_date", ship_date);
+  const startOrder = count ?? 0;
+
+  const { data, error } = await db
+    .from("daily_shipping_rows")
+    .insert(
+      salesRows.map((r, i) => ({
+        ship_date,
+        sort_order: startOrder + i,
+        sku: r.sku,
+        image_url: r.image_url,
+        size_text: r.size_text,
+        qty: r.qty,
+        remark: "",
+        customer_name: r.customer_name,
+        salesperson: r.salesperson,
+        po_no: r.po_no,
+        consignee: "",
+        phone: "",
+        source_quote_id: r.source_quote_id,
+      }))
+    )
+    .select();
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+  return NextResponse.json({ rows: data });
+}

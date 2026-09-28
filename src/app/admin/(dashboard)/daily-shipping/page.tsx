@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, Camera } from "lucide-react";
+import { Plus, Trash2, FileDown, FolderOpen, ClipboardList, Search, Loader2, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +108,7 @@ export default function DailyShippingPage() {
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerStatus, setPickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [importingId, setImportingId] = useState<number | null>(null);
+  const [importingFromSales, setImportingFromSales] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -217,6 +218,27 @@ export default function DailyShippingPage() {
     }
   }
 
+  // The usual flow is "record it in Daily Sales, then ship it" — this pulls
+  // that day's sales rows straight in, no need to re-find the quotation.
+  // Remark / consignee / tel. aren't tracked in Daily Sales, so those stay
+  // blank here for the shipper to fill in by hand.
+  async function importFromSales() {
+    setImportingFromSales(true);
+    const res = await fetch("/api/admin/daily-shipping/import-from-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ship_date: date }),
+    });
+    const data = await res.json();
+    setImportingFromSales(false);
+    if (res.ok) {
+      setRows((prev) => [...prev, ...data.rows]);
+      toast.success(t(`ดึงมาแล้ว ${data.rows.length} รายการ`, `Imported ${data.rows.length} item(s)`, `已导入 ${data.rows.length} 项`));
+    } else {
+      toast.error(data.error || t("ดึงข้อมูลไม่สำเร็จ", "Import failed", "导入失败"));
+    }
+  }
+
   const filteredSaved = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
     return savedList.filter((s) => {
@@ -275,6 +297,10 @@ export default function DailyShippingPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input type="date" className="w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Button size="sm" onClick={importFromSales} disabled={importingFromSales} title={t("ดึงรายการที่บันทึกไว้ใน Daily Sales ของวันนี้เข้ามาทั้งหมด", "Pulls in everything already logged in Daily Sales for this date", "导入当天Daily Sales中已记录的全部项目")}>
+            {importingFromSales ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <ClipboardList size={14} className="mr-1.5" />}
+            {t("ดึงจาก Daily Sales", "Import from Daily Sales", "从每日销售导入")}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
             <FolderOpen size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Import from quotation", "从报价单导入")}
           </Button>
@@ -332,7 +358,7 @@ export default function DailyShippingPage() {
                   <TableCell colSpan={11} className="text-center py-12 text-sm text-[#9CA3AF]">
                     {rows.length > 0
                       ? t("ไม่พบรายการที่ตรงกับคำค้นหา", "No rows match your search", "未找到匹配的记录")
-                      : t('ยังไม่มีรายการของวันนี้ — กด "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from quotation" or "Add row"', '该日期暂无数据 — 点击"从报价单导入"或"手动添加"')}
+                      : t('ยังไม่มีรายการของวันนี้ — กด "ดึงจาก Daily Sales" "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from Daily Sales", "Import from quotation", or "Add row"', '该日期暂无数据 — 点击"从每日销售导入"、"从报价单导入"或"手动添加"')}
                   </TableCell>
                 </TableRow>
               ) : (

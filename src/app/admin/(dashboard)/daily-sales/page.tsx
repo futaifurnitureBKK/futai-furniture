@@ -106,6 +106,7 @@ export default function DailySalesPage() {
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerStatus, setPickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [importingId, setImportingId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +210,15 @@ export default function DailySalesPage() {
   const grandTotal = rows.reduce((sum, r) => sum + r.qty * r.unit_price, 0);
 
   async function exportExcel() {
+    setExporting(true);
+    try {
+      await buildAndDownloadExcel();
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function buildAndDownloadExcel() {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Daily Sales");
@@ -242,7 +252,8 @@ export default function DailySalesPage() {
       c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     });
 
-    rows.forEach((r, i) => {
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
       const row = ws.addRow([
         i + 1,
         r.sku,
@@ -258,8 +269,27 @@ export default function DailySalesPage() {
       row.eachCell((c) => {
         c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
       });
-      row.height = 40;
-    });
+      row.height = 56;
+
+      if (r.image_url) {
+        try {
+          const imgRes = await fetch(r.image_url);
+          if (imgRes.ok) {
+            const buf = await imgRes.arrayBuffer();
+            const ct = imgRes.headers.get("content-type") || "";
+            const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
+            const imageId = wb.addImage({ buffer: buf, extension });
+            ws.addImage(imageId, {
+              tl: { col: 2, row: row.number - 1 },
+              ext: { width: 60, height: 56 },
+              editAs: "oneCell",
+            });
+          }
+        } catch {
+          // image failed to load — leave the cell blank rather than fail the export
+        }
+      }
+    }
 
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -292,8 +322,9 @@ export default function DailySalesPage() {
           <Button size="sm" variant="outline" onClick={addRow}>
             <Plus size={14} className="mr-1.5" /> {t("เพิ่มแถวเอง", "Add row", "手动添加")}
           </Button>
-          <Button size="sm" onClick={exportExcel} disabled={!rows.length}>
-            <FileDown size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
+          <Button size="sm" onClick={exportExcel} disabled={!rows.length || exporting}>
+            {exporting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
+            {exporting ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
         </div>
       </div>

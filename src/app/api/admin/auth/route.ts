@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (attempt) await db.from("login_attempts").delete().eq("ip", ip);
+  await db.from("admin_logins").insert({ ip, user_agent: req.headers.get("user-agent") || "" });
 
   const token = await createSessionToken(process.env.ADMIN_SESSION_SECRET, MAX_AGE);
   const res = NextResponse.json({ ok: true });

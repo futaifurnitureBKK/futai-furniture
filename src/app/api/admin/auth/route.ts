@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken } from "@/lib/admin-session";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { verifyPassword } from "@/lib/password-hash";
 
 const COOKIE = "futai_admin_auth";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -31,7 +32,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `ลองผิดหลายครั้งเกินไป กรุณารออีก ${waitMin} นาที` }, { status: 429 });
   }
 
-  if (password !== process.env.ADMIN_SECRET) {
+  // A password changed from the "ตั้งค่าความปลอดภัย" screen lives in the DB
+  // as a hash; until one is set, ADMIN_SECRET keeps working as a fallback.
+  const { data: cred } = await db.from("admin_credentials").select("password_hash").eq("id", "main").maybeSingle();
+  const passwordOk = cred?.password_hash
+    ? await verifyPassword(password, cred.password_hash)
+    : password === process.env.ADMIN_SECRET;
+
+  if (!passwordOk) {
     const windowExpired = attempt ? now - new Date(attempt.first_attempt_at).getTime() > WINDOW_MS : true;
     const attempts = windowExpired ? 1 : (attempt?.attempts ?? 0) + 1;
     const locked_until = attempts >= MAX_ATTEMPTS ? new Date(now + LOCKOUT_MS).toISOString() : null;

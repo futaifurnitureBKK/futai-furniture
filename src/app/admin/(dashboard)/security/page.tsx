@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, FormEvent } from "react";
-import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
+import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, KeyRound, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -57,6 +57,85 @@ function briefUA(ua: string): string {
     ua.match(/Version\/[\d.]+.*Safari/)?.[0].replace(/Version\/([\d.]+).*/, "Safari $1") ??
     "";
   return [browser, os].filter(Boolean).join(" · ") || ua.slice(0, 40);
+}
+
+function PasswordChangeCard({
+  title, hint, target, t,
+}: {
+  title: string;
+  hint: string;
+  target: "main" | "security_code";
+  t: (th: string, en: string, zh?: string) => string;
+}) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    if (next.length < 8) {
+      setMsg({ ok: false, text: t("รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร", "New password must be at least 8 characters", "新密码至少需要8个字符") });
+      return;
+    }
+    if (next !== confirm) {
+      setMsg({ ok: false, text: t("รหัสผ่านใหม่ไม่ตรงกัน", "New passwords don't match", "新密码不一致") });
+      return;
+    }
+    setSaving(true);
+    const res = await fetch("/api/admin/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, currentPassword: current, newPassword: next }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      setMsg({ ok: true, text: t("เปลี่ยนรหัสผ่านสำเร็จ", "Password changed", "密码已更改") });
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } else {
+      setMsg({ ok: false, text: data.error || t("เปลี่ยนรหัสผ่านไม่สำเร็จ", "Failed to change password", "更改密码失败") });
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-2.5 bg-[#FAF7F2] rounded-lg p-4">
+      <div>
+        <p className="text-sm font-semibold text-[#1A1A1A]">{title}</p>
+        <p className="text-xs text-[#9CA3AF]">{hint}</p>
+      </div>
+      <Input
+        type="password"
+        placeholder={t("รหัสผ่านปัจจุบัน", "Current password", "当前密码")}
+        value={current}
+        onChange={(e) => setCurrent(e.target.value)}
+        className="h-9 text-sm bg-white"
+      />
+      <Input
+        type="password"
+        placeholder={t("รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)", "New password (min 8 characters)", "新密码（至少8个字符）")}
+        value={next}
+        onChange={(e) => setNext(e.target.value)}
+        className="h-9 text-sm bg-white"
+      />
+      <Input
+        type="password"
+        placeholder={t("ยืนยันรหัสผ่านใหม่", "Confirm new password", "确认新密码")}
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        className="h-9 text-sm bg-white"
+      />
+      {msg && <p className={`text-xs ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>}
+      <Button type="submit" size="sm" disabled={saving || !next}>
+        {saving && <Loader2 size={13} className="animate-spin mr-1.5" />}
+        {t("บันทึกรหัสผ่านใหม่", "Save new password", "保存新密码")}
+      </Button>
+    </form>
+  );
 }
 
 export default function SecurityPage() {
@@ -139,6 +218,11 @@ export default function SecurityPage() {
         // ignore — just means it'll ask again next time
       }
     }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    window.location.href = "/admin/login";
   }
 
   // Sales-by-owner is only fetched once this page's own extra code has been
@@ -227,15 +311,41 @@ export default function SecurityPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("ประวัติเข้าระบบแอดมิน", "Admin Login Log", "管理员登录记录")}</h1>
-        <p className="text-sm text-[#6B6B6B] mt-0.5">
-          {t(
-            "รายการ IP ที่ล็อกอินเข้า /admin สำเร็จ และ IP ที่พยายามล็อกอินผิดพลาด/ถูกบล็อกชั่วคราว",
-            "IP addresses that successfully logged into /admin, plus IPs with failed attempts or a temporary lockout",
-            "成功登录 /admin 的IP地址，以及登录失败或被暂时锁定的IP"
-          )}
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("ประวัติเข้าระบบแอดมิน", "Admin Login Log", "管理员登录记录")}</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">
+            {t(
+              "รายการ IP ที่ล็อกอินเข้า /admin สำเร็จ และ IP ที่พยายามล็อกอินผิดพลาด/ถูกบล็อกชั่วคราว",
+              "IP addresses that successfully logged into /admin, plus IPs with failed attempts or a temporary lockout",
+              "成功登录 /admin 的IP地址，以及登录失败或被暂时锁定的IP"
+            )}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleLogout}>
+          <LogOut size={14} className="mr-1.5" /> {t("ออกจากระบบ", "Log out", "退出登录")}
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
+          <KeyRound size={16} className="text-[#1A1A1A]" />
+          <p className="text-sm font-semibold text-[#1A1A1A]">{t("ตั้งค่าความปลอดภัย", "Security settings", "安全设置")}</p>
+        </div>
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <PasswordChangeCard
+            target="main"
+            t={t}
+            title={t("รหัสผ่านเข้า Admin หลัก", "Main admin login password", "主管理员登录密码")}
+            hint={t("ใช้ล็อกอินเข้า /admin", "Used to log into /admin", "用于登录 /admin")}
+          />
+          <PasswordChangeCard
+            target="security_code"
+            t={t}
+            title={t("รหัสพิเศษหน้านี้", "This page's extra code", "本页专用密码")}
+            hint={t("ใช้ปลดล็อกหน้าประวัติเข้าระบบนี้เท่านั้น", "Used only to unlock this Login Log page", "仅用于解锁本登录记录页面")}
+          />
+        </div>
       </div>
 
       {loading ? (

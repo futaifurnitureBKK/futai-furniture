@@ -73,7 +73,7 @@ function AdSpendInput({
   return (
     <Input
       type="number"
-      className="h-7 w-20 text-[11px] px-1.5"
+      className="h-6 w-full min-w-0 text-[10px] px-1 text-right"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onClick={(e) => e.stopPropagation()}
@@ -713,7 +713,16 @@ export default function KpiPage() {
             <div>
               <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
               <div className="overflow-x-auto">
-              <table className="w-full text-[11px]">
+              <table className="w-full text-[11px] table-fixed">
+                <colgroup>
+                  <col className="w-[20%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
                     <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
@@ -721,7 +730,7 @@ export default function KpiPage() {
                     <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
                     <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
                     <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
-                    <th className="py-1 font-medium text-right whitespace-nowrap">{t(`ค่ายิง Ads ฿ (${adSpendEditDate})`, `Ad spend ฿ (${adSpendEditDate})`, `广告费 ฿ (${adSpendEditDate})`)}</th>
+                    <th className="py-1 font-medium text-right">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
                     <th className="py-1 font-medium text-right">{t("ROAS", "ROAS", "ROAS")}</th>
                   </tr>
                 </thead>
@@ -763,7 +772,11 @@ export default function KpiPage() {
               </table>
               </div>
               <p className="text-[10px] text-[#9CA3AF] mt-1">
-                {t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่กำลังดูอยู่ ส่วน ROAS คำนวณจากทั้งช่วง", "Click a name to filter the charts and board — the Ad Spend box edits the day being viewed; ROAS is computed over the whole range", "点击姓名筛选图表和看板——广告费栏编辑当前查看的日期；ROAS按整个时间段计算")}
+                {t(
+                  `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่ ${adSpendEditDate} ส่วน ROAS คำนวณจากทั้งช่วง`,
+                  `Click a name to filter the charts and board — the Ad Spend box edits ${adSpendEditDate}; ROAS is computed over the whole range`,
+                  `点击姓名筛选图表和看板——广告费栏编辑 ${adSpendEditDate} 当天；ROAS按整个时间段计算`
+                )}
               </p>
             </div>
 

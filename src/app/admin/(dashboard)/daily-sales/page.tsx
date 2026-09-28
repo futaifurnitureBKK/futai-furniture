@@ -4,7 +4,7 @@ import Image from "next/image";
 import {
   Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown,
   LayoutGrid, Eye, SlidersHorizontal, ImageOff, Wallet, ListChecks, Boxes, Calculator,
-  ChevronUp, ChevronDown, RotateCcw,
+  ChevronUp, ChevronDown, RotateCcw, Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -275,6 +275,7 @@ export default function DailySalesPage() {
   const [pickerStatus, setPickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [importingId, setImportingId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [uploadingImageId, setUploadingImageId] = useState<number | null>(null);
 
   const [gridPickerOpen, setGridPickerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -410,6 +411,23 @@ export default function DailySalesPage() {
 
   function pickProduct(id: number, entry: PriceCatalogEntry) {
     saveRow(id, { sku: entry.sku, size_text: entry.size, unit_price: entry.price ?? 0, image_url: entry.image });
+  }
+
+  async function uploadRowImage(id: number, file: File) {
+    setUploadingImageId(id);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/daily-sales/upload-photo", { method: "POST", body });
+      const data = await res.json();
+      if (res.ok) {
+        await saveRow(id, { image_url: data.url });
+      } else {
+        toast.error(data.error || t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+      }
+    } finally {
+      setUploadingImageId(null);
+    }
   }
 
   async function deleteRow(id: number) {
@@ -554,8 +572,29 @@ export default function DailySalesPage() {
         return (
           <TableCell key={key}>
             <div className="flex items-center gap-2">
-              <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+              <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] group">
                 {r.image_url && <Image src={r.image_url} alt="" fill sizes="44px" className="object-contain" />}
+                <label
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors cursor-pointer"
+                  title={t("อัปโหลดรูป", "Upload photo", "上传图片")}
+                >
+                  {uploadingImageId === r.id ? (
+                    <Loader2 size={13} className="text-white animate-spin" />
+                  ) : (
+                    <Camera size={13} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingImageId === r.id}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadRowImage(r.id, f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
               </div>
               <div className="min-w-[7rem]">
                 <Input

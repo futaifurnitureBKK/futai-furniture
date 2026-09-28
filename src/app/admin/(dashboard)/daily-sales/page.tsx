@@ -262,6 +262,7 @@ export default function DailySalesPage() {
   const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [rows, setRows] = useState<DailySalesRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -438,8 +439,8 @@ export default function DailySalesPage() {
 
   function toggleSelectAll() {
     setSelected((s) => {
-      if (s.size === rows.length && rows.length > 0) return new Set();
-      return new Set(rows.map((r) => r.id));
+      if (s.size === searchedRows.length && searchedRows.length > 0) return new Set();
+      return new Set(searchedRows.map((r) => r.id));
     });
   }
 
@@ -495,10 +496,17 @@ export default function DailySalesPage() {
     });
   }, [savedList, pickerQuery, pickerStatus]);
 
+  // Simple text filter over the rows already loaded for the current date/range
+  // — matches by SKU or customer name so a specific order is easy to find.
+  const searchQuery = search.trim().toLowerCase();
+  const searchedRows = searchQuery
+    ? rows.filter((r) => r.sku.toLowerCase().includes(searchQuery) || r.customer_name.toLowerCase().includes(searchQuery))
+    : rows;
+
   const displayRows = useMemo(() => {
-    if (!sortKey) return rows;
+    if (!sortKey) return searchedRows;
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...searchedRows].sort((a, b) => {
       let av: string | number;
       let bv: string | number;
       if (sortKey === "total") {
@@ -514,11 +522,11 @@ export default function DailySalesPage() {
       if (av > bv) return 1 * dir;
       return 0;
     });
-  }, [rows, sortKey, sortDir]);
+  }, [searchedRows, sortKey, sortDir]);
 
-  const grandTotal = rows.reduce((sum, r) => sum + r.qty * r.unit_price, 0);
-  const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
-  const avgPerRow = rows.length ? grandTotal / rows.length : 0;
+  const grandTotal = searchedRows.reduce((sum, r) => sum + r.qty * r.unit_price, 0);
+  const totalQty = searchedRows.reduce((sum, r) => sum + r.qty, 0);
+  const avgPerRow = searchedRows.length ? grandTotal / searchedRows.length : 0;
   const showDateColumn = rangeKey !== "1d";
   // The Excel template is a single-day form — export (and the preview) always
   // scope to the anchor date, even when viewing a wider range in the page.
@@ -801,9 +809,19 @@ export default function DailySalesPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard icon={Wallet} label={rangeKey === "1d" ? t("ยอดขายรวมวันนี้", "Today's sales", "今日销售额") : t("ยอดขายรวมช่วงนี้", "Sales for period", "所选期间销售额")} value={`฿${fmt(grandTotal)}`} />
-        <KpiCard icon={ListChecks} label={t("จำนวนรายการ", "Rows", "记录数")} value={String(rows.length)} />
+        <KpiCard icon={ListChecks} label={t("จำนวนรายการ", "Rows", "记录数")} value={String(searchedRows.length)} />
         <KpiCard icon={Boxes} label={t("จำนวนชิ้นรวม", "Total qty", "总数量")} value={fmt(totalQty)} />
         <KpiCard icon={Calculator} label={t("เฉลี่ยต่อรายการ", "Avg per row", "每行均价")} value={`฿${fmt(avgPerRow)}`} />
+      </div>
+
+      <div className="relative w-full sm:w-72">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+        <Input
+          className="pl-8"
+          placeholder={t("ค้นหา SKU หรือชื่อลูกค้า...", "Search SKU or customer...", "搜索SKU或客户...")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
@@ -818,7 +836,7 @@ export default function DailySalesPage() {
               <TableRow className="bg-[#FAF7F2]">
                 <TableHead className="text-xs w-8">
                   <Checkbox
-                    checked={rows.length > 0 && selected.size === rows.length}
+                    checked={searchedRows.length > 0 && selected.size === searchedRows.length}
                     onCheckedChange={() => toggleSelectAll()}
                     aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
                   />
@@ -849,7 +867,9 @@ export default function DailySalesPage() {
               {displayRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={totalColSpan} className="text-center py-12 text-sm text-[#9CA3AF]">
-                    {t('ยังไม่มีรายการของวันนี้ — กด "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from quotation" or "Add row"', '该日期暂无数据 — 点击"从报价单导入"或"手动添加"')}
+                    {rows.length > 0
+                      ? t("ไม่พบรายการที่ตรงกับคำค้นหา", "No rows match your search", "未找到匹配的记录")
+                      : t('ยังไม่มีรายการของวันนี้ — กด "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from quotation" or "Add row"', '该日期暂无数据 — 点击"从报价单导入"或"手动添加"')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -876,7 +896,7 @@ export default function DailySalesPage() {
                 ))
               )}
             </TableBody>
-            {rows.length > 0 && (
+            {searchedRows.length > 0 && (
               <tfoot>
                 <TableRow className="bg-[#FAF7F2]">
                   <TableCell colSpan={totalColSpan} className="text-right text-sm font-semibold text-[#1A1A1A]">

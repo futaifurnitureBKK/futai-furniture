@@ -701,11 +701,11 @@ export default function KpiPage() {
               <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
               <table className="w-full text-[11px] table-fixed">
                 <colgroup>
-                  <col className="w-[28%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[28%]" />
+                  <col />
+                  <col className="w-11" />
+                  <col className="w-11" />
+                  <col className="w-12" />
+                  <col className="w-14" />
                 </colgroup>
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">

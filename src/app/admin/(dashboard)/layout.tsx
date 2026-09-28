@@ -29,15 +29,15 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 const NAV = [
   { href: "/admin/shipping",          labelTh: "จัดส่งสินค้า",  labelEn: "Shipping",     labelZh: "发货",       icon: Truck },
   { href: "/admin",                   labelTh: "Dashboard",    labelEn: "Dashboard",    labelZh: "仪表盘",     icon: LayoutDashboard },
-  { href: "/admin/pos",               labelTh: "POS",          labelEn: "POS",          labelZh: "收银台",     icon: MonitorPlay },
-  { href: "/admin/orders",            labelTh: "คำสั่งซื้อ",   labelEn: "Orders",       labelZh: "订单",       icon: ShoppingBag },
+  { href: "/admin/pos",               labelTh: "POS",          labelEn: "POS",          labelZh: "收银台",     icon: MonitorPlay, hidden: true },
+  { href: "/admin/orders",            labelTh: "คำสั่งซื้อ",   labelEn: "Orders",       labelZh: "订单",       icon: ShoppingBag, hidden: true },
   { href: "/admin/quotes",            labelTh: "ใบเสนอราคา",  labelEn: "Quotes",       labelZh: "报价单",     icon: FileText },
   { href: "/admin/quote-builder",     labelTh: "สร้างใบเสนอราคา", labelEn: "Quote Builder", labelZh: "生成报价单", icon: Receipt },
   { href: "/admin/daily-sales",       labelTh: "ยอดขายรายวัน",  labelEn: "Daily Sales",  labelZh: "每日销售",   icon: ClipboardList },
   { href: "/admin/kpi",               labelTh: "KPI ติดตามลูกค้า", labelEn: "Lead Tracker", labelZh: "客户跟进",   icon: Target },
   { href: "/admin/StockDEMO",         labelTh: "สต็อก DEMO",  labelEn: "Stock DEMO",   labelZh: "库存 DEMO",  icon: Warehouse },
   { href: "/admin/products",          labelTh: "สินค้า",       labelEn: "Products",     labelZh: "产品",       icon: Package },
-  { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus },
+  { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus, hidden: true },
   { href: "/admin/categories",        labelTh: "รูปหมวดหมู่",  labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },
   { href: "/admin/customers",         labelTh: "ลูกค้า",       labelEn: "Customers",    labelZh: "客户",       icon: Users },
   { href: "/admin/security",          labelTh: "ประวัติเข้าระบบ", labelEn: "Login Log",   labelZh: "登录记录",   icon: ShieldCheck },
@@ -48,7 +48,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   const { t } = useLanguage();
   return (
     <nav className="flex-1 px-3 py-4 space-y-1">
-      {NAV.map(({ href, labelTh, labelEn, labelZh, icon: Icon }) => {
+      {NAV.filter((item) => !item.hidden).map(({ href, labelTh, labelEn, labelZh, icon: Icon }) => {
         const active = href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
         return (
           <Link

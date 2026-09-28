@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X } from "lucide-react";
+import { Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -35,6 +36,48 @@ function todayStr() {
 
 function fmt(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 0 });
+}
+
+type RangeKey = "1d" | "7d" | "30d" | "month";
+
+function computeRange(anchor: string, key: RangeKey): { from: string; to: string } {
+  const end = new Date(anchor);
+  if (key === "1d") return { from: anchor, to: anchor };
+  if (key === "7d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  if (key === "30d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  const first = new Date(end.getFullYear(), end.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+  return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+}
+
+type SortKey = "sale_date" | "sku" | "size_text" | "unit_price" | "qty" | "total" | "customer_name" | "salesperson" | "po_no";
+
+function SortableHead({
+  label, active, dir, onClick, className,
+}: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  onClick: () => void;
+  className?: string;
+}) {
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead className={`text-xs cursor-pointer select-none whitespace-nowrap ${className || ""}`} onClick={onClick}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <Icon size={11} className={active ? "text-[#1A1A1A]" : "text-[#C8C5BE]"} />
+      </span>
+    </TableHead>
+  );
 }
 
 function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void }) {
@@ -97,8 +140,13 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
 export default function DailySalesPage() {
   const { t } = useLanguage();
   const [date, setDate] = useState(todayStr());
+  const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [rows, setRows] = useState<DailySalesRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savedList, setSavedList] = useState<SavedListRow[]>([]);
@@ -108,21 +156,24 @@ export default function DailySalesPage() {
   const [importingId, setImportingId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  const { from, to } = useMemo(() => computeRange(date, rangeKey), [date, rangeKey]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/daily-sales?date=${date}`);
+      const res = await fetch(`/api/admin/daily-sales?from=${from}&to=${to}`);
       const data = await res.json();
       if (!cancelled) {
         if (res.ok) setRows(data.rows);
+        setSelected(new Set());
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [from, to]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -173,10 +224,57 @@ export default function DailySalesPage() {
   async function deleteRow(id: number) {
     const prev = rows;
     setRows((list) => list.filter((r) => r.id !== id));
+    setSelected((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
     const res = await fetch(`/api/admin/daily-sales/${id}`, { method: "DELETE" });
     if (!res.ok) {
       setRows(prev);
       toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
+    }
+  }
+
+  function toggleRow(id: number) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((s) => {
+      if (s.size === rows.length && rows.length > 0) return new Set();
+      return new Set(rows.map((r) => r.id));
+    });
+  }
+
+  async function deleteSelected() {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setBulkDeleting(true);
+    const results = await Promise.all(
+      ids.map((id) => fetch(`/api/admin/daily-sales/${id}`, { method: "DELETE" }).then((r) => ({ id, ok: r.ok })))
+    );
+    const okIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
+    setRows((prev) => prev.filter((r) => !okIds.has(r.id)));
+    setSelected(new Set());
+    setBulkDeleting(false);
+    const failed = results.filter((r) => !r.ok).length;
+    if (failed) toast.error(t(`ลบไม่สำเร็จ ${failed} รายการ`, `${failed} item(s) failed to delete`, `${failed} 项删除失败`));
+    else toast.success(t(`ลบแล้ว ${okIds.size} รายการ`, `Deleted ${okIds.size} item(s)`, `已删除 ${okIds.size} 项`));
+  }
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
     }
   }
 
@@ -207,7 +305,32 @@ export default function DailySalesPage() {
     });
   }, [savedList, pickerQuery, pickerStatus]);
 
+  const displayRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      let av: string | number;
+      let bv: string | number;
+      if (sortKey === "total") {
+        av = a.qty * a.unit_price;
+        bv = b.qty * b.unit_price;
+      } else {
+        av = a[sortKey] ?? "";
+        bv = b[sortKey] ?? "";
+      }
+      if (typeof av === "string") av = av.toLowerCase();
+      if (typeof bv === "string") bv = bv.toLowerCase();
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }, [rows, sortKey, sortDir]);
+
   const grandTotal = rows.reduce((sum, r) => sum + r.qty * r.unit_price, 0);
+  const showDateColumn = rangeKey !== "1d";
+  // The Excel template is a single-day form — export always scopes to the
+  // anchor date, even when viewing a wider range in the page.
+  const exportRows = useMemo(() => rows.filter((r) => r.sale_date === date), [rows, date]);
 
   async function exportExcel() {
     setExporting(true);
@@ -259,8 +382,8 @@ export default function DailySalesPage() {
       c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     });
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
+    for (let i = 0; i < exportRows.length; i++) {
+      const r = exportRows[i];
       const row = ws.addRow([
         i + 1,
         r.sku,
@@ -325,13 +448,38 @@ export default function DailySalesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input type="date" className="w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
+          <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+            {([
+              ["1d", t("วันนี้", "Today", "今天")],
+              ["7d", t("7 วัน", "7 days", "7天")],
+              ["30d", t("30 วัน", "30 days", "30天")],
+              ["month", t("เดือนนี้", "This month", "本月")],
+            ] as [RangeKey, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setRangeKey(key)}
+                className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  rangeKey === key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
             <FolderOpen size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Import from quotation", "从报价单导入")}
           </Button>
           <Button size="sm" variant="outline" onClick={addRow}>
             <Plus size={14} className="mr-1.5" /> {t("เพิ่มแถวเอง", "Add row", "手动添加")}
           </Button>
-          <Button size="sm" onClick={exportExcel} disabled={!rows.length || exporting}>
+          {selected.size > 0 && (
+            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={deleteSelected} disabled={bulkDeleting}>
+              {bulkDeleting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Trash2 size={14} className="mr-1.5" />}
+              {t(`ลบที่เลือก (${selected.size})`, `Delete selected (${selected.size})`, `删除已选 (${selected.size})`)}
+            </Button>
+          )}
+          <Button size="sm" onClick={exportExcel} disabled={!exportRows.length || exporting} title={showDateColumn ? t("ส่งออกเฉพาะวันที่เลือกในช่องวันที่", "Exports only the date selected above", "仅导出上方选择的日期") : undefined}>
             {exporting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
             {exporting ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
@@ -348,28 +496,45 @@ export default function DailySalesPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
+                <TableHead className="text-xs w-8">
+                  <Checkbox
+                    checked={rows.length > 0 && selected.size === rows.length}
+                    onCheckedChange={() => toggleSelectAll()}
+                    aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
+                  />
+                </TableHead>
                 <TableHead className="text-xs w-10">{t("ที่", "No.", "序号")}</TableHead>
                 <TableHead className="text-xs w-32">{t("รูป / รหัสรุ่น", "Photo / Model", "图片/型号")}</TableHead>
-                <TableHead className="text-xs">{t("ขนาด (มม.)", "Size (mm)", "规格")}</TableHead>
-                <TableHead className="text-xs w-24">{t("ราคาต่อหน่วย", "Unit Price", "单价")}</TableHead>
-                <TableHead className="text-xs w-20">{t("จำนวน", "Qty", "数量")}</TableHead>
-                <TableHead className="text-xs w-24">{t("ยอดรวม", "Total", "总金额")}</TableHead>
-                <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
-                <TableHead className="text-xs w-32">{t("ผู้ขาย", "Saler", "业务员")}</TableHead>
-                <TableHead className="text-xs">{t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号")}</TableHead>
+                <SortableHead label={t("ขนาด (มม.)", "Size (mm)", "规格")} active={sortKey === "size_text"} dir={sortDir} onClick={() => toggleSort("size_text")} />
+                <SortableHead className="w-24" label={t("ราคาต่อหน่วย", "Unit Price", "单价")} active={sortKey === "unit_price"} dir={sortDir} onClick={() => toggleSort("unit_price")} />
+                <SortableHead className="w-20" label={t("จำนวน", "Qty", "数量")} active={sortKey === "qty"} dir={sortDir} onClick={() => toggleSort("qty")} />
+                <SortableHead className="w-24" label={t("ยอดรวม", "Total", "总金额")} active={sortKey === "total"} dir={sortDir} onClick={() => toggleSort("total")} />
+                <SortableHead label={t("ลูกค้า", "Customer", "客户")} active={sortKey === "customer_name"} dir={sortDir} onClick={() => toggleSort("customer_name")} />
+                <SortableHead className="w-32" label={t("ผู้ขาย", "Saler", "业务员")} active={sortKey === "salesperson"} dir={sortDir} onClick={() => toggleSort("salesperson")} />
+                <SortableHead label={t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号")} active={sortKey === "po_no"} dir={sortDir} onClick={() => toggleSort("po_no")} />
+                {showDateColumn && (
+                  <SortableHead className="w-24" label={t("วันที่", "Date", "日期")} active={sortKey === "sale_date"} dir={sortDir} onClick={() => toggleSort("sale_date")} />
+                )}
                 <TableHead className="text-xs" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.length === 0 ? (
+              {displayRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-sm text-[#9CA3AF]">
+                  <TableCell colSpan={showDateColumn ? 12 : 11} className="text-center py-12 text-sm text-[#9CA3AF]">
                     {t('ยังไม่มีรายการของวันนี้ — กด "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from quotation" or "Add row"', '该日期暂无数据 — 点击"从报价单导入"或"手动添加"')}
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((r, i) => (
+                displayRows.map((r, i) => (
                   <TableRow key={r.id} className="align-top">
+                    <TableCell className="pt-3">
+                      <Checkbox
+                        checked={selected.has(r.id)}
+                        onCheckedChange={() => toggleRow(r.id)}
+                        aria-label={t("เลือกแถว", "Select row", "选择行")}
+                      />
+                    </TableCell>
                     <TableCell className="text-sm text-[#6B6B6B] pt-3">{i + 1}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -448,6 +613,9 @@ export default function DailySalesPage() {
                         onBlur={(e) => saveRow(r.id, { po_no: e.target.value })}
                       />
                     </TableCell>
+                    {showDateColumn && (
+                      <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap">{r.sale_date}</TableCell>
+                    )}
                     <TableCell className="pt-3">
                       <Button size="icon-sm" variant="ghost" onClick={() => deleteRow(r.id)} aria-label={t("ลบ", "Delete", "删除")}>
                         <Trash2 size={13} className="text-red-500" />
@@ -460,11 +628,11 @@ export default function DailySalesPage() {
             {rows.length > 0 && (
               <tfoot>
                 <TableRow className="bg-[#FAF7F2]">
-                  <TableCell colSpan={5} className="text-right text-xs font-semibold text-[#6B6B6B]">
-                    {t("ยอดรวมทั้งวัน", "Day total", "当日总计")}
+                  <TableCell colSpan={6} className="text-right text-xs font-semibold text-[#6B6B6B]">
+                    {rangeKey === "1d" ? t("ยอดรวมทั้งวัน", "Day total", "当日总计") : t("ยอดรวมช่วงที่เลือก", "Total for period", "所选期间总计")}
                   </TableCell>
                   <TableCell className="text-sm font-bold text-[#C8102E]">฿{fmt(grandTotal)}</TableCell>
-                  <TableCell colSpan={4} />
+                  <TableCell colSpan={showDateColumn ? 5 : 4} />
                 </TableRow>
               </tfoot>
             )}

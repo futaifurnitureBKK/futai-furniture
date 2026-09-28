@@ -7,15 +7,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const date = req.nextUrl.searchParams.get("date");
-  if (!date) {
-    return NextResponse.json({ error: "date is required" }, { status: 400 });
+  const from = req.nextUrl.searchParams.get("from");
+  const to = req.nextUrl.searchParams.get("to");
+  if (!date && !(from && to)) {
+    return NextResponse.json({ error: "date or from/to is required" }, { status: 400 });
   }
   const db = supabaseAdmin();
-  const { data, error } = await db
-    .from("daily_sales_rows")
-    .select("*")
-    .eq("sale_date", date)
-    .order("sort_order", { ascending: true });
+  let query = db.from("daily_sales_rows").select("*");
+  if (from && to) {
+    query = query
+      .gte("sale_date", from)
+      .lte("sale_date", to)
+      .order("sale_date", { ascending: true })
+      .order("sort_order", { ascending: true });
+  } else {
+    query = query.eq("sale_date", date as string).order("sort_order", { ascending: true });
+  }
+  const { data, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

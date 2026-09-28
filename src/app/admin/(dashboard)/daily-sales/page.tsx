@@ -22,7 +22,8 @@ import {
 import { useLanguage } from "@/store/language";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS } from "@/lib/saved-quote-options";
-import type { DailySalesRow, SavedQuoteStatus } from "@/types";
+import { SALES_HEADERS, buildDailySheetsWorkbook, downloadWorkbook } from "@/lib/daily-sheets-excel";
+import type { DailySalesRow, DailyShippingRow, SavedQuoteStatus } from "@/types";
 
 type SavedListRow = {
   id: number;
@@ -63,21 +64,6 @@ function computeRange(anchor: string, key: RangeKey): { from: string; to: string
 }
 
 type SortKey = "sale_date" | "sku" | "size_text" | "unit_price" | "qty" | "total" | "customer_name" | "salesperson" | "po_no";
-
-// Bilingual headers used both by the real Excel export and by the in-page
-// preview, so the two never drift apart.
-const EXCEL_HEADERS = [
-  "序号\nNo. (เลขที่)",
-  "型号\nModel (แบบอย่าง)",
-  "图片\nPicture (รูปภาพ)",
-  "规格\n(mm) (ขนาด)",
-  "单价\nUnit Price (ราคาต่อหน่วย)",
-  "数量\nQuantity (ปริมาณ)",
-  "总金额\nTotal (จำนวนเงินทั้งหมด)",
-  "客户\nCustomer (ชื่อลูกค้า)",
-  "业务员\nSaler (ผู้ขาย)",
-  "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
-];
 
 // The columns a viewer can hide or reorder from the "settings" dialog.
 // No., checkbox, date (auto) and delete stay fixed.
@@ -705,83 +691,19 @@ export default function DailySalesPage() {
   }
 
   async function buildAndDownloadExcel() {
-    const ExcelJS = (await import("exceljs")).default;
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Daily Sales");
-    const PICTURE_COL_WIDTH = 12;
-    const DATA_ROW_HEIGHT = 56;
-    // Excel's "column width" unit and points-per-row don't map 1:1 to pixels;
-    // these are the standard approximations (Calibri 11 default font) so the
-    // embedded image sizes exactly to the actual cell instead of guessing.
-    const pictureColPx = Math.round(PICTURE_COL_WIDTH * 7 + 5);
-    const dataRowPx = Math.round((DATA_ROW_HEIGHT * 4) / 3);
-    ws.columns = [
-      { width: 6 }, { width: 16 }, { width: PICTURE_COL_WIDTH }, { width: 16 }, { width: 12 },
-      { width: 8 }, { width: 14 }, { width: 22 }, { width: 14 }, { width: 16 },
-    ];
-    ws.mergeCells("A1:J1");
-    const title = ws.getCell("A1");
-    title.value = "单日销售表格\nDaily Sales (แบบฟอร์มการขายประจำวัน ) " + date;
-    title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
-    title.font = { bold: true, size: 13 };
-    ws.getRow(1).height = 28;
-
-    const headerRow = ws.addRow(EXCEL_HEADERS);
-    headerRow.eachCell((c) => {
-      c.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
-      c.font = { bold: true, size: 9 };
-      c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    });
-
-    for (let i = 0; i < exportRows.length; i++) {
-      const r = exportRows[i];
-      const row = ws.addRow([
-        i + 1,
-        r.sku,
-        "",
-        r.size_text,
-        r.unit_price,
-        r.qty,
-        r.qty * r.unit_price,
-        r.customer_name,
-        r.salesperson || "",
-        r.po_no,
-      ]);
-      row.eachCell((c) => {
-        c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-      });
-      row.height = DATA_ROW_HEIGHT;
-
-      if (r.image_url) {
-        try {
-          const imgRes = await fetch(r.image_url);
-          if (imgRes.ok) {
-            const buf = await imgRes.arrayBuffer();
-            const ct = imgRes.headers.get("content-type") || "";
-            const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
-            const imageId = wb.addImage({ buffer: buf, extension });
-            // Sized to the Picture column's actual pixel width/height so it
-            // fills the cell exactly instead of spilling over or leaving gaps.
-            ws.addImage(imageId, {
-              tl: { col: 2, row: row.number - 1 },
-              ext: { width: pictureColPx, height: dataRowPx },
-              editAs: "oneCell",
-            });
-          }
-        } catch {
-          // image failed to load — leave the cell blank rather than fail the export
-        }
-      }
+    // The export is always the full two-sheet workbook (Daily Sales + Daily
+    // Shipping) for the anchor date, so it matches the original template
+    // regardless of which page you export from.
+    let shippingRows: DailyShippingRow[] = [];
+    try {
+      const res = await fetch(`/api/admin/daily-shipping?date=${date}`);
+      const data = await res.json();
+      if (res.ok) shippingRows = data.rows;
+    } catch {
+      // if the shipping sheet can't be loaded, still export the sales sheet alone
     }
-
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `daily-sales-${date}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = await buildDailySheetsWorkbook(date, exportRows, shippingRows);
+    await downloadWorkbook(wb, `daily-sheets-${date}.xlsx`);
   }
 
   return (
@@ -1081,12 +1003,12 @@ export default function DailySalesPage() {
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr>
-                  <th colSpan={EXCEL_HEADERS.length} className="border border-[#D8D4CC] bg-[#FAF7F2] px-2 py-2 text-center font-bold text-xs whitespace-pre-line">
+                  <th colSpan={SALES_HEADERS.length} className="border border-[#D8D4CC] bg-[#FAF7F2] px-2 py-2 text-center font-bold text-xs whitespace-pre-line">
                     {`单日销售表格\nDaily Sales (แบบฟอร์มการขายประจำวัน ) ${date}`}
                   </th>
                 </tr>
                 <tr>
-                  {EXCEL_HEADERS.map((h) => (
+                  {SALES_HEADERS.map((h) => (
                     <th key={h} className="border border-[#D8D4CC] bg-[#F5F3EF] px-1.5 py-1.5 text-center font-semibold whitespace-pre-line">{h}</th>
                   ))}
                 </tr>
@@ -1112,7 +1034,7 @@ export default function DailySalesPage() {
                 ))}
                 {exportRows.length === 0 && (
                   <tr>
-                    <td colSpan={EXCEL_HEADERS.length} className="text-center py-10 text-[#9CA3AF]">
+                    <td colSpan={SALES_HEADERS.length} className="text-center py-10 text-[#9CA3AF]">
                       {t("ไม่มีรายการของวันที่นี้", "No rows for this date", "该日期暂无数据")}
                     </td>
                   </tr>

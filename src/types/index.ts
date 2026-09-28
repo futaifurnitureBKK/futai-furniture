@@ -254,6 +254,25 @@ export interface DailySalesRow {
   updated_at: string;
 }
 
+export interface DailyShippingRow {
+  id: number;
+  ship_date: string;
+  sort_order: number;
+  sku: string;
+  image_url: string | null;
+  size_text: string;
+  qty: number;
+  remark: string;
+  customer_name: string;
+  salesperson: string | null;
+  po_no: string;
+  consignee: string;
+  phone: string;
+  source_quote_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CheckoutFormValues {
   name: string;
   company: string;

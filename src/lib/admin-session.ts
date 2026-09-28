@@ -1,57 +1,67 @@
-// Signed, expiring session tokens for the admin cookie. Works in both the
-// Edge middleware runtime and Node.js API routes — uses only Web Crypto
-// (crypto.subtle, btoa/atob), no Buffer or Node-only APIs.
+// Server-tracked admin sessions (Supabase-backed) — replaces the old
+// stateless signed-token approach so currently-active logins can be listed
+// and remotely revoked ("kick") from the security page. Talks to Supabase's
+// REST API directly with a raw fetch (not the supabase-js client), the same
+// way proxy.ts's visitor tracking already does, so this one implementation
+// works unchanged in both the Edge proxy/middleware and Node.js API routes.
 
-const encoder = new TextEncoder();
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function restUrl(path: string): string {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${path}`;
 }
 
-function fromBase64Url(str: string): Uint8Array {
-  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((str.length + 3) % 4);
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+function restHeaders(extra?: Record<string, string>): Record<string, string> {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+    ...extra,
+  };
 }
 
-async function hmac(secret: string, data: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
-  return toBase64Url(new Uint8Array(sig));
+export async function createAdminSession(params: {
+  ip: string;
+  name: string;
+  userAgent: string;
+  maxAgeSeconds: number;
+}): Promise<string> {
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + params.maxAgeSeconds * 1000).toISOString();
+  await fetch(restUrl("admin_sessions"), {
+    method: "POST",
+    headers: restHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({
+      id,
+      ip: params.ip,
+      name: params.name,
+      user_agent: params.userAgent,
+      expires_at: expiresAt,
+    }),
+  });
+  return id;
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-export async function createSessionToken(secret: string, maxAgeSeconds: number): Promise<string> {
-  const payload = JSON.stringify({ exp: Date.now() + maxAgeSeconds * 1000 });
-  const payloadB64 = toBase64Url(encoder.encode(payload));
-  const sig = await hmac(secret, payloadB64);
-  return `${payloadB64}.${sig}`;
-}
-
-export async function verifySessionToken(token: string | undefined, secret: string): Promise<boolean> {
+export async function isSessionValid(token: string | undefined): Promise<boolean> {
   if (!token) return false;
-  const dot = token.indexOf(".");
-  if (dot === -1) return false;
-  const payloadB64 = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  const expectedSig = await hmac(secret, payloadB64);
-  if (!timingSafeEqual(sig, expectedSig)) return false;
   try {
-    const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(payloadB64)));
-    return typeof payload.exp === "number" && payload.exp > Date.now();
+    const res = await fetch(
+      restUrl(`admin_sessions?id=eq.${encodeURIComponent(token)}&select=expires_at,revoked_at&limit=1`),
+      { headers: restHeaders() }
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as { expires_at: string; revoked_at: string | null }[];
+    const row = rows[0];
+    if (!row || row.revoked_at) return false;
+    return new Date(row.expires_at).getTime() > Date.now();
   } catch {
     return false;
   }
+}
+
+export async function revokeAdminSession(token: string): Promise<void> {
+  await fetch(restUrl(`admin_sessions?id=eq.${encodeURIComponent(token)}`), {
+    method: "PATCH",
+    headers: restHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+  });
 }

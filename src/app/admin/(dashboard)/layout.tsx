@@ -18,7 +18,6 @@ import {
   Receipt,
   Truck,
   Warehouse,
-  ShieldCheck,
   ClipboardList,
   PackageCheck,
   Menu,
@@ -42,7 +41,6 @@ const NAV = [
   { href: "/admin/products/images",   labelTh: "รูปสินค้า",    labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus, hidden: true },
   { href: "/admin/categories",        labelTh: "รูปหมวดหมู่",  labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },
   { href: "/admin/customers",         labelTh: "ลูกค้า",       labelEn: "Customers",    labelZh: "客户",       icon: Users },
-  { href: "/admin/security",          labelTh: "ประวัติเข้าระบบ", labelEn: "Login Log",   labelZh: "登录记录",   icon: ShieldCheck },
   { href: "/admin/settings",          labelTh: "ตั้งค่า",      labelEn: "Settings",     labelZh: "设置",       icon: Settings },
 ];
 

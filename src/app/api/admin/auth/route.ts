@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSessionToken } from "@/lib/admin-session";
+import { createAdminSession, revokeAdminSession } from "@/lib/admin-session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyPassword } from "@/lib/password-hash";
 
@@ -16,7 +16,7 @@ function getClientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ADMIN_SECRET || !process.env.ADMIN_SESSION_SECRET) {
+  if (!process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: "Admin auth not configured" }, { status: 500 });
   }
 
@@ -55,11 +55,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (attempt) await db.from("login_attempts").delete().eq("ip", ip);
-  await db.from("admin_logins").insert({ ip, name: String(name || "").trim(), user_agent: req.headers.get("user-agent") || "" });
+  const trimmedName = String(name || "").trim();
+  const userAgent = req.headers.get("user-agent") || "";
+  await db.from("admin_logins").insert({ ip, name: trimmedName, user_agent: userAgent });
 
-  const token = await createSessionToken(process.env.ADMIN_SESSION_SECRET, MAX_AGE);
+  const sessionId = await createAdminSession({ ip, name: trimmedName, userAgent, maxAgeSeconds: MAX_AGE });
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, token, {
+  res.cookies.set(COOKIE, sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
@@ -69,8 +71,10 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  const token = req.cookies.get(COOKIE)?.value;
+  if (token) await revokeAdminSession(token);
   const res = NextResponse.json({ ok: true });
-  res.cookies.delete("futai_admin_auth");
+  res.cookies.delete(COOKIE);
   return res;
 }

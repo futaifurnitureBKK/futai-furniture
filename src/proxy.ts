@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
-import { verifySessionToken } from "@/lib/admin-session";
+import { isSessionValid } from "@/lib/admin-session";
 
-// Protects /admin routes with a signed session cookie, and counts storefront
-// pageviews into Supabase for the admin dashboard.
+// Protects /admin routes with a server-tracked session cookie (looked up in
+// Supabase, so a session can be seen as "active" and remotely revoked from
+// the security page), and counts storefront pageviews into Supabase for the
+// admin dashboard.
 // Visitor tracking is excluded here for any non-production run (npm run dev),
 // so local dev never inflates the count.
 
@@ -26,8 +28,7 @@ async function handleAdmin(request: NextRequest): Promise<NextResponse> {
   }
 
   const auth = request.cookies.get(ADMIN_COOKIE);
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (secret && (await verifySessionToken(auth?.value, secret))) {
+  if (await isSessionValid(auth?.value)) {
     return noStore(NextResponse.next());
   }
 

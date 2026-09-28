@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, FormEvent } from "react";
-import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, KeyRound, LogOut } from "lucide-react";
+import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, KeyRound, LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,8 +23,23 @@ interface Attempt {
   first_attempt_at: string;
   locked_until: string | null;
 }
+interface ActiveSession {
+  id: string;
+  ip: string;
+  name: string;
+  user_agent: string;
+  created_at: string;
+  expires_at: string;
+}
 
 const CODE_KEY = "futai-security-code";
+
+// Kept as a standalone module-scope function (rather than assigning
+// window.location.href inline inside a state-updating handler) so React
+// Compiler doesn't flag the navigation as mutating an outside value.
+function goToLogin() {
+  window.location.href = "/admin/login";
+}
 const NO_OWNER = "__none";
 
 function todayStr() {
@@ -138,16 +153,20 @@ function PasswordChangeCard({
   );
 }
 
-export default function SecurityPage() {
+export default function AdminSecurityPage() {
   const { t } = useLanguage();
   const [unlocked, setUnlocked] = useState(false);
   const [checkingStoredCode, setCheckingStoredCode] = useState(true);
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState("");
   const [unlocking, setUnlocking] = useState(false);
+  const [unlockedCode, setUnlockedCode] = useState("");
 
   const [logins, setLogins] = useState<Login[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [kickingId, setKickingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
@@ -161,20 +180,31 @@ export default function SecurityPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/logins", { headers: { "x-security-code": code } });
-      const data = await res.json();
-      if (res.ok) {
-        setLogins(data.logins);
-        setAttempts(data.attempts);
-        setLoadedAt(Date.now());
-        return true;
+      const [loginsRes, sessionsRes] = await Promise.all([
+        fetch("/api/admin/logins", { headers: { "x-security-code": code } }),
+        fetch("/api/admin/sessions", { headers: { "x-security-code": code } }),
+      ]);
+      const data = await loginsRes.json();
+      if (!loginsRes.ok) {
+        if (loginsRes.status === 403) {
+          setCodeError(data.error || t("รหัสไม่ถูกต้อง", "Wrong code", "代码错误"));
+        } else {
+          setError(data.error || "Load failed");
+        }
+        return false;
       }
-      if (res.status === 403) {
-        setCodeError(data.error || t("รหัสไม่ถูกต้อง", "Wrong code", "代码错误"));
-      } else {
-        setError(data.error || "Load failed");
+      setLogins(data.logins);
+      setAttempts(data.attempts);
+      setLoadedAt(Date.now());
+
+      const sessData = await sessionsRes.json();
+      if (sessionsRes.ok) {
+        setActiveSessions(sessData.sessions);
+        setCurrentSessionId(sessData.currentSessionId);
       }
-      return false;
+
+      setUnlockedCode(code);
+      return true;
     } catch {
       setError("Network error");
       return false;
@@ -223,6 +253,21 @@ export default function SecurityPage() {
   async function handleLogout() {
     await fetch("/api/admin/auth", { method: "DELETE" });
     window.location.href = "/admin/login";
+  }
+
+  async function handleKick(session: ActiveSession) {
+    if (!confirm(t(`ออกจากระบบ IP ${session.ip} เลยไหม?`, `Log out IP ${session.ip} now?`, `确定要注销 IP ${session.ip} 吗？`))) return;
+    setKickingId(session.id);
+    const res = await fetch(`/api/admin/sessions/${session.id}`, {
+      method: "DELETE",
+      headers: { "x-security-code": unlockedCode },
+    });
+    setKickingId(null);
+    if (res.ok) {
+      const wasSelf = session.id === currentSessionId;
+      setActiveSessions((prev) => prev.filter((s) => s.id !== session.id));
+      if (wasSelf) goToLogin();
+    }
   }
 
   // Sales-by-owner is only fetched once this page's own extra code has been
@@ -357,6 +402,58 @@ export default function SecurityPage() {
         <div className="bg-white rounded-xl shadow-sm p-6 text-sm text-red-600">{error}</div>
       ) : (
         <>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
+              <Radio size={16} className="text-emerald-600" />
+              <p className="text-sm font-semibold text-[#1A1A1A]">
+                {t(`กำลังใช้งานอยู่ตอนนี้ (${activeSessions.length})`, `Currently active (${activeSessions.length})`, `当前活跃 (${activeSessions.length})`)}
+              </p>
+            </div>
+            {activeSessions.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ไม่มีใครล็อกอินอยู่ตอนนี้", "No one is logged in right now", "目前没有人登录")}</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#FAF7F2]">
+                    <TableHead className="text-xs">{t("ล็อกอินเมื่อ", "Logged in at", "登录时间")}</TableHead>
+                    <TableHead className="text-xs">{t("ชื่อ", "Name", "姓名")}</TableHead>
+                    <TableHead className="text-xs">IP</TableHead>
+                    <TableHead className="text-xs">{t("อุปกรณ์ / เบราว์เซอร์", "Device / Browser", "设备/浏览器")}</TableHead>
+                    <TableHead className="text-xs" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeSessions.map((s) => (
+                    <TableRow key={s.id} className="hover:bg-[#FAF7F2]/50">
+                      <TableCell className="text-xs text-[#6B6B6B]">{new Date(s.created_at).toLocaleString("th-TH")}</TableCell>
+                      <TableCell className="text-sm font-medium text-[#1A1A1A]">
+                        {s.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
+                        {s.id === currentSessionId && (
+                          <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                            {t("เครื่องนี้", "This device", "本设备")}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm font-mono">{s.ip}</TableCell>
+                      <TableCell className="text-xs text-[#6B6B6B]">{briefUA(s.user_agent)}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleKick(s)}
+                          disabled={kickingId === s.id}
+                        >
+                          {kickingId === s.id ? <Loader2 size={13} className="animate-spin" /> : t("ออกจากระบบ", "Log out", "注销")}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
           {attempts.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">

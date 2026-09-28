@@ -222,8 +222,15 @@ export default function DailySalesPage() {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Daily Sales");
+    const PICTURE_COL_WIDTH = 12;
+    const DATA_ROW_HEIGHT = 56;
+    // Excel's "column width" unit and points-per-row don't map 1:1 to pixels;
+    // these are the standard approximations (Calibri 11 default font) so the
+    // embedded image sizes exactly to the actual cell instead of guessing.
+    const pictureColPx = Math.round(PICTURE_COL_WIDTH * 7 + 5);
+    const dataRowPx = Math.round((DATA_ROW_HEIGHT * 4) / 3);
     ws.columns = [
-      { width: 6 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 12 },
+      { width: 6 }, { width: 16 }, { width: PICTURE_COL_WIDTH }, { width: 16 }, { width: 12 },
       { width: 8 }, { width: 14 }, { width: 22 }, { width: 14 }, { width: 16 },
     ];
     ws.mergeCells("A1:J1");
@@ -269,7 +276,7 @@ export default function DailySalesPage() {
       row.eachCell((c) => {
         c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
       });
-      row.height = 56;
+      row.height = DATA_ROW_HEIGHT;
 
       if (r.image_url) {
         try {
@@ -279,9 +286,11 @@ export default function DailySalesPage() {
             const ct = imgRes.headers.get("content-type") || "";
             const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
             const imageId = wb.addImage({ buffer: buf, extension });
+            // Sized to the Picture column's actual pixel width/height so it
+            // fills the cell exactly instead of spilling over or leaving gaps.
             ws.addImage(imageId, {
               tl: { col: 2, row: row.number - 1 },
-              ext: { width: 60, height: 56 },
+              ext: { width: pictureColPx, height: dataRowPx },
               editAs: "oneCell",
             });
           }

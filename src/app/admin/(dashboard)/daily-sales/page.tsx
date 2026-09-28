@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown,
+  LayoutGrid, Eye, SlidersHorizontal, ImageOff, Wallet, ListChecks, Boxes, Calculator,
+  ChevronUp, ChevronDown, RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +64,27 @@ function computeRange(anchor: string, key: RangeKey): { from: string; to: string
 
 type SortKey = "sale_date" | "sku" | "size_text" | "unit_price" | "qty" | "total" | "customer_name" | "salesperson" | "po_no";
 
+// Bilingual headers used both by the real Excel export and by the in-page
+// preview, so the two never drift apart.
+const EXCEL_HEADERS = [
+  "序号\nNo. (เลขที่)",
+  "型号\nModel (แบบอย่าง)",
+  "图片\nPicture (รูปภาพ)",
+  "规格\n(mm) (ขนาด)",
+  "单价\nUnit Price (ราคาต่อหน่วย)",
+  "数量\nQuantity (ปริมาณ)",
+  "总金额\nTotal (จำนวนเงินทั้งหมด)",
+  "客户\nCustomer (ชื่อลูกค้า)",
+  "业务员\nSaler (ผู้ขาย)",
+  "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
+];
+
+// The columns a viewer can hide or reorder from the "settings" dialog.
+// No., checkbox, date (auto) and delete stay fixed.
+const CONFIGURABLE_COLUMNS = ["photo", "size", "unit_price", "qty", "total", "customer_name", "salesperson", "po_no"] as const;
+type ConfigColumnKey = typeof CONFIGURABLE_COLUMNS[number];
+const COLUMN_SETTINGS_KEY = "futai-daily-sales-columns";
+
 function SortableHead({
   label, active, dir, onClick, className,
 }: {
@@ -77,6 +102,26 @@ function SortableHead({
         <Icon size={11} className={active ? "text-[#1A1A1A]" : "text-[#C8C5BE]"} />
       </span>
     </TableHead>
+  );
+}
+
+function KpiCard({
+  icon: Icon, label, value,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-[#E8E5E0] p-3.5 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg bg-[#FAF7F2] flex items-center justify-center shrink-0">
+        <Icon size={16} className="text-[#C8102E]" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-[#9CA3AF] truncate">{label}</p>
+        <p className="text-base font-bold text-[#1A1A1A] truncate">{value}</p>
+      </div>
+    </div>
   );
 }
 
@@ -137,6 +182,80 @@ function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void 
   );
 }
 
+function GridPickerDialog({
+  open, onOpenChange, onPick,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onPick: (entry: PriceCatalogEntry) => void;
+}) {
+  const { t } = useLanguage();
+  const [q, setQ] = useState("");
+
+  const matches = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return PRICE_CATALOG.slice(0, 60);
+    return PRICE_CATALOG.filter((e) => e.sku.toLowerCase().includes(query) || e.category.toLowerCase().includes(query)).slice(0, 60);
+  }, [q]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl sm:max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{t("เลือกสินค้าจากแคตตาล็อก", "Pick a product", "从产品目录选择")}</DialogTitle>
+        </DialogHeader>
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <Input
+            className="pl-8"
+            placeholder={t("ค้นหา SKU หรือหมวดหมู่...", "Search SKU or category...", "搜索SKU或类别...")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <p className="text-xs text-[#9CA3AF]">
+          {t("กดที่สินค้าเพื่อเพิ่มเป็นแถวใหม่ — เลือกได้หลายชิ้นติดกัน", "Tap a product to add it as a new row — tap several in a row", "点击商品即可新增一行——可连续点击多个")}
+        </p>
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pb-2">
+            {matches.map((m, i) => (
+              <button
+                key={`${m.sku}-${i}`}
+                type="button"
+                onClick={() => onPick(m)}
+                className="text-left bg-white border border-[#E8E5E0] rounded-lg overflow-hidden hover:border-[#C8102E]/50 hover:shadow-sm transition-all"
+              >
+                <div className="relative aspect-square bg-[#F5F3EF]">
+                  {m.image ? (
+                    <Image src={m.image} alt="" fill sizes="150px" className="object-contain p-2" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#C8C5BE]">
+                      <ImageOff size={20} />
+                    </div>
+                  )}
+                </div>
+                <div className="p-1.5">
+                  <p className="text-[10px] font-mono font-semibold text-[#1A1A1A] truncate">{m.sku}</p>
+                  <p className="text-[10px] text-[#6B6B6B] truncate">{m.size}</p>
+                  <p className="text-[10px] text-[#C8102E] font-medium">{m.priceLabel}</p>
+                </div>
+              </button>
+            ))}
+            {matches.length === 0 && (
+              <div className="col-span-full text-center py-10 text-sm text-[#9CA3AF]">{t("ไม่พบสินค้า", "No products found", "未找到商品")}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DailySalesPage() {
   const { t } = useLanguage();
   const [date, setDate] = useState(todayStr());
@@ -155,6 +274,12 @@ export default function DailySalesPage() {
   const [pickerStatus, setPickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [importingId, setImportingId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const [gridPickerOpen, setGridPickerOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+  const [columnOrder, setColumnOrder] = useState<ConfigColumnKey[]>([...CONFIGURABLE_COLUMNS]);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<ConfigColumnKey>>(new Set());
 
   const { from, to } = useMemo(() => computeRange(date, rangeKey), [date, rangeKey]);
 
@@ -192,15 +317,80 @@ export default function DailySalesPage() {
     };
   }, [pickerOpen]);
 
-  async function addRow() {
+  // Column layout is a per-browser display preference — read once after mount.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(COLUMN_SETTINGS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as { order?: string[]; hidden?: string[] };
+        if (Array.isArray(parsed.order)) {
+          const valid = parsed.order.filter((k): k is ConfigColumnKey => (CONFIGURABLE_COLUMNS as readonly string[]).includes(k));
+          const missing = CONFIGURABLE_COLUMNS.filter((k) => !valid.includes(k));
+          setColumnOrder([...valid, ...missing]);
+        }
+        if (Array.isArray(parsed.hidden)) {
+          setHiddenColumns(new Set(parsed.hidden.filter((k): k is ConfigColumnKey => (CONFIGURABLE_COLUMNS as readonly string[]).includes(k))));
+        }
+      } catch {
+        // ignore — private browsing / blocked storage, just use defaults
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLUMN_SETTINGS_KEY, JSON.stringify({ order: columnOrder, hidden: Array.from(hiddenColumns) }));
+    } catch {
+      // ignore
+    }
+  }, [columnOrder, hiddenColumns]);
+
+  function moveColumn(key: ConfigColumnKey, dir: -1 | 1) {
+    setColumnOrder((prev) => {
+      const idx = prev.indexOf(key);
+      const nextIdx = idx + dir;
+      if (idx === -1 || nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+      return next;
+    });
+  }
+
+  function toggleColumnHidden(key: ConfigColumnKey) {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function resetColumns() {
+    setColumnOrder([...CONFIGURABLE_COLUMNS]);
+    setHiddenColumns(new Set());
+  }
+
+  async function addRow(overrides?: Partial<Pick<DailySalesRow, "sku" | "size_text" | "unit_price" | "image_url">>) {
     const res = await fetch("/api/admin/daily-sales", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sale_date: date, qty: 1 }),
+      body: JSON.stringify({ sale_date: date, qty: 1, ...overrides }),
     });
     const data = await res.json();
     if (res.ok) setRows((prev) => [...prev, data.row]);
     else toast.error(data.error || t("เพิ่มแถวไม่สำเร็จ", "Could not add row", "添加失败"));
+  }
+
+  async function addRowFromCatalog(entry: PriceCatalogEntry) {
+    await addRow({ sku: entry.sku, size_text: entry.size, unit_price: entry.price ?? 0, image_url: entry.image });
+    toast.success(t(`เพิ่ม ${entry.sku} แล้ว`, `Added ${entry.sku}`, `已添加 ${entry.sku}`));
   }
 
   function patchLocal(id: number, change: Partial<DailySalesRow>) {
@@ -327,10 +517,136 @@ export default function DailySalesPage() {
   }, [rows, sortKey, sortDir]);
 
   const grandTotal = rows.reduce((sum, r) => sum + r.qty * r.unit_price, 0);
+  const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
+  const avgPerRow = rows.length ? grandTotal / rows.length : 0;
   const showDateColumn = rangeKey !== "1d";
-  // The Excel template is a single-day form — export always scopes to the
-  // anchor date, even when viewing a wider range in the page.
+  // The Excel template is a single-day form — export (and the preview) always
+  // scope to the anchor date, even when viewing a wider range in the page.
   const exportRows = useMemo(() => rows.filter((r) => r.sale_date === date), [rows, date]);
+
+  const visibleColumns = columnOrder.filter((k) => !hiddenColumns.has(k));
+  const totalColSpan = 2 + visibleColumns.length + (showDateColumn ? 1 : 0) + 1; // checkbox + No. + configurable + date? + delete
+
+  function columnMeta(key: ConfigColumnKey): { label: string; className?: string; sortKey?: SortKey } {
+    switch (key) {
+      case "photo": return { label: t("รูป / รหัสรุ่น", "Photo / Model", "图片/型号"), className: "w-32" };
+      case "size": return { label: t("ขนาด (มม.)", "Size (mm)", "规格"), sortKey: "size_text" };
+      case "unit_price": return { label: t("ราคาต่อหน่วย", "Unit Price", "单价"), className: "w-24", sortKey: "unit_price" };
+      case "qty": return { label: t("จำนวน", "Qty", "数量"), className: "w-20", sortKey: "qty" };
+      case "total": return { label: t("ยอดรวม", "Total", "总金额"), className: "w-24", sortKey: "total" };
+      case "customer_name": return { label: t("ลูกค้า", "Customer", "客户"), sortKey: "customer_name" };
+      case "salesperson": return { label: t("ผู้ขาย", "Saler", "业务员"), className: "w-32", sortKey: "salesperson" };
+      case "po_no": return { label: t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号") };
+    }
+  }
+
+  function renderColumnCell(key: ConfigColumnKey, r: DailySalesRow) {
+    switch (key) {
+      case "photo":
+        return (
+          <TableCell key={key}>
+            <div className="flex items-center gap-2">
+              <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                {r.image_url && <Image src={r.image_url} alt="" fill sizes="44px" className="object-contain" />}
+              </div>
+              <div className="min-w-[7rem]">
+                <Input
+                  className="h-7 text-xs font-mono"
+                  value={r.sku}
+                  onChange={(e) => patchLocal(r.id, { sku: e.target.value })}
+                  onBlur={(e) => saveRow(r.id, { sku: e.target.value })}
+                />
+                <div className="mt-1">
+                  <ProductPicker onPick={(entry) => pickProduct(r.id, entry)} />
+                </div>
+              </div>
+            </div>
+          </TableCell>
+        );
+      case "size":
+        return (
+          <TableCell key={key}>
+            <Input
+              className="h-8 text-xs w-28"
+              value={r.size_text}
+              onChange={(e) => patchLocal(r.id, { size_text: e.target.value })}
+              onBlur={(e) => saveRow(r.id, { size_text: e.target.value })}
+            />
+          </TableCell>
+        );
+      case "unit_price":
+        return (
+          <TableCell key={key}>
+            <Input
+              type="number"
+              className="h-8 text-xs w-20"
+              value={r.unit_price}
+              onChange={(e) => patchLocal(r.id, { unit_price: Number(e.target.value) || 0 })}
+              onBlur={(e) => saveRow(r.id, { unit_price: Number(e.target.value) || 0 })}
+            />
+          </TableCell>
+        );
+      case "qty":
+        return (
+          <TableCell key={key}>
+            <Input
+              type="number"
+              className="h-8 text-xs w-16"
+              value={r.qty}
+              onChange={(e) => patchLocal(r.id, { qty: Number(e.target.value) || 0 })}
+              onBlur={(e) => saveRow(r.id, { qty: Number(e.target.value) || 0 })}
+            />
+          </TableCell>
+        );
+      case "total":
+        return (
+          <TableCell key={key} className="text-sm font-semibold text-[#1A1A1A] pt-3">
+            ฿{fmt(r.qty * r.unit_price)}
+          </TableCell>
+        );
+      case "customer_name":
+        return (
+          <TableCell key={key}>
+            <Input
+              className="h-8 text-xs w-36"
+              value={r.customer_name}
+              onChange={(e) => patchLocal(r.id, { customer_name: e.target.value })}
+              onBlur={(e) => saveRow(r.id, { customer_name: e.target.value })}
+            />
+          </TableCell>
+        );
+      case "salesperson":
+        return (
+          <TableCell key={key}>
+            <Select
+              value={r.salesperson || "__none"}
+              onValueChange={(v) => saveRow(r.id, { salesperson: !v || v === "__none" ? null : v })}
+            >
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue>{(v: string) => (v === "__none" ? t("ยังไม่ระบุ", "Not set", "未设置") : v)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">{t("ยังไม่ระบุ", "Not set", "未设置")}</SelectItem>
+                {SALESPEOPLE.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </TableCell>
+        );
+      case "po_no":
+        return (
+          <TableCell key={key}>
+            <Input
+              className="h-8 text-xs w-28 font-mono"
+              value={r.po_no}
+              onChange={(e) => patchLocal(r.id, { po_no: e.target.value })}
+              onBlur={(e) => saveRow(r.id, { po_no: e.target.value })}
+            />
+          </TableCell>
+        );
+    }
+  }
 
   async function exportExcel() {
     setExporting(true);
@@ -363,19 +679,7 @@ export default function DailySalesPage() {
     title.font = { bold: true, size: 13 };
     ws.getRow(1).height = 28;
 
-    const headers = [
-      "序号\nNo. (เลขที่)",
-      "型号\nModel (แบบอย่าง)",
-      "图片\nPicture (รูปภาพ)",
-      "规格\n(mm) (ขนาด)",
-      "单价\nUnit Price (ราคาต่อหน่วย)",
-      "数量\nQuantity (ปริมาณ)",
-      "总金额\nTotal (จำนวนเงินทั้งหมด)",
-      "客户\nCustomer (ชื่อลูกค้า)",
-      "业务员\nSaler (ผู้ขาย)",
-      "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
-    ];
-    const headerRow = ws.addRow(headers);
+    const headerRow = ws.addRow(EXCEL_HEADERS);
     headerRow.eachCell((c) => {
       c.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
       c.font = { bold: true, size: 9 };
@@ -470,7 +774,10 @@ export default function DailySalesPage() {
           <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
             <FolderOpen size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Import from quotation", "从报价单导入")}
           </Button>
-          <Button size="sm" variant="outline" onClick={addRow}>
+          <Button size="sm" variant="outline" onClick={() => setGridPickerOpen(true)}>
+            <LayoutGrid size={14} className="mr-1.5" /> {t("เลือกสินค้า", "Pick product", "选择商品")}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => addRow()}>
             <Plus size={14} className="mr-1.5" /> {t("เพิ่มแถวเอง", "Add row", "手动添加")}
           </Button>
           {selected.size > 0 && (
@@ -479,11 +786,24 @@ export default function DailySalesPage() {
               {t(`ลบที่เลือก (${selected.size})`, `Delete selected (${selected.size})`, `删除已选 (${selected.size})`)}
             </Button>
           )}
+          <Button size="icon-sm" variant="outline" onClick={() => setColumnSettingsOpen(true)} aria-label={t("ตั้งค่าคอลัมน์", "Column settings", "列设置")}>
+            <SlidersHorizontal size={14} />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)}>
+            <Eye size={14} className="mr-1.5" /> {t("ดูตัวอย่าง Excel", "Preview Excel", "预览Excel")}
+          </Button>
           <Button size="sm" onClick={exportExcel} disabled={!exportRows.length || exporting} title={showDateColumn ? t("ส่งออกเฉพาะวันที่เลือกในช่องวันที่", "Exports only the date selected above", "仅导出上方选择的日期") : undefined}>
             {exporting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
             {exporting ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard icon={Wallet} label={rangeKey === "1d" ? t("ยอดขายรวมวันนี้", "Today's sales", "今日销售额") : t("ยอดขายรวมช่วงนี้", "Sales for period", "所选期间销售额")} value={`฿${fmt(grandTotal)}`} />
+        <KpiCard icon={ListChecks} label={t("จำนวนรายการ", "Rows", "记录数")} value={String(rows.length)} />
+        <KpiCard icon={Boxes} label={t("จำนวนชิ้นรวม", "Total qty", "总数量")} value={fmt(totalQty)} />
+        <KpiCard icon={Calculator} label={t("เฉลี่ยต่อรายการ", "Avg per row", "每行均价")} value={`฿${fmt(avgPerRow)}`} />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
@@ -504,14 +824,21 @@ export default function DailySalesPage() {
                   />
                 </TableHead>
                 <TableHead className="text-xs w-10">{t("ที่", "No.", "序号")}</TableHead>
-                <TableHead className="text-xs w-32">{t("รูป / รหัสรุ่น", "Photo / Model", "图片/型号")}</TableHead>
-                <SortableHead label={t("ขนาด (มม.)", "Size (mm)", "规格")} active={sortKey === "size_text"} dir={sortDir} onClick={() => toggleSort("size_text")} />
-                <SortableHead className="w-24" label={t("ราคาต่อหน่วย", "Unit Price", "单价")} active={sortKey === "unit_price"} dir={sortDir} onClick={() => toggleSort("unit_price")} />
-                <SortableHead className="w-20" label={t("จำนวน", "Qty", "数量")} active={sortKey === "qty"} dir={sortDir} onClick={() => toggleSort("qty")} />
-                <SortableHead className="w-24" label={t("ยอดรวม", "Total", "总金额")} active={sortKey === "total"} dir={sortDir} onClick={() => toggleSort("total")} />
-                <SortableHead label={t("ลูกค้า", "Customer", "客户")} active={sortKey === "customer_name"} dir={sortDir} onClick={() => toggleSort("customer_name")} />
-                <SortableHead className="w-32" label={t("ผู้ขาย", "Saler", "业务员")} active={sortKey === "salesperson"} dir={sortDir} onClick={() => toggleSort("salesperson")} />
-                <SortableHead label={t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号")} active={sortKey === "po_no"} dir={sortDir} onClick={() => toggleSort("po_no")} />
+                {visibleColumns.map((key) => {
+                  const meta = columnMeta(key);
+                  return meta.sortKey ? (
+                    <SortableHead
+                      key={key}
+                      className={meta.className}
+                      label={meta.label}
+                      active={sortKey === meta.sortKey}
+                      dir={sortDir}
+                      onClick={() => toggleSort(meta.sortKey as SortKey)}
+                    />
+                  ) : (
+                    <TableHead key={key} className={`text-xs ${meta.className || ""}`}>{meta.label}</TableHead>
+                  );
+                })}
                 {showDateColumn && (
                   <SortableHead className="w-24" label={t("วันที่", "Date", "日期")} active={sortKey === "sale_date"} dir={sortDir} onClick={() => toggleSort("sale_date")} />
                 )}
@@ -521,7 +848,7 @@ export default function DailySalesPage() {
             <TableBody>
               {displayRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={showDateColumn ? 12 : 11} className="text-center py-12 text-sm text-[#9CA3AF]">
+                  <TableCell colSpan={totalColSpan} className="text-center py-12 text-sm text-[#9CA3AF]">
                     {t('ยังไม่มีรายการของวันนี้ — กด "ดึงจากใบเสนอราคา" หรือ "เพิ่มแถวเอง"', 'No rows for this date yet — click "Import from quotation" or "Add row"', '该日期暂无数据 — 点击"从报价单导入"或"手动添加"')}
                   </TableCell>
                 </TableRow>
@@ -536,83 +863,7 @@ export default function DailySalesPage() {
                       />
                     </TableCell>
                     <TableCell className="text-sm text-[#6B6B6B] pt-3">{i + 1}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
-                          {r.image_url && <Image src={r.image_url} alt="" fill sizes="44px" className="object-contain" />}
-                        </div>
-                        <div className="min-w-[7rem]">
-                          <Input
-                            className="h-7 text-xs font-mono"
-                            value={r.sku}
-                            onChange={(e) => patchLocal(r.id, { sku: e.target.value })}
-                            onBlur={(e) => saveRow(r.id, { sku: e.target.value })}
-                          />
-                          <div className="mt-1">
-                            <ProductPicker onPick={(entry) => pickProduct(r.id, entry)} />
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        className="h-8 text-xs w-28"
-                        value={r.size_text}
-                        onChange={(e) => patchLocal(r.id, { size_text: e.target.value })}
-                        onBlur={(e) => saveRow(r.id, { size_text: e.target.value })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        className="h-8 text-xs w-20"
-                        value={r.unit_price}
-                        onChange={(e) => patchLocal(r.id, { unit_price: Number(e.target.value) || 0 })}
-                        onBlur={(e) => saveRow(r.id, { unit_price: Number(e.target.value) || 0 })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        className="h-8 text-xs w-16"
-                        value={r.qty}
-                        onChange={(e) => patchLocal(r.id, { qty: Number(e.target.value) || 0 })}
-                        onBlur={(e) => saveRow(r.id, { qty: Number(e.target.value) || 0 })}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm font-semibold text-[#1A1A1A] pt-3">฿{fmt(r.qty * r.unit_price)}</TableCell>
-                    <TableCell>
-                      <Input
-                        className="h-8 text-xs w-36"
-                        value={r.customer_name}
-                        onChange={(e) => patchLocal(r.id, { customer_name: e.target.value })}
-                        onBlur={(e) => saveRow(r.id, { customer_name: e.target.value })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={r.salesperson || "__none"}
-                        onValueChange={(v) => saveRow(r.id, { salesperson: !v || v === "__none" ? null : v })}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-full">
-                          <SelectValue>{(v: string) => (v === "__none" ? t("ยังไม่ระบุ", "Not set", "未设置") : v)}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none">{t("ยังไม่ระบุ", "Not set", "未设置")}</SelectItem>
-                          {SALESPEOPLE.map((name) => (
-                            <SelectItem key={name} value={name}>{name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        className="h-8 text-xs w-28 font-mono"
-                        value={r.po_no}
-                        onChange={(e) => patchLocal(r.id, { po_no: e.target.value })}
-                        onBlur={(e) => saveRow(r.id, { po_no: e.target.value })}
-                      />
-                    </TableCell>
+                    {visibleColumns.map((key) => renderColumnCell(key, r))}
                     {showDateColumn && (
                       <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap">{r.sale_date}</TableCell>
                     )}
@@ -628,11 +879,10 @@ export default function DailySalesPage() {
             {rows.length > 0 && (
               <tfoot>
                 <TableRow className="bg-[#FAF7F2]">
-                  <TableCell colSpan={6} className="text-right text-xs font-semibold text-[#6B6B6B]">
-                    {rangeKey === "1d" ? t("ยอดรวมทั้งวัน", "Day total", "当日总计") : t("ยอดรวมช่วงที่เลือก", "Total for period", "所选期间总计")}
+                  <TableCell colSpan={totalColSpan} className="text-right text-sm font-semibold text-[#1A1A1A]">
+                    {rangeKey === "1d" ? t("ยอดรวมทั้งวัน", "Day total", "当日总计") : t("ยอดรวมช่วงที่เลือก", "Total for period", "所选期间总计")}:{" "}
+                    <span className="font-bold text-[#C8102E]">฿{fmt(grandTotal)}</span>
                   </TableCell>
-                  <TableCell className="text-sm font-bold text-[#C8102E]">฿{fmt(grandTotal)}</TableCell>
-                  <TableCell colSpan={showDateColumn ? 5 : 4} />
                 </TableRow>
               </tfoot>
             )}
@@ -702,6 +952,125 @@ export default function DailySalesPage() {
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={() => setPickerOpen(false)}>
               <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <GridPickerDialog open={gridPickerOpen} onOpenChange={setGridPickerOpen} onPick={addRowFromCatalog} />
+
+      <Dialog open={columnSettingsOpen} onOpenChange={setColumnSettingsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("ตั้งค่าคอลัมน์", "Column settings", "列设置")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-[#9CA3AF] -mt-2">
+            {t("ซ่อน/แสดง หรือจัดลำดับคอลัมน์ — บันทึกไว้ในเบราว์เซอร์นี้เท่านั้น", "Hide/show or reorder columns — saved to this browser only", "隐藏/显示或调整列顺序——仅保存在此浏览器")}
+          </p>
+          <div className="space-y-1.5">
+            {columnOrder.map((key, idx) => {
+              const meta = columnMeta(key);
+              return (
+                <div key={key} className="flex items-center gap-2 border border-[#E8E5E0] rounded-lg px-2.5 py-1.5">
+                  <Checkbox
+                    checked={!hiddenColumns.has(key)}
+                    onCheckedChange={() => toggleColumnHidden(key)}
+                    aria-label={meta.label}
+                  />
+                  <span className={`flex-1 text-sm ${hiddenColumns.has(key) ? "text-[#C8C5BE] line-through" : "text-[#1A1A1A]"}`}>
+                    {meta.label.split("\n")[0]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => moveColumn(key, -1)}
+                    disabled={idx === 0}
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-[#6B6B6B] hover:bg-[#FAF7F2] disabled:opacity-30"
+                    aria-label={t("เลื่อนขึ้น", "Move up", "上移")}
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveColumn(key, 1)}
+                    disabled={idx === columnOrder.length - 1}
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-[#6B6B6B] hover:bg-[#FAF7F2] disabled:opacity-30"
+                    aria-label={t("เลื่อนลง", "Move down", "下移")}
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between">
+            <Button variant="outline" size="sm" onClick={resetColumns}>
+              <RotateCcw size={13} className="mr-1.5" /> {t("รีเซ็ต", "Reset", "重置")}
+            </Button>
+            <Button size="sm" onClick={() => setColumnSettingsOpen(false)}>
+              {t("เสร็จสิ้น", "Done", "完成")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl sm:max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t("ตัวอย่างไฟล์ Excel", "Excel preview", "Excel预览")} — {date}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto border border-[#E8E5E0] rounded-lg">
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr>
+                  <th colSpan={EXCEL_HEADERS.length} className="border border-[#D8D4CC] bg-[#FAF7F2] px-2 py-2 text-center font-bold text-xs whitespace-pre-line">
+                    {`单日销售表格\nDaily Sales (แบบฟอร์มการขายประจำวัน ) ${date}`}
+                  </th>
+                </tr>
+                <tr>
+                  {EXCEL_HEADERS.map((h) => (
+                    <th key={h} className="border border-[#D8D4CC] bg-[#F5F3EF] px-1.5 py-1.5 text-center font-semibold whitespace-pre-line">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {exportRows.map((r, i) => (
+                  <tr key={r.id}>
+                    <td className="border border-[#E8E5E0] text-center px-1.5 py-1.5">{i + 1}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 font-mono">{r.sku}</td>
+                    <td className="border border-[#E8E5E0] p-1">
+                      <div className="relative w-16 h-12 mx-auto bg-[#F5F3EF]">
+                        {r.image_url ? <Image src={r.image_url} alt="" fill sizes="64px" className="object-contain" /> : null}
+                      </div>
+                    </td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.size_text}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-right">{fmt(r.unit_price)}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-center">{r.qty}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-right font-semibold">{fmt(r.qty * r.unit_price)}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.customer_name}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.salesperson || ""}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 font-mono">{r.po_no}</td>
+                  </tr>
+                ))}
+                {exportRows.length === 0 && (
+                  <tr>
+                    <td colSpan={EXCEL_HEADERS.length} className="text-center py-10 text-[#9CA3AF]">
+                      {t("ไม่มีรายการของวันที่นี้", "No rows for this date", "该日期暂无数据")}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-[#9CA3AF]">
+            {t("* ตัวอย่างนี้เป็นการจำลองคร่าวๆ รูปแบบจริงในไฟล์ Excel ที่ดาวน์โหลดอาจต่างเล็กน้อย", "* This preview is approximate — the downloaded Excel file's exact formatting may differ slightly", "* 此预览为大致模拟，下载的Excel文件格式可能略有不同")}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPreviewOpen(false)}>
+              <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+            </Button>
+            <Button size="sm" onClick={exportExcel} disabled={!exportRows.length || exporting}>
+              {exporting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
+              {t("Export Excel", "Export Excel", "导出Excel")}
             </Button>
           </div>
         </DialogContent>

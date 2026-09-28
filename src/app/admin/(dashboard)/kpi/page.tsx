@@ -61,28 +61,28 @@ const NO_OWNER = "__none";
 // edited remounts this with a fresh local value instead of needing an effect
 // to resync it — the usual React way to reset state when a prop changes.
 function AdSpendInput({
-  date, initialAmount, onSave, t,
+  date, owner, initialAmount, onSave,
 }: {
   date: string;
+  owner: string;
   initialAmount: number;
-  onSave: (date: string, amount: number) => Promise<void>;
-  t: (th: string, en: string, zh?: string) => string;
+  onSave: (date: string, owner: string, amount: number) => Promise<void>;
 }) {
   const [value, setValue] = useState(String(initialAmount));
   const [saving, setSaving] = useState(false);
   return (
     <Input
       type="number"
-      className="h-8 w-32 text-xs"
+      className="h-7 w-20 text-[11px] px-1.5"
       value={value}
       onChange={(e) => setValue(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
       onBlur={async () => {
         setSaving(true);
-        await onSave(date, Number(value) || 0);
+        await onSave(date, owner, Number(value) || 0);
         setSaving(false);
       }}
       disabled={saving}
-      placeholder={t("จำนวนเงิน", "Amount", "金额")}
     />
   );
 }
@@ -385,6 +385,13 @@ export default function KpiPage() {
     [rangeLeads, ownerFilter]
   );
 
+  // The day being edited in each owner's "ค่ายิง Ads" cell — a single picked
+  // date, or "today" while viewing a range (spend is logged per day either
+  // way; ROAS below sums whichever days fall inside the range being viewed).
+  const adSpendEditDate = selectedDate ?? todayStr();
+  const adSpendScopeFrom = selectedDate ?? rangeStart;
+  const adSpendScopeTo = selectedDate ?? todayStr();
+
   const ownerSummary = useMemo(() => {
     // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row
     const legacy = [...new Set(leads.map((l) => l.owner).filter((o): o is string => !!o && !SALESPEOPLE.includes(o)))];
@@ -393,39 +400,39 @@ export default function KpiPage() {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
       const revenue = converted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0);
+      const ownerAdSpendRows = adSpendRows.filter((r) => r.owner === name);
+      const editDayAmount = ownerAdSpendRows.find((r) => r.date === adSpendEditDate)?.amount ?? 0;
+      const scopedAdSpend = ownerAdSpendRows
+        .filter((r) => r.date >= adSpendScopeFrom && r.date <= adSpendScopeTo)
+        .reduce((sum, r) => sum + r.amount, 0);
       return {
         name,
         count: rows.length,
         converted: converted.length,
         rate: rows.length ? (converted.length / rows.length) * 100 : 0,
         revenue,
+        editDayAmount,
+        scopedAdSpend,
+        roas: scopedAdSpend > 0 ? revenue / scopedAdSpend : null,
       };
     });
-  }, [rangeLeads, leads]);
+  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, adSpendScopeFrom, adSpendScopeTo]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
   const scopeConverted = useMemo(() => rangeLeads.filter((l) => l.status === "converted"), [rangeLeads]);
   const scopeRevenue = useMemo(() => scopeConverted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0), [scopeConverted]);
+  const scopedAdSpendTotal = useMemo(() => ownerSummary.reduce((sum, o) => sum + o.scopedAdSpend, 0), [ownerSummary]);
+  const scopedRoasTotal = scopedAdSpendTotal > 0 ? scopeRevenue / scopedAdSpendTotal : null;
 
-  // The day being edited in the ad-spend box below — a single picked date, or
-  // "today" while viewing a range (spend is logged per day either way; the
-  // scoped total just sums whichever days fall inside the range being viewed).
-  const adSpendEditDate = selectedDate ?? todayStr();
-  const scopedAdSpend = useMemo(() => {
-    const from = selectedDate ?? rangeStart;
-    const to = selectedDate ?? todayStr();
-    return adSpendRows.filter((r) => r.date >= from && r.date <= to).reduce((sum, r) => sum + r.amount, 0);
-  }, [adSpendRows, selectedDate, rangeStart]);
-
-  async function saveAdSpend(date: string, amount: number) {
+  async function saveAdSpend(date: string, owner: string, amount: number) {
     const res = await fetch("/api/admin/ad-spend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, amount }),
+      body: JSON.stringify({ date, owner, amount }),
     });
     const data = await res.json();
     if (res.ok) {
-      setAdSpendRows((prev) => [...prev.filter((r) => r.date !== date), data.row]);
+      setAdSpendRows((prev) => [...prev.filter((r) => !(r.date === date && r.owner === owner)), data.row]);
     }
   }
 
@@ -705,6 +712,7 @@ export default function KpiPage() {
 
             <div>
               <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
+              <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
@@ -713,6 +721,8 @@ export default function KpiPage() {
                     <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
                     <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
                     <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
+                    <th className="py-1 font-medium text-right whitespace-nowrap">{t(`ค่ายิง Ads ฿ (${adSpendEditDate})`, `Ad spend ฿ (${adSpendEditDate})`, `广告费 ฿ (${adSpendEditDate})`)}</th>
+                    <th className="py-1 font-medium text-right">{t("ROAS", "ROAS", "ROAS")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -729,6 +739,8 @@ export default function KpiPage() {
                     <td className="py-1 text-right">
                       {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
                     </td>
+                    <td className="py-1 text-right">{scopedAdSpendTotal ? scopedAdSpendTotal.toLocaleString("th-TH") : "-"}</td>
+                    <td className="py-1 text-right">{scopedRoasTotal != null ? `${scopedRoasTotal.toFixed(1)}x` : "-"}</td>
                   </tr>
                   {ownerSummary.map((o) => (
                     <tr
@@ -741,11 +753,18 @@ export default function KpiPage() {
                       <td className="py-1 text-right">{o.converted}</td>
                       <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
                       <td className="py-1 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
+                      <td className="py-1 text-right">
+                        <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
+                      </td>
+                      <td className="py-1 text-right">{o.roas != null ? `${o.roas.toFixed(1)}x` : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="text-[10px] text-[#9CA3AF] mt-1">{t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น", "Click a name to filter the charts and board", "点击姓名筛选图表和看板")}</p>
+              </div>
+              <p className="text-[10px] text-[#9CA3AF] mt-1">
+                {t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่กำลังดูอยู่ ส่วน ROAS คำนวณจากทั้งช่วง", "Click a name to filter the charts and board — the Ad Spend box edits the day being viewed; ROAS is computed over the whole range", "点击姓名筛选图表和看板——广告费栏编辑当前查看的日期；ROAS按整个时间段计算")}
+              </p>
             </div>
 
             <div>
@@ -792,40 +811,6 @@ export default function KpiPage() {
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="border-t border-[#E8E5E0] pt-4">
-              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">{t("ค่ายิง Ads", "Ad Spend", "广告费")}</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">
-                  {t(`ค่ายิง Ads วันที่ ${adSpendEditDate}`, `Ad spend for ${adSpendEditDate}`, `${adSpendEditDate} 广告费`)}
-                </Label>
-                <AdSpendInput
-                  key={adSpendEditDate}
-                  date={adSpendEditDate}
-                  initialAmount={adSpendRows.find((r) => r.date === adSpendEditDate)?.amount ?? 0}
-                  onSave={saveAdSpend}
-                  t={t}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
-                  <p className="text-[10px] text-[#9CA3AF]">{t(`รวม (${scopeLabel})`, `Total (${scopeLabel})`, `合计 (${scopeLabel})`)}</p>
-                  <p className="text-sm font-bold text-[#1A1A1A]">฿{scopedAdSpend.toLocaleString("th-TH")}</p>
-                </div>
-                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
-                  <p className="text-[10px] text-[#9CA3AF]">{t("ต้นทุนต่อลีด", "Cost / lead", "每条线索成本")}</p>
-                  <p className="text-sm font-bold text-[#1A1A1A]">
-                    {scopedAdSpend > 0 && rangeLeads.length > 0 ? `฿${(scopedAdSpend / rangeLeads.length).toLocaleString("th-TH", { maximumFractionDigits: 0 })}` : "-"}
-                  </p>
-                </div>
-                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
-                  <p className="text-[10px] text-[#9CA3AF]">{t("ROAS", "ROAS", "ROAS")}</p>
-                  <p className="text-sm font-bold text-[#1A1A1A]">
-                    {scopedAdSpend > 0 ? `${(scopeRevenue / scopedAdSpend).toFixed(1)}x` : "-"}
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>

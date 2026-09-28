@@ -277,6 +277,7 @@ export interface DailyShippingRow {
 
 export interface AdSpend {
   date: string;
+  owner: string;
   amount: number;
   updated_at: string;
 }

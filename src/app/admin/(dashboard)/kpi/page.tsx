@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
 } from "recharts";
@@ -16,10 +16,32 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/store/language";
-import type { AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
+import type {
+  AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown,
+  SavedQuoteChannel, SavedQuoteItem, SavedQuoteStatus,
+} from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
-import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS, computeGrandTotal } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
+
+interface SavedQuoteListItem {
+  id: number;
+  doc_type: keyof typeof DOC_LABELS;
+  doc_no: string;
+  customer_name: string;
+  doc_date: string;
+  status: SavedQuoteStatus;
+  channel: SavedQuoteChannel;
+  shipping_date: string | null;
+  shipping_address: string;
+  contact_person: string;
+  contact_phone: string;
+  salesperson: string | null;
+  notes: string;
+  items: SavedQuoteItem[];
+  discount_pct: number;
+  vat_pct: number;
+}
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -119,6 +141,11 @@ export default function KpiPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [quotePickerOpen, setQuotePickerOpen] = useState(false);
+  const [savedQuotes, setSavedQuotes] = useState<SavedQuoteListItem[]>([]);
+  const [loadingSavedQuotes, setLoadingSavedQuotes] = useState(false);
+  const [quotePickerQuery, setQuotePickerQuery] = useState("");
+  const [quotePickerStatus, setQuotePickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [editing, setEditing] = useState<Lead | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -196,6 +223,49 @@ export default function KpiPage() {
       owner: lead.owner || "",
     });
     setLastSavedAt(null);
+    setDialogOpen(true);
+  }
+
+  useEffect(() => {
+    if (!quotePickerOpen) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingSavedQuotes(true);
+      const res = await fetch("/api/admin/saved-quotes?archived=false");
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) setSavedQuotes(data.quotes);
+        setLoadingSavedQuotes(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quotePickerOpen]);
+
+  // Pulls a saved quotation's details into the "Add Lead" form so nobody has
+  // to retype what's already in the quote — the form still opens for review
+  // before saving, since several lead-only fields (follow-up status, whether
+  // the phone's been reached, etc.) have no quote equivalent to pull from.
+  function importFromQuote(quote: SavedQuoteListItem) {
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      customer_name: quote.customer_name,
+      address: quote.shipping_address || "",
+      channel: (quote.channel as LeadChannel) || "facebook",
+      sku: quote.items.map((it) => it.sku).filter(Boolean).join(", "),
+      status: "quoted",
+      contact_method: quote.contact_phone ? "phone" : "line",
+      contact_id: quote.contact_phone || "",
+      customer_details: quote.contact_person ? `ผู้ติดต่อ: ${quote.contact_person}` : "",
+      notes: quote.notes || "",
+      needed_by_date: quote.shipping_date || "",
+      deal_value: quote.items.length ? String(Math.round(computeGrandTotal(quote.items, quote.discount_pct, quote.vat_pct))) : "",
+      owner: quote.salesperson || "",
+    });
+    setLastSavedAt(null);
+    setQuotePickerOpen(false);
     setDialogOpen(true);
   }
 
@@ -425,6 +495,15 @@ export default function KpiPage() {
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
 
+  const filteredSavedQuotes = useMemo(() => {
+    const q = quotePickerQuery.trim().toLowerCase();
+    return savedQuotes.filter((s) => {
+      if (quotePickerStatus !== "all" && s.status !== quotePickerStatus) return false;
+      if (!q) return true;
+      return s.customer_name.toLowerCase().includes(q) || s.doc_no.toLowerCase().includes(q);
+    });
+  }, [savedQuotes, quotePickerQuery, quotePickerStatus]);
+
   // The status board follows the chosen range / selected date too.
   const boardGroups = useMemo(
     () =>
@@ -541,6 +620,9 @@ export default function KpiPage() {
           <Button size="sm" variant="outline" onClick={exportExcel} disabled={leads.length === 0}>
             <Download size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setQuotePickerOpen(true)}>
+            <FolderOpen size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Import from quotation", "从报价单导入")}
+          </Button>
           <Button size="sm" onClick={openAdd}>
             <Plus size={14} className="mr-1.5" /> {t("เพิ่มลีด", "Add Lead", "添加线索")}
           </Button>
@@ -552,6 +634,73 @@ export default function KpiPage() {
         onOpenChange={setImportOpen}
         onImported={(newLeads) => setLeads((prev) => [...newLeads, ...prev])}
       />
+
+      <Dialog open={quotePickerOpen} onOpenChange={setQuotePickerOpen}>
+        <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t("ดึงลีดจากใบเสนอราคา", "Add a lead from a saved quotation", "从报价单添加线索")}</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+              <Input
+                className="pl-8"
+                placeholder={t("ค้นหาชื่อบริษัท หรือเลขที่เอกสาร...", "Search company or doc no...", "搜索公司名或单号...")}
+                value={quotePickerQuery}
+                onChange={(e) => setQuotePickerQuery(e.target.value)}
+              />
+            </div>
+            <Select value={quotePickerStatus} onValueChange={(v) => setQuotePickerStatus((v ?? "all") as SavedQuoteStatus | "all")}>
+              <SelectTrigger className="w-44">
+                <SelectValue>
+                  {(v: SavedQuoteStatus | "all") => (v === "all" ? t("ทุกสถานะ", "All statuses", "全部状态") : t(STATUS_META[v].th, STATUS_META[v].en, STATUS_META[v].zh))}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("ทุกสถานะ", "All statuses", "全部状态")}</SelectItem>
+                {STATUS_ORDER.map((s) => (
+                  <SelectItem key={s} value={s}>{t(STATUS_META[s].th, STATUS_META[s].en, STATUS_META[s].zh)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+            {loadingSavedQuotes ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-10">
+                <Loader2 size={16} className="inline animate-spin mr-2" /> {t("กำลังโหลด...", "Loading...", "加载中...")}
+              </p>
+            ) : filteredSavedQuotes.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ไม่พบเอกสาร", "No documents found", "未找到文件")}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {filteredSavedQuotes.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-2 border border-[#E8E5E0] rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#1A1A1A] truncate">{s.customer_name || "-"}</p>
+                      <p className="text-xs text-[#9CA3AF] font-mono">
+                        {s.doc_no} · {t(DOC_LABELS[s.doc_type].th, DOC_LABELS[s.doc_type].en, DOC_LABELS[s.doc_type].zh)} · {s.doc_date}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${STATUS_META[s.status].color}`}>
+                        {t(STATUS_META[s.status].th, STATUS_META[s.status].en, STATUS_META[s.status].zh)}
+                      </span>
+                      <Button size="sm" onClick={() => importFromQuote(s)}>
+                        {t("นำเข้า", "Import", "导入")}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setQuotePickerOpen(false)}>
+              <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/store/language";
-import type { AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
+import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
@@ -57,36 +57,6 @@ const BOARD_COLUMNS: {
 
 const NO_OWNER = "__none";
 
-// Keyed by `date` from the parent (key={date}) so switching the day being
-// edited remounts this with a fresh local value instead of needing an effect
-// to resync it — the usual React way to reset state when a prop changes.
-function AdSpendInput({
-  date, owner, initialAmount, onSave,
-}: {
-  date: string;
-  owner: string;
-  initialAmount: number;
-  onSave: (date: string, owner: string, amount: number) => Promise<void>;
-}) {
-  const [value, setValue] = useState(String(initialAmount));
-  const [saving, setSaving] = useState(false);
-  return (
-    <Input
-      type="number"
-      className="h-6 w-full min-w-0 text-[10px] px-1 text-right"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
-      onBlur={async () => {
-        setSaving(true);
-        await onSave(date, owner, Number(value) || 0);
-        setSaving(false);
-      }}
-      disabled={saving}
-    />
-  );
-}
-
 const emptyForm = {
   lead_date: todayStr(),
   customer_id: "",
@@ -125,7 +95,6 @@ export default function KpiPage() {
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [adSpendRows, setAdSpendRows] = useState<AdSpend[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
   useEffect(() => {
@@ -141,20 +110,6 @@ export default function KpiPage() {
         setLeads(res.ok ? data.leads : []);
         setLoading(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Fetched once — the table is small (one row per day), so it's simpler to
-  // just pull it all and sum client-side over whatever range is being viewed.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/admin/ad-spend");
-      const data = await res.json();
-      if (!cancelled && res.ok) setAdSpendRows(data.rows);
     })();
     return () => {
       cancelled = true;
@@ -385,13 +340,6 @@ export default function KpiPage() {
     [rangeLeads, ownerFilter]
   );
 
-  // The day being edited in each owner's "ค่ายิง Ads" cell — a single picked
-  // date, or "today" while viewing a range (spend is logged per day either
-  // way; ROAS below sums whichever days fall inside the range being viewed).
-  const adSpendEditDate = selectedDate ?? todayStr();
-  const adSpendScopeFrom = selectedDate ?? rangeStart;
-  const adSpendScopeTo = selectedDate ?? todayStr();
-
   const ownerSummary = useMemo(() => {
     // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row
     const legacy = [...new Set(leads.map((l) => l.owner).filter((o): o is string => !!o && !SALESPEOPLE.includes(o)))];
@@ -400,41 +348,17 @@ export default function KpiPage() {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
       const revenue = converted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0);
-      const ownerAdSpendRows = adSpendRows.filter((r) => r.owner === name);
-      const editDayAmount = ownerAdSpendRows.find((r) => r.date === adSpendEditDate)?.amount ?? 0;
-      const scopedAdSpend = ownerAdSpendRows
-        .filter((r) => r.date >= adSpendScopeFrom && r.date <= adSpendScopeTo)
-        .reduce((sum, r) => sum + r.amount, 0);
       return {
         name,
         count: rows.length,
         converted: converted.length,
         rate: rows.length ? (converted.length / rows.length) * 100 : 0,
         revenue,
-        editDayAmount,
-        scopedAdSpend,
-        roas: scopedAdSpend > 0 ? revenue / scopedAdSpend : null,
       };
     });
-  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, adSpendScopeFrom, adSpendScopeTo]);
+  }, [rangeLeads, leads]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
-  const scopeConverted = useMemo(() => rangeLeads.filter((l) => l.status === "converted"), [rangeLeads]);
-  const scopeRevenue = useMemo(() => scopeConverted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0), [scopeConverted]);
-  const scopedAdSpendTotal = useMemo(() => ownerSummary.reduce((sum, o) => sum + o.scopedAdSpend, 0), [ownerSummary]);
-  const scopedRoasTotal = scopedAdSpendTotal > 0 ? scopeRevenue / scopedAdSpendTotal : null;
-
-  async function saveAdSpend(date: string, owner: string, amount: number) {
-    const res = await fetch("/api/admin/ad-spend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, owner, amount }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setAdSpendRows((prev) => [...prev.filter((r) => !(r.date === date && r.owner === owner)), data.row]);
-    }
-  }
 
   // The status board follows the chosen range / selected date too.
   const boardGroups = useMemo(
@@ -712,17 +636,7 @@ export default function KpiPage() {
 
             <div>
               <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
-              <div className="overflow-x-auto">
-              <table className="w-full text-[11px] table-fixed">
-                <colgroup>
-                  <col className="w-[20%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[19%]" />
-                  <col className="w-[19%]" />
-                  <col className="w-[14%]" />
-                </colgroup>
+              <table className="w-full text-[11px]">
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
                     <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
@@ -730,8 +644,6 @@ export default function KpiPage() {
                     <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
                     <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
                     <th className="py-1 font-medium text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</th>
-                    <th className="py-1 font-medium text-right">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
-                    <th className="py-1 font-medium text-right">{t("ROAS", "ROAS", "ROAS")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -748,8 +660,6 @@ export default function KpiPage() {
                     <td className="py-1 text-right">
                       {rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
                     </td>
-                    <td className="py-1 text-right">{scopedAdSpendTotal ? scopedAdSpendTotal.toLocaleString("th-TH") : "-"}</td>
-                    <td className="py-1 text-right">{scopedRoasTotal != null ? `${scopedRoasTotal.toFixed(1)}x` : "-"}</td>
                   </tr>
                   {ownerSummary.map((o) => (
                     <tr
@@ -762,22 +672,11 @@ export default function KpiPage() {
                       <td className="py-1 text-right">{o.converted}</td>
                       <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
                       <td className="py-1 text-right">{o.revenue ? o.revenue.toLocaleString("th-TH") : "-"}</td>
-                      <td className="py-1 text-right">
-                        <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
-                      </td>
-                      <td className="py-1 text-right">{o.roas != null ? `${o.roas.toFixed(1)}x` : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              </div>
-              <p className="text-[10px] text-[#9CA3AF] mt-1">
-                {t(
-                  `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่ ${adSpendEditDate} ส่วน ROAS คำนวณจากทั้งช่วง`,
-                  `Click a name to filter the charts and board — the Ad Spend box edits ${adSpendEditDate}; ROAS is computed over the whole range`,
-                  `点击姓名筛选图表和看板——广告费栏编辑 ${adSpendEditDate} 当天；ROAS按整个时间段计算`
-                )}
-              </p>
+              <p className="text-[10px] text-[#9CA3AF] mt-1">{t("กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น", "Click a name to filter the charts and board", "点击姓名筛选图表和看板")}</p>
             </div>
 
             <div>
@@ -806,22 +705,6 @@ export default function KpiPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">{t("SKU ขายดี (ปิดการขาย)", "Top SKUs (Converted)", "热销SKU（已成交）")}</p>
-              {topSkus.length === 0 ? (
-                <p className="text-xs text-[#9CA3AF]">{t("ยังไม่มีดีลที่ปิด", "No closed deals yet", "暂无已成交订单")}</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {topSkus.map(([sku, count]) => (
-                    <div key={sku} className="flex items-center justify-between text-xs">
-                      <span className="font-mono text-[#1A1A1A]">{sku}</span>
-                      <span className="text-[#6B6B6B]">{count} {t("ดีล", "deals", "单")}</span>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>

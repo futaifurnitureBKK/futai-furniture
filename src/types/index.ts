@@ -237,6 +237,23 @@ export interface QuoteFormValues {
   message: string;
 }
 
+export interface DailySalesRow {
+  id: number;
+  sale_date: string;
+  sort_order: number;
+  sku: string;
+  image_url: string | null;
+  size_text: string;
+  unit_price: number;
+  qty: number;
+  customer_name: string;
+  salesperson: string | null;
+  po_no: string;
+  source_quote_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CheckoutFormValues {
   name: string;
   company: string;

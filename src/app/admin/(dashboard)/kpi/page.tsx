@@ -71,19 +71,21 @@ function AdSpendInput({
   const [value, setValue] = useState(String(initialAmount));
   const [saving, setSaving] = useState(false);
   return (
-    <Input
-      type="number"
-      className="h-6 w-full min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
-      onBlur={async () => {
-        setSaving(true);
-        await onSave(date, owner, Number(value) || 0);
-        setSaving(false);
-      }}
-      disabled={saving}
-    />
+    <div className="flex justify-center">
+      <Input
+        type="number"
+        className="h-6 w-14 min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={async () => {
+          setSaving(true);
+          await onSave(date, owner, Number(value) || 0);
+          setSaving(false);
+        }}
+        disabled={saving}
+      />
+    </div>
   );
 }
 
@@ -701,11 +703,11 @@ export default function KpiPage() {
               <p className="text-xs font-semibold text-[#1A1A1A] mb-1.5">{t("สรุปตามผู้ดูแล", "Summary by owner", "按负责人汇总")}</p>
               <table className="w-full text-[11px] table-fixed">
                 <colgroup>
-                  <col />
-                  <col className="w-11" />
-                  <col className="w-11" />
-                  <col className="w-12" />
-                  <col className="w-11" />
+                  <col className="w-1/5" />
+                  <col className="w-1/5" />
+                  <col className="w-1/5" />
+                  <col className="w-1/5" />
+                  <col className="w-1/5" />
                 </colgroup>
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
@@ -713,7 +715,7 @@ export default function KpiPage() {
                     <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
                     <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
                     <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
-                    <th className="py-1 font-medium text-right">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
+                    <th className="py-1 font-medium text-center">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -727,7 +729,7 @@ export default function KpiPage() {
                     <td className="py-1 text-right">
                       {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
                     </td>
-                    <td className="py-1 text-right">{adSpendEditDateTotal ? adSpendEditDateTotal.toLocaleString("th-TH") : "-"}</td>
+                    <td className="py-1 text-center">{adSpendEditDateTotal ? adSpendEditDateTotal.toLocaleString("th-TH") : "-"}</td>
                   </tr>
                   {ownerSummary.map((o) => (
                     <tr

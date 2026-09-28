@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/store/language";
-import type { Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
+import type { AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown } from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
@@ -57,6 +57,36 @@ const BOARD_COLUMNS: {
 
 const NO_OWNER = "__none";
 
+// Keyed by `date` from the parent (key={date}) so switching the day being
+// edited remounts this with a fresh local value instead of needing an effect
+// to resync it — the usual React way to reset state when a prop changes.
+function AdSpendInput({
+  date, initialAmount, onSave, t,
+}: {
+  date: string;
+  initialAmount: number;
+  onSave: (date: string, amount: number) => Promise<void>;
+  t: (th: string, en: string, zh?: string) => string;
+}) {
+  const [value, setValue] = useState(String(initialAmount));
+  const [saving, setSaving] = useState(false);
+  return (
+    <Input
+      type="number"
+      className="h-8 w-32 text-xs"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={async () => {
+        setSaving(true);
+        await onSave(date, Number(value) || 0);
+        setSaving(false);
+      }}
+      disabled={saving}
+      placeholder={t("จำนวนเงิน", "Amount", "金额")}
+    />
+  );
+}
+
 const emptyForm = {
   lead_date: todayStr(),
   customer_id: "",
@@ -95,6 +125,7 @@ export default function KpiPage() {
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [adSpendRows, setAdSpendRows] = useState<AdSpend[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
   useEffect(() => {
@@ -110,6 +141,20 @@ export default function KpiPage() {
         setLeads(res.ok ? data.leads : []);
         setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetched once — the table is small (one row per day), so it's simpler to
+  // just pull it all and sum client-side over whatever range is being viewed.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/admin/ad-spend");
+      const data = await res.json();
+      if (!cancelled && res.ok) setAdSpendRows(data.rows);
     })();
     return () => {
       cancelled = true;
@@ -359,6 +404,30 @@ export default function KpiPage() {
   }, [rangeLeads, leads]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+  const scopeConverted = useMemo(() => rangeLeads.filter((l) => l.status === "converted"), [rangeLeads]);
+  const scopeRevenue = useMemo(() => scopeConverted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0), [scopeConverted]);
+
+  // The day being edited in the ad-spend box below — a single picked date, or
+  // "today" while viewing a range (spend is logged per day either way; the
+  // scoped total just sums whichever days fall inside the range being viewed).
+  const adSpendEditDate = selectedDate ?? todayStr();
+  const scopedAdSpend = useMemo(() => {
+    const from = selectedDate ?? rangeStart;
+    const to = selectedDate ?? todayStr();
+    return adSpendRows.filter((r) => r.date >= from && r.date <= to).reduce((sum, r) => sum + r.amount, 0);
+  }, [adSpendRows, selectedDate, rangeStart]);
+
+  async function saveAdSpend(date: string, amount: number) {
+    const res = await fetch("/api/admin/ad-spend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, amount }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setAdSpendRows((prev) => [...prev.filter((r) => r.date !== date), data.row]);
+    }
+  }
 
   // The status board follows the chosen range / selected date too.
   const boardGroups = useMemo(
@@ -723,6 +792,40 @@ export default function KpiPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="border-t border-[#E8E5E0] pt-4">
+              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">{t("ค่ายิง Ads", "Ad Spend", "广告费")}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">
+                  {t(`ค่ายิง Ads วันที่ ${adSpendEditDate}`, `Ad spend for ${adSpendEditDate}`, `${adSpendEditDate} 广告费`)}
+                </Label>
+                <AdSpendInput
+                  key={adSpendEditDate}
+                  date={adSpendEditDate}
+                  initialAmount={adSpendRows.find((r) => r.date === adSpendEditDate)?.amount ?? 0}
+                  onSave={saveAdSpend}
+                  t={t}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] text-[#9CA3AF]">{t(`รวม (${scopeLabel})`, `Total (${scopeLabel})`, `合计 (${scopeLabel})`)}</p>
+                  <p className="text-sm font-bold text-[#1A1A1A]">฿{scopedAdSpend.toLocaleString("th-TH")}</p>
+                </div>
+                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] text-[#9CA3AF]">{t("ต้นทุนต่อลีด", "Cost / lead", "每条线索成本")}</p>
+                  <p className="text-sm font-bold text-[#1A1A1A]">
+                    {scopedAdSpend > 0 && rangeLeads.length > 0 ? `฿${(scopedAdSpend / rangeLeads.length).toLocaleString("th-TH", { maximumFractionDigits: 0 })}` : "-"}
+                  </p>
+                </div>
+                <div className="bg-[#FAF7F2] rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] text-[#9CA3AF]">{t("ROAS", "ROAS", "ROAS")}</p>
+                  <p className="text-sm font-bold text-[#1A1A1A]">
+                    {scopedAdSpend > 0 ? `${(scopeRevenue / scopedAdSpend).toFixed(1)}x` : "-"}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

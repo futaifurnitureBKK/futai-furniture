@@ -275,6 +275,12 @@ export interface DailyShippingRow {
   updated_at: string;
 }
 
+export interface AdSpend {
+  date: string;
+  amount: number;
+  updated_at: string;
+}
+
 export interface CheckoutFormValues {
   name: string;
   company: string;

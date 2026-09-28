@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useEffect, useState, FormEvent } from "react";
+import { Loader2, Lock, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -20,6 +22,8 @@ interface Attempt {
   locked_until: string | null;
 }
 
+const CODE_KEY = "futai-security-code";
+
 // Trims a raw User-Agent string down to "Browser · OS" for a quick read —
 // this is an internal security log, not a full device-detection feature.
 function briefUA(ua: string): string {
@@ -36,35 +40,113 @@ function briefUA(ua: string): string {
 
 export default function SecurityPage() {
   const { t } = useLanguage();
+  const [unlocked, setUnlocked] = useState(false);
+  const [checkingStoredCode, setCheckingStoredCode] = useState(true);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+
   const [logins, setLogins] = useState<Login[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
+
+  async function load(code: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/logins", { headers: { "x-security-code": code } });
+      const data = await res.json();
+      if (res.ok) {
+        setLogins(data.logins);
+        setAttempts(data.attempts);
+        setLoadedAt(Date.now());
+        return true;
+      }
+      if (res.status === 403) {
+        setCodeError(data.error || t("รหัสไม่ถูกต้อง", "Wrong code", "代码错误"));
+      } else {
+        setError(data.error || "Load failed");
+      }
+      return false;
+    } catch {
+      setError("Network error");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      let stored = "";
       try {
-        const res = await fetch("/api/admin/logins");
-        const data = await res.json();
-        if (cancelled) return;
-        if (res.ok) {
-          setLogins(data.logins);
-          setAttempts(data.attempts);
-          setLoadedAt(Date.now());
-        } else {
-          setError(data.error || "Load failed");
-        }
+        stored = sessionStorage.getItem(CODE_KEY) ?? "";
       } catch {
-        if (!cancelled) setError("Network error");
+        // private mode / storage blocked — just show the code prompt
       }
-      if (!cancelled) setLoading(false);
+      if (stored) {
+        const ok = await load(stored);
+        if (!cancelled && ok) setUnlocked(true);
+      }
+      if (!cancelled) setCheckingStoredCode(false);
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleUnlock(e: FormEvent) {
+    e.preventDefault();
+    setUnlocking(true);
+    setCodeError("");
+    const ok = await load(codeInput);
+    setUnlocking(false);
+    if (ok) {
+      setUnlocked(true);
+      try {
+        sessionStorage.setItem(CODE_KEY, codeInput);
+      } catch {
+        // ignore — just means it'll ask again next time
+      }
+    }
+  }
+
+  if (checkingStoredCode) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm py-16 text-center text-sm text-[#6B6B6B]">
+        <Loader2 size={20} className="mx-auto mb-2 animate-spin" />
+        {t("กำลังโหลด...", "Loading...", "加载中...")}
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="max-w-sm mx-auto mt-16 bg-white rounded-xl shadow-sm p-6 text-center space-y-3">
+        <Lock size={24} className="mx-auto text-[#9CA3AF]" />
+        <p className="text-sm font-semibold text-[#1A1A1A]">
+          {t("หน้านี้ต้องใส่รหัสเพิ่มเติม", "This page needs an extra code", "此页面需要额外的密码")}
+        </p>
+        <form onSubmit={handleUnlock} className="space-y-2">
+          <Input
+            type="password"
+            autoFocus
+            value={codeInput}
+            onChange={(e) => setCodeInput(e.target.value)}
+            placeholder={t("รหัส", "Code", "密码")}
+          />
+          {codeError && <p className="text-xs text-red-600">{codeError}</p>}
+          <Button type="submit" className="w-full" disabled={unlocking || !codeInput}>
+            {unlocking ? t("กำลังตรวจสอบ...", "Checking...", "验证中...") : t("เข้าดู", "Unlock", "解锁")}
+          </Button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

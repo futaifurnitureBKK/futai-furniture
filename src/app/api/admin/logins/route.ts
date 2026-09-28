@@ -6,6 +6,13 @@ export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const secret = process.env.SECURITY_LOG_CODE;
+  const code = req.headers.get("x-security-code") || "";
+  if (secret && code !== secret) {
+    return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 403 });
+  }
+
   const db = supabaseAdmin();
 
   const [{ data: logins, error: loginsErr }, { data: attempts, error: attemptsErr }] = await Promise.all([

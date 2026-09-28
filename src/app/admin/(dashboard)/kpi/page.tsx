@@ -73,7 +73,7 @@ function AdSpendInput({
   return (
     <Input
       type="number"
-      className="h-6 w-full min-w-0 text-[10px] px-1 text-right"
+      className="h-6 w-full min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onClick={(e) => e.stopPropagation()}
@@ -705,7 +705,7 @@ export default function KpiPage() {
                   <col className="w-11" />
                   <col className="w-11" />
                   <col className="w-12" />
-                  <col className="w-14" />
+                  <col className="w-11" />
                 </colgroup>
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">

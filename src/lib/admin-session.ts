@@ -27,7 +27,7 @@ export async function createAdminSession(params: {
 }): Promise<string> {
   const id = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + params.maxAgeSeconds * 1000).toISOString();
-  await fetch(restUrl("admin_sessions"), {
+  const res = await fetch(restUrl("admin_sessions"), {
     method: "POST",
     headers: restHeaders({ Prefer: "return=minimal" }),
     body: JSON.stringify({
@@ -38,6 +38,13 @@ export async function createAdminSession(params: {
       expires_at: expiresAt,
     }),
   });
+  // Fail loudly rather than handing back a session id that was never
+  // actually stored — that would look like a successful login but bounce
+  // straight back to /admin/login on the very next page load.
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Failed to create admin session (${res.status}): ${detail}`);
+  }
   return id;
 }
 

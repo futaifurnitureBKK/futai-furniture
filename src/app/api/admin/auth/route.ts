@@ -59,7 +59,16 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get("user-agent") || "";
   await db.from("admin_logins").insert({ ip, name: trimmedName, user_agent: userAgent });
 
-  const sessionId = await createAdminSession({ ip, name: trimmedName, userAgent, maxAgeSeconds: MAX_AGE });
+  let sessionId: string;
+  try {
+    sessionId = await createAdminSession({ ip, name: trimmedName, userAgent, maxAgeSeconds: MAX_AGE });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { error: "สร้าง session ไม่สำเร็จ — อาจยังไม่ได้สร้างตาราง admin_sessions ในฐานข้อมูล" },
+      { status: 500 }
+    );
+  }
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE, sessionId, {
     httpOnly: true,

@@ -133,6 +133,7 @@ const emptyForm = {
   deal_value: "",
   lost_reason: "",
   owner: "",
+  source_quote_id: null as number | null,
 };
 
 export default function KpiPage() {
@@ -221,6 +222,7 @@ export default function KpiPage() {
       deal_value: lead.deal_value != null ? String(lead.deal_value) : "",
       lost_reason: lead.lost_reason || "",
       owner: lead.owner || "",
+      source_quote_id: lead.source_quote_id,
     });
     setLastSavedAt(null);
     setDialogOpen(true);
@@ -263,6 +265,7 @@ export default function KpiPage() {
       needed_by_date: quote.shipping_date || "",
       deal_value: quote.items.length ? String(Math.round(computeGrandTotal(quote.items, quote.discount_pct, quote.vat_pct))) : "",
       owner: quote.salesperson || "",
+      source_quote_id: quote.id,
     });
     setLastSavedAt(null);
     setQuotePickerOpen(false);
@@ -504,6 +507,13 @@ export default function KpiPage() {
     });
   }, [savedQuotes, quotePickerQuery, quotePickerStatus]);
 
+  // Which quotes already have a lead pulled from them, so the picker can
+  // flag them instead of letting someone import the same quote twice by accident.
+  const importedQuoteIds = useMemo(
+    () => new Set(leads.map((l) => l.source_quote_id).filter((id): id is number => id != null)),
+    [leads]
+  );
+
   // The status board follows the chosen range / selected date too.
   const boardGroups = useMemo(
     () =>
@@ -673,24 +683,35 @@ export default function KpiPage() {
               <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ไม่พบเอกสาร", "No documents found", "未找到文件")}</p>
             ) : (
               <div className="space-y-1.5">
-                {filteredSavedQuotes.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-2 border border-[#E8E5E0] rounded-lg px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[#1A1A1A] truncate">{s.customer_name || "-"}</p>
-                      <p className="text-xs text-[#9CA3AF] font-mono">
-                        {s.doc_no} · {t(DOC_LABELS[s.doc_type].th, DOC_LABELS[s.doc_type].en, DOC_LABELS[s.doc_type].zh)} · {s.doc_date}
-                      </p>
+                {filteredSavedQuotes.map((s) => {
+                  const alreadyImported = importedQuoteIds.has(s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between gap-2 border rounded-lg px-3 py-2 ${alreadyImported ? "border-emerald-200 bg-emerald-50/40" : "border-[#E8E5E0]"}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[#1A1A1A] truncate">{s.customer_name || "-"}</p>
+                        <p className="text-xs text-[#9CA3AF] font-mono">
+                          {s.doc_no} · {t(DOC_LABELS[s.doc_type].th, DOC_LABELS[s.doc_type].en, DOC_LABELS[s.doc_type].zh)} · {s.doc_date}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {alreadyImported && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                            {t("นำเข้าแล้ว", "Already imported", "已导入")}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${STATUS_META[s.status].color}`}>
+                          {t(STATUS_META[s.status].th, STATUS_META[s.status].en, STATUS_META[s.status].zh)}
+                        </span>
+                        <Button size="sm" variant={alreadyImported ? "outline" : "default"} onClick={() => importFromQuote(s)}>
+                          {alreadyImported ? t("นำเข้าอีกครั้ง", "Import again", "再次导入") : t("นำเข้า", "Import", "导入")}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${STATUS_META[s.status].color}`}>
-                        {t(STATUS_META[s.status].th, STATUS_META[s.status].en, STATUS_META[s.status].zh)}
-                      </span>
-                      <Button size="sm" onClick={() => importFromQuote(s)}>
-                        {t("นำเข้า", "Import", "导入")}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

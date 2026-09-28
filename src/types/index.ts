@@ -45,6 +45,7 @@ export interface Lead {
   deal_value: number | null;
   lost_reason: string | null;
   owner: string | null;
+  source_quote_id: number | null;
   converted_at: string | null;
   created_at: string;
   updated_at: string;

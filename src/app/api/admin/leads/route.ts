@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       next_followup_date: body.next_followup_date || null,
       deal_value: body.deal_value ?? null,
       owner: body.owner || null,
+      source_quote_id: body.source_quote_id ?? null,
     })
     .select()
     .single();

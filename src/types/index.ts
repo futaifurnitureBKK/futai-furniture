@@ -246,7 +246,9 @@ export interface DailySalesRow {
   size_text: string;
   unit_price: number;
   qty: number;
+  remark: string;
   customer_name: string;
+  customer_phone: string;
   salesperson: string | null;
   po_no: string;
   source_quote_id: number | null;

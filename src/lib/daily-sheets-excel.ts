@@ -7,8 +7,10 @@ import type { DailySalesRow, DailyShippingRow } from "@/types";
 
 // When nobody has entered/imported anything into Daily Shipping yet for a
 // date, the shipping sheet shouldn't just export blank — this derives a
-// stand-in set of shipping rows straight from that day's Daily Sales rows
-// (remark / consignee / tel. aren't tracked there, so those come out blank).
+// stand-in set of shipping rows straight from that day's Daily Sales rows.
+// Remark carries over since both sheets track it, and the customer's phone
+// is used as a starting point for Tel.; "consignee" isn't tracked in Daily
+// Sales, so that one comes out blank (it's often a different person).
 export function salesRowsToShippingRows(rows: DailySalesRow[]): DailyShippingRow[] {
   return rows.map((r) => ({
     id: r.id,
@@ -18,12 +20,12 @@ export function salesRowsToShippingRows(rows: DailySalesRow[]): DailyShippingRow
     image_url: r.image_url,
     size_text: r.size_text,
     qty: r.qty,
-    remark: "",
+    remark: r.remark,
     customer_name: r.customer_name,
     salesperson: r.salesperson,
     po_no: r.po_no,
     consignee: "",
-    phone: "",
+    phone: r.customer_phone,
     source_quote_id: r.source_quote_id,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -38,7 +40,9 @@ export const SALES_HEADERS = [
   "单价\nUnit Price (ราคาต่อหน่วย)",
   "数量\nQuantity (ปริมาณ)",
   "总金额\nTotal (จำนวนเงินทั้งหมด)",
+  "备注\nRemark (หมายเหตุ)",
   "客户\nCustomer (ชื่อลูกค้า)",
+  "客户电话\nCustomer Tel. (เบอร์ลูกค้า)",
   "业务员\nSaler (ผู้ขาย)",
   "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
 ];
@@ -105,9 +109,9 @@ async function addSalesSheet(wb: ExcelJSNamespace.Workbook, date: string, rows: 
   const ws = wb.addWorksheet("Daily Sales");
   ws.columns = [
     { width: 6 }, { width: 16 }, { width: PICTURE_COL_WIDTH }, { width: 16 }, { width: 12 },
-    { width: 8 }, { width: 14 }, { width: 22 }, { width: 14 }, { width: 16 },
+    { width: 8 }, { width: 14 }, { width: 18 }, { width: 22 }, { width: 14 }, { width: 14 }, { width: 16 },
   ];
-  ws.mergeCells("A1:J1");
+  ws.mergeCells("A1:L1");
   const title = ws.getCell("A1");
   title.value = "单日销售表格\nDaily Sales (แบบฟอร์มการขายประจำวัน ) " + date;
   title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
@@ -119,7 +123,7 @@ async function addSalesSheet(wb: ExcelJSNamespace.Workbook, date: string, rows: 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const row = ws.addRow([
-      i + 1, r.sku, "", r.size_text, r.unit_price, r.qty, r.qty * r.unit_price, r.customer_name, r.salesperson || "", r.po_no,
+      i + 1, r.sku, "", r.size_text, r.unit_price, r.qty, r.qty * r.unit_price, r.remark, r.customer_name, r.customer_phone, r.salesperson || "", r.po_no,
     ]);
     row.eachCell((c) => { c.border = THIN_BORDER; });
     row.height = DATA_ROW_HEIGHT;

@@ -63,11 +63,11 @@ function computeRange(anchor: string, key: RangeKey): { from: string; to: string
   return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
 }
 
-type SortKey = "sale_date" | "sku" | "size_text" | "unit_price" | "qty" | "total" | "customer_name" | "salesperson" | "po_no";
+type SortKey = "sale_date" | "sku" | "size_text" | "unit_price" | "qty" | "total" | "remark" | "customer_name" | "customer_phone" | "salesperson" | "po_no";
 
 // The columns a viewer can hide or reorder from the "settings" dialog.
 // No., checkbox, date (auto) and delete stay fixed.
-const CONFIGURABLE_COLUMNS = ["photo", "size", "unit_price", "qty", "total", "customer_name", "salesperson", "po_no"] as const;
+const CONFIGURABLE_COLUMNS = ["photo", "size", "unit_price", "qty", "total", "remark", "customer_name", "customer_phone", "salesperson", "po_no"] as const;
 type ConfigColumnKey = typeof CONFIGURABLE_COLUMNS[number];
 const COLUMN_SETTINGS_KEY = "futai-daily-sales-columns";
 
@@ -546,7 +546,9 @@ export default function DailySalesPage() {
       case "unit_price": return { label: t("ราคาต่อหน่วย", "Unit Price", "单价"), className: "w-24", sortKey: "unit_price" };
       case "qty": return { label: t("จำนวน", "Qty", "数量"), className: "w-20", sortKey: "qty" };
       case "total": return { label: t("ยอดรวม", "Total", "总金额"), className: "w-24", sortKey: "total" };
+      case "remark": return { label: t("หมายเหตุ", "Remark", "备注"), sortKey: "remark" };
       case "customer_name": return { label: t("ลูกค้า", "Customer", "客户"), sortKey: "customer_name" };
+      case "customer_phone": return { label: t("เบอร์ลูกค้า", "Customer Tel.", "客户电话"), className: "w-28", sortKey: "customer_phone" };
       case "salesperson": return { label: t("ผู้ขาย", "Saler", "业务员"), className: "w-32", sortKey: "salesperson" };
       case "po_no": return { label: t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号") };
     }
@@ -637,6 +639,17 @@ export default function DailySalesPage() {
             ฿{fmt(r.qty * r.unit_price)}
           </TableCell>
         );
+      case "remark":
+        return (
+          <TableCell key={key}>
+            <Input
+              className="h-8 text-xs w-32"
+              value={r.remark}
+              onChange={(e) => patchLocal(r.id, { remark: e.target.value })}
+              onBlur={(e) => saveRow(r.id, { remark: e.target.value })}
+            />
+          </TableCell>
+        );
       case "customer_name":
         return (
           <TableCell key={key}>
@@ -645,6 +658,17 @@ export default function DailySalesPage() {
               value={r.customer_name}
               onChange={(e) => patchLocal(r.id, { customer_name: e.target.value })}
               onBlur={(e) => saveRow(r.id, { customer_name: e.target.value })}
+            />
+          </TableCell>
+        );
+      case "customer_phone":
+        return (
+          <TableCell key={key}>
+            <Input
+              className="h-8 text-xs w-28 font-mono"
+              value={r.customer_phone}
+              onChange={(e) => patchLocal(r.id, { customer_phone: e.target.value })}
+              onBlur={(e) => saveRow(r.id, { customer_phone: e.target.value })}
             />
           </TableCell>
         );
@@ -1030,7 +1054,9 @@ export default function DailySalesPage() {
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-right">{fmt(r.unit_price)}</td>
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-center">{r.qty}</td>
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5 text-right font-semibold">{fmt(r.qty * r.unit_price)}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.remark}</td>
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.customer_name}</td>
+                    <td className="border border-[#E8E5E0] px-1.5 py-1.5 font-mono">{r.customer_phone}</td>
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5">{r.salesperson || ""}</td>
                     <td className="border border-[#E8E5E0] px-1.5 py-1.5 font-mono">{r.po_no}</td>
                   </tr>

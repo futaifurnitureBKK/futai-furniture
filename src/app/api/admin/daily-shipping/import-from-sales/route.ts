@@ -6,8 +6,10 @@ import type { DailySalesRow } from "@/types";
 // Pulls every row already logged in Daily Sales for a given date into the
 // shipping log — the usual flow is "record the sale, then ship it", so this
 // is normally the fastest way to fill this page (no need to re-find the
-// quotation). Remark / consignee / tel. aren't tracked in Daily Sales, so
-// those are left blank for the shipper to fill in by hand.
+// quotation). Remark carries straight over since both sheets track it, and
+// the customer's phone number is used as a starting point for Tel. — but
+// "consignee" isn't tracked in Daily Sales, so that one's left blank for the
+// shipper to fill in by hand (it's often a different person than the buyer).
 export async function POST(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,12 +50,12 @@ export async function POST(req: NextRequest) {
         image_url: r.image_url,
         size_text: r.size_text,
         qty: r.qty,
-        remark: "",
+        remark: r.remark,
         customer_name: r.customer_name,
         salesperson: r.salesperson,
         po_no: r.po_no,
         consignee: "",
-        phone: "",
+        phone: r.customer_phone,
         source_quote_id: r.source_quote_id,
       }))
     )

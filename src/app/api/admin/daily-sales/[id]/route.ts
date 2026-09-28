@@ -8,7 +8,9 @@ const EDITABLE_FIELDS = [
   "size_text",
   "unit_price",
   "qty",
+  "remark",
   "customer_name",
+  "customer_phone",
   "salesperson",
   "po_no",
 ] as const;

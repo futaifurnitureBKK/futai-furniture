@@ -1,12 +1,14 @@
 "use client";
-import { useEffect, useState, FormEvent } from "react";
-import { Loader2, Lock, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState, FormEvent } from "react";
+import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
+import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import type { Lead } from "@/types";
 
 interface Login {
   id: number;
@@ -23,6 +25,25 @@ interface Attempt {
 }
 
 const CODE_KEY = "futai-security-code";
+const NO_OWNER = "__none";
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysAgoStr(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
+const RANGES: { key: RangeKey; days: number | null }[] = [
+  { key: "1D", days: 1 },
+  { key: "5D", days: 5 },
+  { key: "1M", days: 30 },
+  { key: "5M", days: 150 },
+  { key: "ALL", days: null },
+];
 
 // Trims a raw User-Agent string down to "Browser · OS" for a quick read —
 // this is an internal security log, not a full device-detection feature.
@@ -51,6 +72,11 @@ export default function SecurityPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
+
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [range, setRange] = useState<RangeKey>("1M");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   async function load(code: string) {
     setLoading(true);
@@ -114,6 +140,57 @@ export default function SecurityPage() {
       }
     }
   }
+
+  // Sales-by-owner is only fetched once this page's own extra code has been
+  // entered — it sits behind the same gate as the login log, same as on /admin/kpi.
+  useEffect(() => {
+    if (!unlocked) return;
+    let cancelled = false;
+    (async () => {
+      setLeadsLoading(true);
+      const res = await fetch("/api/admin/leads");
+      const data = await res.json();
+      if (!cancelled && res.ok) setLeads(data.leads);
+      setLeadsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked]);
+
+  const rangeStart = useMemo(() => {
+    const days = RANGES.find((r) => r.key === range)?.days;
+    if (days != null) return daysAgoStr(days - 1);
+    const earliest = leads.reduce((min, l) => (l.lead_date < min ? l.lead_date : min), todayStr());
+    return earliest;
+  }, [range, leads]);
+
+  const rangeLeads = useMemo(
+    () =>
+      leads.filter((l) =>
+        selectedDate ? l.lead_date === selectedDate : l.lead_date >= rangeStart && l.lead_date <= todayStr()
+      ),
+    [leads, selectedDate, rangeStart]
+  );
+
+  const ownerSalesSummary = useMemo(() => {
+    const legacy = [...new Set(leads.map((l) => l.owner).filter((o): o is string => !!o && !SALESPEOPLE.includes(o)))];
+    const names = [...SALESPEOPLE, ...legacy, NO_OWNER];
+    return names.map((name) => {
+      const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
+      const converted = rows.filter((l) => l.status === "converted");
+      const revenue = converted.reduce((sum, l) => sum + (l.deal_value ?? 0), 0);
+      return {
+        name,
+        count: rows.length,
+        converted: converted.length,
+        rate: rows.length ? (converted.length / rows.length) * 100 : 0,
+        revenue,
+      };
+    });
+  }, [rangeLeads, leads]);
+
+  const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
 
   if (checkingStoredCode) {
     return (
@@ -246,6 +323,85 @@ export default function SecurityPage() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={16} className="text-indigo-600" />
+                <p className="text-sm font-semibold text-[#1A1A1A]">
+                  {t("ยอดขายตามผู้ดูแล", "Sales by owner", "按负责人销售额")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      setRange(r.key);
+                      setSelectedDate(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      range === r.key && !selectedDate ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                    }`}
+                  >
+                    {r.key}
+                  </button>
+                ))}
+                <Input
+                  type="date"
+                  className="h-8 w-auto text-xs"
+                  value={selectedDate ?? ""}
+                  onChange={(e) => setSelectedDate(e.target.value || null)}
+                />
+              </div>
+            </div>
+            {leadsLoading ? (
+              <div className="py-10 text-center text-sm text-[#6B6B6B]">
+                <Loader2 size={18} className="mx-auto mb-2 animate-spin" />
+                {t("กำลังโหลด...", "Loading...", "加载中...")}
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#FAF7F2]">
+                      <TableHead className="text-xs">{t("ผู้ดูแล", "Owner", "负责人")}</TableHead>
+                      <TableHead className="text-xs text-right">{t("ลีด", "Leads", "线索")}</TableHead>
+                      <TableHead className="text-xs text-right">{t("ปิด", "Closed", "成交")}</TableHead>
+                      <TableHead className="text-xs text-right">{t("อัตรา", "Rate", "成交率")}</TableHead>
+                      <TableHead className="text-xs text-right">{t("ยอดขาย ฿", "Revenue ฿", "销售额 ฿")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="bg-[#FAF7F2] font-semibold">
+                      <TableCell className="text-sm">{t("ทุกคน", "Everyone", "全部")}</TableCell>
+                      <TableCell className="text-sm text-right">{rangeLeads.length}</TableCell>
+                      <TableCell className="text-sm text-right">{rangeLeads.filter((l) => l.status === "converted").length}</TableCell>
+                      <TableCell className="text-sm text-right">
+                        {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
+                      </TableCell>
+                      <TableCell className="text-sm text-right">
+                        ฿{rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                      </TableCell>
+                    </TableRow>
+                    {ownerSalesSummary.map((o) => (
+                      <TableRow key={o.name} className="hover:bg-[#FAF7F2]/50">
+                        <TableCell className="text-sm">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</TableCell>
+                        <TableCell className="text-sm text-right">{o.count}</TableCell>
+                        <TableCell className="text-sm text-right">{o.converted}</TableCell>
+                        <TableCell className="text-sm text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</TableCell>
+                        <TableCell className="text-sm text-right">{o.revenue ? `฿${o.revenue.toLocaleString("th-TH")}` : "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <p className="text-[10px] text-[#9CA3AF] px-5 py-2">
+                  {t(`ช่วง: ${scopeLabel}`, `Range: ${scopeLabel}`, `范围: ${scopeLabel}`)}
+                </p>
+              </>
             )}
           </div>
         </>

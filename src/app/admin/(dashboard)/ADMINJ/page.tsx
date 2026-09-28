@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState, FormEvent } from "react";
-import { Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, KeyRound, LogOut, Radio } from "lucide-react";
+import {
+  Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, KeyRound, LogOut, Radio,
+  CheckCircle2, XCircle, Users, Clock,
+} from "lucide-react";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -72,6 +78,29 @@ function briefUA(ua: string): string {
     ua.match(/Version\/[\d.]+.*Safari/)?.[0].replace(/Version\/([\d.]+).*/, "Safari $1") ??
     "";
   return [browser, os].filter(Boolean).join(" · ") || ua.slice(0, 40);
+}
+
+function StatCard({
+  icon: Icon, iconClass, label, value, sub,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  iconClass: string;
+  label: string;
+  value: string;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-4 flex items-start gap-3">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
+        <Icon size={16} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-[#9CA3AF]">{label}</p>
+        <p className="text-lg font-bold text-[#1A1A1A] truncate">{value}</p>
+        {sub && <p className="text-[11px] text-[#9CA3AF] mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  );
 }
 
 function PasswordChangeCard({
@@ -321,6 +350,38 @@ export default function AdminSecurityPage() {
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
 
+  // KPI summary cards — logins/attempts only cover what's already fetched
+  // (last 200 logins, currently-tracked attempt windows), which is plenty
+  // for a today-vs-yesterday comparison on an internal tool like this.
+  const todayLoginsCount = useMemo(() => logins.filter((l) => l.created_at.slice(0, 10) === todayStr()).length, [logins]);
+  const yesterdayLoginsCount = useMemo(() => logins.filter((l) => l.created_at.slice(0, 10) === daysAgoStr(1)).length, [logins]);
+  const loginTrendPct = yesterdayLoginsCount ? Math.round(((todayLoginsCount - yesterdayLoginsCount) / yesterdayLoginsCount) * 100) : null;
+  // login_attempts only keeps the current window per IP, not a full history,
+  // so there's no reliable "yesterday" figure to compare failed logins
+  // against — shown as a plain count rather than a fabricated trend.
+  const todayFailedCount = useMemo(
+    () => attempts.filter((a) => a.first_attempt_at.slice(0, 10) === todayStr()).reduce((sum, a) => sum + a.attempts, 0),
+    [attempts]
+  );
+  const mostRecentSession = activeSessions[0] ?? null;
+
+  // Daily sales trend for the chart — only meaningful over a range, not a
+  // single picked date, so it sits out when selectedDate is set.
+  const dailySalesTrend = useMemo(() => {
+    if (selectedDate) return [];
+    const sums = new Map<string, number>();
+    const end = new Date(todayStr());
+    for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
+      sums.set(d.toISOString().slice(0, 10), 0);
+    }
+    leads
+      .filter((l) => l.status === "converted")
+      .forEach((l) => {
+        if (sums.has(l.lead_date)) sums.set(l.lead_date, (sums.get(l.lead_date) || 0) + (l.deal_value ?? 0));
+      });
+    return Array.from(sums.entries()).map(([date, total]) => ({ date, total }));
+  }, [leads, rangeStart, selectedDate]);
+
   if (checkingStoredCode) {
     return (
       <div className="bg-white rounded-xl shadow-sm py-16 text-center text-sm text-[#6B6B6B]">
@@ -371,6 +432,48 @@ export default function AdminSecurityPage() {
           <LogOut size={14} className="mr-1.5" /> {t("ออกจากระบบ", "Log out", "退出登录")}
         </Button>
       </div>
+
+      {!loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard
+            icon={CheckCircle2}
+            iconClass="bg-emerald-50 text-emerald-600"
+            label={t("ล็อกอินสำเร็จ (วันนี้)", "Successful logins (today)", "成功登录（今天）")}
+            value={t(`${todayLoginsCount} ครั้ง`, `${todayLoginsCount}`, `${todayLoginsCount} 次`)}
+            sub={
+              <>
+                {loginTrendPct != null && (
+                  <span className={loginTrendPct >= 0 ? "text-emerald-600" : "text-red-600"}>
+                    {loginTrendPct >= 0 ? "▲" : "▼"} {Math.abs(loginTrendPct)}%{" "}
+                  </span>
+                )}
+                {t(`จากเมื่อวาน (${yesterdayLoginsCount} ครั้ง)`, `vs yesterday (${yesterdayLoginsCount})`, `较昨天 (${yesterdayLoginsCount})`)}
+              </>
+            }
+          />
+          <StatCard
+            icon={XCircle}
+            iconClass="bg-red-50 text-red-600"
+            label={t("ล็อกอินล้มเหลว (วันนี้)", "Failed logins (today)", "登录失败（今天）")}
+            value={t(`${todayFailedCount} ครั้ง`, `${todayFailedCount}`, `${todayFailedCount} 次`)}
+            sub={t("รวมทุก IP ที่พยายามวันนี้", "Across all IPs that tried today", "今天所有尝试的IP合计")}
+          />
+          <StatCard
+            icon={Users}
+            iconClass="bg-indigo-50 text-indigo-600"
+            label={t("กำลังใช้งานอยู่ตอนนี้", "Currently active", "当前活跃")}
+            value={t(`${activeSessions.length} คน`, `${activeSessions.length}`, `${activeSessions.length} 人`)}
+            sub={t("เซสชันที่ยังไม่หมดอายุ", "Sessions not yet expired", "尚未过期的会话")}
+          />
+          <StatCard
+            icon={Clock}
+            iconClass="bg-amber-50 text-amber-600"
+            label={t("ใช้งานล่าสุด", "Most recently active", "最近活跃")}
+            value={mostRecentSession ? mostRecentSession.ip : "-"}
+            sub={mostRecentSession ? new Date(mostRecentSession.created_at).toLocaleString("th-TH") : t("ไม่มีใครใช้งานอยู่", "No one active", "无人在线")}
+          />
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
@@ -454,7 +557,7 @@ export default function AdminSecurityPage() {
             )}
           </div>
 
-          {attempts.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
                 <ShieldAlert size={16} className="text-amber-600" />
@@ -462,75 +565,81 @@ export default function AdminSecurityPage() {
                   {t("IP ที่เข้ารหัสผิด / ถูกบล็อกชั่วคราว", "IPs with failed attempts / temporarily locked", "密码错误 / 暂时被锁定的IP")}
                 </p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#FAF7F2]">
-                    <TableHead className="text-xs">IP</TableHead>
-                    <TableHead className="text-xs">{t("ครั้งที่ผิด", "Failed attempts", "失败次数")}</TableHead>
-                    <TableHead className="text-xs">{t("ครั้งแรกเมื่อ", "First attempt", "首次尝试")}</TableHead>
-                    <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attempts.map((a) => {
-                    const locked = !!a.locked_until && new Date(a.locked_until).getTime() > loadedAt;
-                    return (
-                      <TableRow key={a.ip}>
-                        <TableCell className="text-sm font-mono">{a.ip}</TableCell>
-                        <TableCell className="text-sm">{a.attempts}</TableCell>
-                        <TableCell className="text-xs text-[#6B6B6B]">{new Date(a.first_attempt_at).toLocaleString("th-TH")}</TableCell>
-                        <TableCell>
-                          {locked ? (
-                            <span className="text-xs font-medium px-2 py-1 rounded bg-red-100 text-red-700">
-                              {t("ถูกบล็อกถึง", "Locked until", "锁定至")} {new Date(a.locked_until as string).toLocaleTimeString("th-TH")}
-                            </span>
-                          ) : (
-                            <span className="text-xs font-medium px-2 py-1 rounded bg-[#E8E5E0] text-[#6B6B6B]">
-                              {t("ปล่อยแล้ว", "Not locked", "未锁定")}
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
-              <ShieldCheck size={16} className="text-emerald-600" />
-              <p className="text-sm font-semibold text-[#1A1A1A]">
-                {t("ล็อกอินสำเร็จ (200 ครั้งล่าสุด)", "Successful logins (last 200)", "成功登录（最近200条）")}
-              </p>
-            </div>
-            {logins.length === 0 ? (
-              <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#FAF7F2]">
-                    <TableHead className="text-xs">{t("วันที่ / เวลา", "Date / Time", "日期/时间")}</TableHead>
-                    <TableHead className="text-xs">{t("ชื่อ", "Name", "姓名")}</TableHead>
-                    <TableHead className="text-xs">IP</TableHead>
-                    <TableHead className="text-xs">{t("อุปกรณ์ / เบราว์เซอร์", "Device / Browser", "设备/浏览器")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logins.map((l) => (
-                    <TableRow key={l.id} className="hover:bg-[#FAF7F2]/50">
-                      <TableCell className="text-xs text-[#6B6B6B]">{new Date(l.created_at).toLocaleString("th-TH")}</TableCell>
-                      <TableCell className="text-sm font-medium text-[#1A1A1A]">
-                        {l.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
-                      </TableCell>
-                      <TableCell className="text-sm font-mono">{l.ip}</TableCell>
-                      <TableCell className="text-xs text-[#6B6B6B]">{briefUA(l.user_agent)}</TableCell>
+              {attempts.length === 0 ? (
+                <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ไม่มี IP ที่เข้ารหัสผิด", "No IPs with failed attempts", "没有密码错误的IP")}</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#FAF7F2]">
+                      <TableHead className="text-xs">IP</TableHead>
+                      <TableHead className="text-xs">{t("ครั้งที่ผิด", "Failed attempts", "失败次数")}</TableHead>
+                      <TableHead className="text-xs">{t("ครั้งแรกเมื่อ", "First attempt", "首次尝试")}</TableHead>
+                      <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {attempts.map((a) => {
+                      const locked = !!a.locked_until && new Date(a.locked_until).getTime() > loadedAt;
+                      return (
+                        <TableRow key={a.ip}>
+                          <TableCell className="text-sm font-mono">{a.ip}</TableCell>
+                          <TableCell className="text-sm">{a.attempts}</TableCell>
+                          <TableCell className="text-xs text-[#6B6B6B]">{new Date(a.first_attempt_at).toLocaleString("th-TH")}</TableCell>
+                          <TableCell>
+                            {locked ? (
+                              <span className="text-xs font-medium px-2 py-1 rounded bg-red-100 text-red-700">
+                                {t("ถูกบล็อกถึง", "Locked until", "锁定至")} {new Date(a.locked_until as string).toLocaleTimeString("th-TH")}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium px-2 py-1 rounded bg-[#E8E5E0] text-[#6B6B6B]">
+                                {t("ปล่อยแล้ว", "Not locked", "未锁定")}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
+                <ShieldCheck size={16} className="text-emerald-600" />
+                <p className="text-sm font-semibold text-[#1A1A1A]">
+                  {t("ล็อกอินสำเร็จ (200 ครั้งล่าสุด)", "Successful logins (last 200)", "成功登录（最近200条）")}
+                </p>
+              </div>
+              {logins.length === 0 ? (
+                <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ยังไม่มีข้อมูล", "No data yet", "暂无数据")}</p>
+              ) : (
+                <div className="max-h-[420px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-[#FAF7F2]">
+                        <TableHead className="text-xs">{t("วันที่ / เวลา", "Date / Time", "日期/时间")}</TableHead>
+                        <TableHead className="text-xs">{t("ชื่อ", "Name", "姓名")}</TableHead>
+                        <TableHead className="text-xs">IP</TableHead>
+                        <TableHead className="text-xs">{t("อุปกรณ์ / เบราว์เซอร์", "Device / Browser", "设备/浏览器")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {logins.map((l) => (
+                        <TableRow key={l.id} className="hover:bg-[#FAF7F2]/50">
+                          <TableCell className="text-xs text-[#6B6B6B]">{new Date(l.created_at).toLocaleString("th-TH")}</TableCell>
+                          <TableCell className="text-sm font-medium text-[#1A1A1A]">
+                            {l.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">{l.ip}</TableCell>
+                          <TableCell className="text-xs text-[#6B6B6B]">{briefUA(l.user_agent)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -572,6 +681,42 @@ export default function AdminSecurityPage() {
               </div>
             ) : (
               <>
+                {dailySalesTrend.length > 0 && (
+                  <div className="px-5 pt-4" style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={dailySalesTrend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="salesTrendFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#6366F1" stopOpacity={0.25} />
+                            <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke="#E8E5E0" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                          axisLine={{ stroke: "#E8E5E0" }}
+                          tickLine={false}
+                          interval={Math.max(0, Math.ceil(dailySalesTrend.length / 7) - 1)}
+                        />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const d = payload[0].payload as (typeof dailySalesTrend)[number];
+                            return (
+                              <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
+                                <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                                <p className="text-[#6B6B6B]">{t("ยอดขาย", "Sales", "销售额")} ฿{d.total.toLocaleString("th-TH")}</p>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Area type="monotone" dataKey="total" stroke="#6366F1" strokeWidth={2} fill="url(#salesTrendFill)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#FAF7F2]">

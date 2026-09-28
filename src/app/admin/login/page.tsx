@@ -2,10 +2,8 @@
 import { useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { SALESPEOPLE } from "@/lib/saved-quote-options";
 
 function LoginForm() {
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +18,7 @@ function LoginForm() {
     const res = await fetch("/api/admin/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, name: name.trim() }),
+      body: JSON.stringify({ password }),
     });
     if (res.ok) {
       router.push(from);
@@ -48,27 +46,6 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">
-              ชื่อผู้เข้าใช้
-            </label>
-            <input
-              type="text"
-              list="staff-names"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="เช่น Kan & J"
-              required
-              autoFocus
-              className="w-full border border-[#E8E5E0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
-            />
-            <datalist id="staff-names">
-              {SALESPEOPLE.map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">
               รหัสผ่าน
             </label>
             <input
@@ -77,6 +54,7 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              autoFocus
               className="w-full border border-[#E8E5E0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
             />
           </div>

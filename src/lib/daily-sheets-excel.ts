@@ -5,6 +5,31 @@ import type { DailySalesRow, DailyShippingRow } from "@/types";
 // one always produces the same single .xlsx file with both sheets — matching
 // the original two-sheet 单日销售&出货表格 template.
 
+// When nobody has entered/imported anything into Daily Shipping yet for a
+// date, the shipping sheet shouldn't just export blank — this derives a
+// stand-in set of shipping rows straight from that day's Daily Sales rows
+// (remark / consignee / tel. aren't tracked there, so those come out blank).
+export function salesRowsToShippingRows(rows: DailySalesRow[]): DailyShippingRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    ship_date: r.sale_date,
+    sort_order: r.sort_order,
+    sku: r.sku,
+    image_url: r.image_url,
+    size_text: r.size_text,
+    qty: r.qty,
+    remark: "",
+    customer_name: r.customer_name,
+    salesperson: r.salesperson,
+    po_no: r.po_no,
+    consignee: "",
+    phone: "",
+    source_quote_id: r.source_quote_id,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+}
+
 export const SALES_HEADERS = [
   "序号\nNo. (เลขที่)",
   "型号\nModel (แบบอย่าง)",

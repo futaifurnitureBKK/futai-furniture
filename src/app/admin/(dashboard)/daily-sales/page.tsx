@@ -22,7 +22,7 @@ import {
 import { useLanguage } from "@/store/language";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS } from "@/lib/saved-quote-options";
-import { SALES_HEADERS, buildDailySheetsWorkbook, downloadWorkbook } from "@/lib/daily-sheets-excel";
+import { SALES_HEADERS, buildDailySheetsWorkbook, downloadWorkbook, salesRowsToShippingRows } from "@/lib/daily-sheets-excel";
 import type { DailySalesRow, DailyShippingRow, SavedQuoteStatus } from "@/types";
 
 type SavedListRow = {
@@ -693,16 +693,19 @@ export default function DailySalesPage() {
   async function buildAndDownloadExcel() {
     // The export is always the full two-sheet workbook (Daily Sales + Daily
     // Shipping) for the anchor date, so it matches the original template
-    // regardless of which page you export from.
+    // regardless of which page you export from. If nobody has entered or
+    // imported anything into Daily Shipping for this date yet, fall back to
+    // deriving the shipping sheet straight from these same sales rows rather
+    // than exporting it blank.
     let shippingRows: DailyShippingRow[] = [];
     try {
       const res = await fetch(`/api/admin/daily-shipping?date=${date}`);
       const data = await res.json();
       if (res.ok) shippingRows = data.rows;
     } catch {
-      // if the shipping sheet can't be loaded, still export the sales sheet alone
+      // if the shipping sheet can't be loaded, fall back below
     }
-    const wb = await buildDailySheetsWorkbook(date, exportRows, shippingRows);
+    const wb = await buildDailySheetsWorkbook(date, exportRows, shippingRows.length ? shippingRows : salesRowsToShippingRows(exportRows));
     await downloadWorkbook(wb, `daily-sheets-${date}.xlsx`);
   }
 

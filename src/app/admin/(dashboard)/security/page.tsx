@@ -9,6 +9,7 @@ import { useLanguage } from "@/store/language";
 interface Login {
   id: number;
   ip: string;
+  name: string;
   user_agent: string;
   created_at: string;
 }
@@ -145,6 +146,7 @@ export default function SecurityPage() {
                 <TableHeader>
                   <TableRow className="bg-[#FAF7F2]">
                     <TableHead className="text-xs">{t("วันที่ / เวลา", "Date / Time", "日期/时间")}</TableHead>
+                    <TableHead className="text-xs">{t("ชื่อ", "Name", "姓名")}</TableHead>
                     <TableHead className="text-xs">IP</TableHead>
                     <TableHead className="text-xs">{t("อุปกรณ์ / เบราว์เซอร์", "Device / Browser", "设备/浏览器")}</TableHead>
                   </TableRow>
@@ -153,6 +155,9 @@ export default function SecurityPage() {
                   {logins.map((l) => (
                     <TableRow key={l.id} className="hover:bg-[#FAF7F2]/50">
                       <TableCell className="text-xs text-[#6B6B6B]">{new Date(l.created_at).toLocaleString("th-TH")}</TableCell>
+                      <TableCell className="text-sm font-medium text-[#1A1A1A]">
+                        {l.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
+                      </TableCell>
                       <TableCell className="text-sm font-mono">{l.ip}</TableCell>
                       <TableCell className="text-xs text-[#6B6B6B]">{briefUA(l.user_agent)}</TableCell>
                     </TableRow>

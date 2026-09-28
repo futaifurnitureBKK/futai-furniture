@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Admin auth not configured" }, { status: 500 });
   }
 
-  const { password } = await req.json();
+  const { password, name } = await req.json();
   const ip = getClientIp(req);
   const db = supabaseAdmin();
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (attempt) await db.from("login_attempts").delete().eq("ip", ip);
-  await db.from("admin_logins").insert({ ip, user_agent: req.headers.get("user-agent") || "" });
+  await db.from("admin_logins").insert({ ip, name: String(name || "").trim(), user_agent: req.headers.get("user-agent") || "" });
 
   const token = await createSessionToken(process.env.ADMIN_SESSION_SECRET, MAX_AGE);
   const res = NextResponse.json({ ok: true });

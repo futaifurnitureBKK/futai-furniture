@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X } from "lucide-react";
+import Link from "next/link";
+import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X, Eye } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
 } from "recharts";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -696,7 +697,7 @@ export default function KpiPage() {
                           {s.doc_no} · {t(DOC_LABELS[s.doc_type].th, DOC_LABELS[s.doc_type].en, DOC_LABELS[s.doc_type].zh)} · {s.doc_date}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
                         {alreadyImported && (
                           <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">
                             {t("นำเข้าแล้ว", "Already imported", "已导入")}
@@ -705,6 +706,15 @@ export default function KpiPage() {
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${STATUS_META[s.status].color}`}>
                           {t(STATUS_META[s.status].th, STATUS_META[s.status].en, STATUS_META[s.status].zh)}
                         </span>
+                        <Link
+                          href={`/admin/quote-builder?open=${s.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={buttonVariants({ size: "sm", variant: "outline" })}
+                          title={t("ดูใบเสนอราคานี้", "View this quotation", "查看此报价单")}
+                        >
+                          <Eye size={13} className="mr-1" /> {t("ดู", "View", "查看")}
+                        </Link>
                         <Button size="sm" variant={alreadyImported ? "outline" : "default"} onClick={() => importFromQuote(s)}>
                           {alreadyImported ? t("นำเข้าอีกครั้ง", "Import again", "再次导入") : t("นำเข้า", "Import", "导入")}
                         </Button>

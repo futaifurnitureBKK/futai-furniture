@@ -68,6 +68,16 @@ const DATA_ROW_HEIGHT = 56;
 // embedded image sizes exactly to the actual cell instead of guessing.
 const PICTURE_COL_PX = Math.round(PICTURE_COL_WIDTH * 7 + 5);
 const DATA_ROW_PX = Math.round((DATA_ROW_HEIGHT * 4) / 3);
+// The Picture column and the data row aren't the same pixel size, so
+// stretching a photo to fill both distorts it. Instead the image is kept
+// square (1:1) at whichever side is smaller, with a little padding, and
+// centered in the cell — it ends up slightly smaller than the cell rather
+// than exactly filling it, but never squished.
+const IMAGE_PADDING_PX = 4;
+const IMAGE_SQUARE_PX = Math.max(8, Math.min(PICTURE_COL_PX, DATA_ROW_PX) - IMAGE_PADDING_PX * 2);
+const IMAGE_COL_OFFSET = (PICTURE_COL_PX - IMAGE_SQUARE_PX) / 2 / PICTURE_COL_PX;
+const IMAGE_ROW_OFFSET = (DATA_ROW_PX - IMAGE_SQUARE_PX) / 2 / DATA_ROW_PX;
+const TITLE_ROW_HEIGHT = 46;
 const THIN_BORDER = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } as const;
 
 function styleHeaderRow(row: ExcelJSNamespace.Row) {
@@ -93,11 +103,11 @@ async function embedRowImage(
     const ct = imgRes.headers.get("content-type") || "";
     const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
     const imageId = wb.addImage({ buffer: buf, extension });
-    // Sized to the Picture column's actual pixel width/height so it fills
-    // the cell exactly instead of spilling over or leaving gaps.
+    // Kept square (1:1) and centered in the cell rather than stretched to
+    // fill it — see IMAGE_SQUARE_PX above.
     ws.addImage(imageId, {
-      tl: { col: pictureColIndex, row: row.number - 1 },
-      ext: { width: PICTURE_COL_PX, height: DATA_ROW_PX },
+      tl: { col: pictureColIndex + IMAGE_COL_OFFSET, row: row.number - 1 + IMAGE_ROW_OFFSET },
+      ext: { width: IMAGE_SQUARE_PX, height: IMAGE_SQUARE_PX },
       editAs: "oneCell",
     });
   } catch {
@@ -116,7 +126,7 @@ async function addSalesSheet(wb: ExcelJSNamespace.Workbook, date: string, rows: 
   title.value = "单日销售表格\nDaily Sales (แบบฟอร์มการขายประจำวัน ) " + date;
   title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
   title.font = { bold: true, size: 13 };
-  ws.getRow(1).height = 28;
+  ws.getRow(1).height = TITLE_ROW_HEIGHT;
 
   styleHeaderRow(ws.addRow(SALES_HEADERS));
 
@@ -142,7 +152,7 @@ async function addShippingSheet(wb: ExcelJSNamespace.Workbook, date: string, row
   title.value = "单日出货表格\nDaily Shipping (แบบฟอร์มการจัดส่งสินค้ารายวัน) " + date;
   title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
   title.font = { bold: true, size: 13 };
-  ws.getRow(1).height = 28;
+  ws.getRow(1).height = TITLE_ROW_HEIGHT;
 
   styleHeaderRow(ws.addRow(SHIPPING_HEADERS));
 

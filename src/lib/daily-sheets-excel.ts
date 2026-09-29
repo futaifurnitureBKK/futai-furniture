@@ -79,6 +79,7 @@ const IMAGE_COL_OFFSET = (PICTURE_COL_PX - IMAGE_SQUARE_PX) / 2 / PICTURE_COL_PX
 const IMAGE_ROW_OFFSET = (DATA_ROW_PX - IMAGE_SQUARE_PX) / 2 / DATA_ROW_PX;
 const TITLE_ROW_HEIGHT = 46;
 const THIN_BORDER = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } as const;
+const DATA_CELL_ALIGNMENT = { horizontal: "center", vertical: "middle", wrapText: true } as const;
 
 function styleHeaderRow(row: ExcelJSNamespace.Row) {
   row.eachCell((c) => {
@@ -135,7 +136,7 @@ async function addSalesSheet(wb: ExcelJSNamespace.Workbook, date: string, rows: 
     const row = ws.addRow([
       i + 1, r.sku, "", r.size_text, r.unit_price, r.qty, r.qty * r.unit_price, r.remark, r.customer_name, r.customer_phone, r.salesperson || "", r.po_no,
     ]);
-    row.eachCell((c) => { c.border = THIN_BORDER; });
+    row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = DATA_CELL_ALIGNMENT; });
     row.height = DATA_ROW_HEIGHT;
     await embedRowImage(wb, ws, row, r.image_url, 2);
   }
@@ -161,7 +162,7 @@ async function addShippingSheet(wb: ExcelJSNamespace.Workbook, date: string, row
     const row = ws.addRow([
       i + 1, r.sku, "", r.size_text, r.qty, r.remark, r.customer_name, r.salesperson || "", r.po_no, r.consignee, r.phone,
     ]);
-    row.eachCell((c) => { c.border = THIN_BORDER; });
+    row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = DATA_CELL_ALIGNMENT; });
     row.height = DATA_ROW_HEIGHT;
     await embedRowImage(wb, ws, row, r.image_url, 2);
   }

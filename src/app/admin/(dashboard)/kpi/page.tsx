@@ -155,6 +155,8 @@ export default function KpiPage() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [customFrom, setCustomFrom] = useState<string | null>(null);
+  const [customTo, setCustomTo] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [adSpendRows, setAdSpendRows] = useState<AdSpend[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -447,12 +449,16 @@ export default function KpiPage() {
 
   // Leads inside the chosen date scope, before the owner filter is applied —
   // the per-owner summary is computed from these.
+  // A custom "จาก–ถึง" range (if both ends are picked) takes priority over a
+  // single picked date, which in turn takes priority over the 1D/5D/1M/5M/ALL
+  // preset buttons — same idea, just three ways to land on a date scope.
+  const hasCustomRange = !!(customFrom && customTo);
+  const scopeFrom = hasCustomRange ? (customFrom as string) : selectedDate ?? rangeStart;
+  const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? todayStr();
+
   const rangeLeads = useMemo(
-    () =>
-      leads.filter((l) =>
-        selectedDate ? l.lead_date === selectedDate : l.lead_date >= rangeStart && l.lead_date <= todayStr()
-      ),
-    [leads, selectedDate, rangeStart]
+    () => leads.filter((l) => l.lead_date >= scopeFrom && l.lead_date <= scopeTo),
+    [leads, scopeFrom, scopeTo]
   );
 
   const leadsInScope = useMemo(
@@ -497,7 +503,7 @@ export default function KpiPage() {
     }
   }
 
-  const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+  const scopeLabel = scopeFrom === scopeTo ? scopeFrom : `${scopeFrom} → ${scopeTo}`;
 
   const filteredSavedQuotes = useMemo(() => {
     const q = quotePickerQuery.trim().toLowerCase();
@@ -768,7 +774,11 @@ export default function KpiPage() {
                 margin={{ top: 20, right: 8, left: -20, bottom: 0 }}
                 onClick={(state) => {
                   const label = state?.activeLabel;
-                  if (typeof label === "string") setSelectedDate(label);
+                  if (typeof label === "string") {
+                    setSelectedDate(label);
+                    setCustomFrom(null);
+                    setCustomTo(null);
+                  }
                 }}
                 style={{ cursor: "pointer" }}
               >
@@ -797,7 +807,7 @@ export default function KpiPage() {
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={20}>
                   {dateData.map((d) => (
-                    <Cell key={d.date} fill={!selectedDate || d.date === selectedDate ? "#C8102E" : "#D9D4CA"} />
+                    <Cell key={d.date} fill={d.date >= scopeFrom && d.date <= scopeTo ? "#C8102E" : "#D9D4CA"} />
                   ))}
                 </Bar>
               </BarChart>
@@ -811,6 +821,8 @@ export default function KpiPage() {
                   onClick={() => {
                     setRange(r.key);
                     setSelectedDate(null);
+                    setCustomFrom(null);
+                    setCustomTo(null);
                   }}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
                     range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
@@ -870,13 +882,39 @@ export default function KpiPage() {
                   {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
                 </button>
               )}
-              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("เลือกวันที่", "Select date", "选择日期")}</Label>
+              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("จาก", "From", "从")}</Label>
               <Input
                 type="date"
                 className="h-8 w-auto text-xs"
-                value={selectedDate ?? ""}
-                onChange={(e) => setSelectedDate(e.target.value || null)}
+                value={customFrom ?? scopeFrom}
+                onChange={(e) => {
+                  setSelectedDate(null);
+                  setCustomFrom(e.target.value || null);
+                }}
               />
+              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("ถึง", "To", "到")}</Label>
+              <Input
+                type="date"
+                className="h-8 w-auto text-xs"
+                value={customTo ?? scopeTo}
+                onChange={(e) => {
+                  setSelectedDate(null);
+                  setCustomTo(e.target.value || null);
+                }}
+              />
+              {(customFrom || customTo || selectedDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setCustomFrom(null);
+                    setCustomTo(null);
+                  }}
+                  className="text-xs text-[#9CA3AF] hover:text-[#1A1A1A] underline"
+                >
+                  {t("ล้าง", "Clear", "清除")}
+                </button>
+              )}
             </div>
 
             <div>

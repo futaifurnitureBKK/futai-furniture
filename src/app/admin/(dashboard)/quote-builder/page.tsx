@@ -1327,7 +1327,7 @@ function QuoteBuilderInner() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Form ─────────────────────────────────────────────────── */}
         <div className="space-y-4 no-print">
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
@@ -1612,7 +1612,7 @@ function QuoteBuilderInner() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="preview-sticky-wrapper xl:sticky xl:top-4 self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto overflow-x-auto">
+        <div className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

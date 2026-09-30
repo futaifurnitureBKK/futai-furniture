@@ -24,6 +24,7 @@ import type {
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS, computeGrandTotal } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 
 interface SavedQuoteListItem {
   id: number;
@@ -882,39 +883,20 @@ export default function KpiPage() {
                   {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
                 </button>
               )}
-              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("จาก", "From", "从")}</Label>
-              <Input
-                type="date"
-                className="h-8 w-auto text-xs"
-                value={customFrom ?? scopeFrom}
-                onChange={(e) => {
+              <DateRangePicker
+                from={scopeFrom}
+                to={scopeTo}
+                onChange={(f, tt) => {
                   setSelectedDate(null);
-                  setCustomFrom(e.target.value || null);
+                  setCustomFrom(f);
+                  setCustomTo(tt);
+                }}
+                onClear={() => {
+                  setSelectedDate(null);
+                  setCustomFrom(null);
+                  setCustomTo(null);
                 }}
               />
-              <Label className="text-xs text-[#6B6B6B] whitespace-nowrap">{t("ถึง", "To", "到")}</Label>
-              <Input
-                type="date"
-                className="h-8 w-auto text-xs"
-                value={customTo ?? scopeTo}
-                onChange={(e) => {
-                  setSelectedDate(null);
-                  setCustomTo(e.target.value || null);
-                }}
-              />
-              {(customFrom || customTo || selectedDate) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(null);
-                    setCustomFrom(null);
-                    setCustomTo(null);
-                  }}
-                  className="text-xs text-[#9CA3AF] hover:text-[#1A1A1A] underline"
-                >
-                  {t("ล้าง", "Clear", "清除")}
-                </button>
-              )}
             </div>
 
             <div>

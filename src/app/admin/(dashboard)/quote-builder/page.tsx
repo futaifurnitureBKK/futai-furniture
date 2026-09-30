@@ -530,7 +530,7 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
               </Select>
             </div>
             <Button type="button" size="sm" className="w-full" disabled={saving} onClick={addPayment}>
-              <Plus size={13} className="mr-1" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("เพิ่มรายการชำระเงิน", "Add Payment", "添加付款记录")}
+              <Plus size={13} className="mr-1" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
             </Button>
           </div>
         </>

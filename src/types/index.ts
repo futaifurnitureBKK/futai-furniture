@@ -43,6 +43,7 @@ export interface Lead {
   needed_by_date: string | null;
   next_followup_date: string | null;
   deal_value: number | null;
+  paid_pct: number | null;
   lost_reason: string | null;
   owner: string | null;
   source_quote_id: number | null;

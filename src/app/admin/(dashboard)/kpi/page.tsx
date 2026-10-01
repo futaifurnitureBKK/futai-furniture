@@ -133,6 +133,7 @@ const emptyForm = {
   needed_by_date: "",
   next_followup_date: "",
   deal_value: "",
+  paid_pct: "",
   lost_reason: "",
   owner: "",
   source_quote_id: null as number | null,
@@ -159,6 +160,7 @@ export default function KpiPage() {
   const [customFrom, setCustomFrom] = useState<string | null>(null);
   const [customTo, setCustomTo] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [customerSearch, setCustomerSearch] = useState("");
   const [adSpendRows, setAdSpendRows] = useState<AdSpend[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
@@ -224,6 +226,7 @@ export default function KpiPage() {
       needed_by_date: lead.needed_by_date || "",
       next_followup_date: lead.next_followup_date || "",
       deal_value: lead.deal_value != null ? String(lead.deal_value) : "",
+      paid_pct: lead.paid_pct != null ? String(lead.paid_pct) : "",
       lost_reason: lead.lost_reason || "",
       owner: lead.owner || "",
       source_quote_id: lead.source_quote_id,
@@ -305,6 +308,7 @@ export default function KpiPage() {
       needed_by_date: f.needed_by_date || null,
       next_followup_date: f.next_followup_date || null,
       deal_value: f.deal_value ? Number(f.deal_value) : null,
+      paid_pct: f.paid_pct ? Number(f.paid_pct) : null,
       lost_reason: f.status === "lost" ? f.lost_reason || null : null,
       owner: f.owner || null,
     };
@@ -435,9 +439,12 @@ export default function KpiPage() {
   const matchesOwner = (l: Lead) =>
     ownerFilter === "all" ? true : ownerFilter === NO_OWNER ? !l.owner : l.owner === ownerFilter;
 
+  const searchQuery = customerSearch.trim().toLowerCase();
+  const matchesSearch = (l: Lead) => !searchQuery || l.customer_name.toLowerCase().includes(searchQuery);
+
   const dateData = useMemo(() => {
     const counts = new Map<string, number>();
-    leads.filter(matchesOwner).forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
+    leads.filter((l) => matchesOwner(l) && matchesSearch(l)).forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
     const days: { date: string; count: number }[] = [];
     const end = new Date(todayStr());
     for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
@@ -446,7 +453,7 @@ export default function KpiPage() {
     }
     return days;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, rangeStart, ownerFilter]);
+  }, [leads, rangeStart, ownerFilter, searchQuery]);
 
   // Leads inside the chosen date scope, before the owner filter is applied —
   // the per-owner summary is computed from these.
@@ -463,9 +470,9 @@ export default function KpiPage() {
   );
 
   const leadsInScope = useMemo(
-    () => rangeLeads.filter(matchesOwner),
+    () => rangeLeads.filter((l) => matchesOwner(l) && matchesSearch(l)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rangeLeads, ownerFilter]
+    [rangeLeads, ownerFilter, searchQuery]
   );
 
   // The day being edited in each owner's "ค่ายิง Ads" cell — a single picked
@@ -587,6 +594,7 @@ export default function KpiPage() {
           หมายเหตุ: l.notes,
           วันที่ลูกค้ายืนยันจ่ายเงิน: l.next_followup_date || "",
           มูลค่าดีล: l.deal_value ?? "",
+          "จ่ายเงินแล้ว (%)": l.paid_pct ?? "",
           เหตุผลที่เสีย: l.lost_reason || "",
         }))
       );
@@ -874,6 +882,26 @@ export default function KpiPage() {
           {/* Date picker + owner summary + platform split */}
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex items-center justify-end gap-2 flex-wrap">
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder={t("ค้นหาชื่อบริษัท/ลูกค้า", "Search company/customer", "搜索公司/客户名称")}
+                  className="h-8 w-48 rounded-lg border border-[#E8E5E0] bg-white pl-7 pr-7 text-xs text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+                />
+                {customerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomerSearch("")}
+                    aria-label={t("ล้าง", "Clear", "清除")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#1A1A1A]"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
               {ownerFilter !== "all" && (
                 <button
                   type="button"
@@ -1052,6 +1080,11 @@ export default function KpiPage() {
                           <span className="bg-[#FAF7F2] rounded px-1.5 py-0.5">{lead.lead_date}</span>
                           {lead.owner && (
                             <span className="bg-indigo-50 text-indigo-700 font-semibold rounded px-1.5 py-0.5">{lead.owner}</span>
+                          )}
+                          {lead.paid_pct != null && (
+                            <span className="bg-emerald-50 text-emerald-700 font-semibold rounded px-1.5 py-0.5">
+                              {t("จ่ายแล้ว", "Paid", "已付")} {lead.paid_pct}%
+                            </span>
                           )}
                         </div>
 
@@ -1356,6 +1389,18 @@ export default function KpiPage() {
                 value={form.deal_value}
                 onChange={(e) => setForm({ ...form, deal_value: e.target.value })}
                 placeholder={t("เช่น 9900", "e.g. 9900", "例如：9900")}
+              />
+            </div>
+            <div>
+              <Label>{t("จ่ายเงินแล้วกี่เปอร์เซ็นต์", "Paid So Far (%)", "已付款百分比")}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                className="mt-1"
+                value={form.paid_pct}
+                onChange={(e) => setForm({ ...form, paid_pct: e.target.value })}
+                placeholder={t("เช่น 50", "e.g. 50", "例如：50")}
               />
             </div>
 

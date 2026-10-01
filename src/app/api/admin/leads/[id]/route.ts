@@ -22,6 +22,7 @@ const EDITABLE_FIELDS = [
   "needed_by_date",
   "next_followup_date",
   "deal_value",
+  "paid_pct",
   "lost_reason",
   "owner",
 ] as const;

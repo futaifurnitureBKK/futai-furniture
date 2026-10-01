@@ -982,9 +982,9 @@ export default function KpiPage() {
                 <thead>
                   <tr className="text-left text-[#9CA3AF] border-b border-[#E8E5E0]">
                     <th className="py-1 font-medium">{t("ผู้ดูแล", "Owner", "负责人")}</th>
-                    <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
-                    <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
-                    <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
+                    <th className="py-1 font-medium text-center">{t("ลีด", "Leads", "线索")}</th>
+                    <th className="py-1 font-medium text-center">{t("ปิด", "Closed", "成交")}</th>
+                    <th className="py-1 font-medium text-center">{t("อัตรา", "Rate", "成交率")}</th>
                     <th className="py-1 font-medium text-center">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
                   </tr>
                 </thead>
@@ -994,9 +994,9 @@ export default function KpiPage() {
                     className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === "all" ? "bg-[#FAF7F2] font-semibold" : ""}`}
                   >
                     <td className="py-1">{t("ทุกคน", "Everyone", "全部")}</td>
-                    <td className="py-1 text-right">{rangeLeads.length}</td>
-                    <td className="py-1 text-right">{rangeLeads.filter((l) => l.status === "converted").length}</td>
-                    <td className="py-1 text-right">
+                    <td className="py-1 text-center">{rangeLeads.length}</td>
+                    <td className="py-1 text-center">{rangeLeads.filter((l) => l.status === "converted").length}</td>
+                    <td className="py-1 text-center">
                       {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
                     </td>
                     <td className="py-1 text-center">{adSpendScopeTotal ? adSpendScopeTotal.toLocaleString("th-TH") : "-"}</td>
@@ -1008,9 +1008,9 @@ export default function KpiPage() {
                       className={`cursor-pointer border-b border-[#F0EDE6] hover:bg-[#FAF7F2] ${ownerFilter === o.name ? "bg-indigo-50 font-semibold" : ""}`}
                     >
                       <td className="py-1">{o.name === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : o.name}</td>
-                      <td className="py-1 text-right">{o.count}</td>
-                      <td className="py-1 text-right">{o.converted}</td>
-                      <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
+                      <td className="py-1 text-center">{o.count}</td>
+                      <td className="py-1 text-center">{o.converted}</td>
+                      <td className="py-1 text-center">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
                       <td className="py-1 text-center">
                         {isSingleDay ? (
                           <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />

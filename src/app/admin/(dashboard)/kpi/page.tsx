@@ -455,6 +455,16 @@ export default function KpiPage() {
     return earliest;
   }, [range, leads]);
 
+  // "ALL" is meant to mean every lead, so its upper bound has to follow the
+  // latest lead_date (which can be after today, e.g. a mis-typed date) —
+  // every other preset stays capped at today. Without this, a future-dated
+  // lead would count in the all-time "ลีดทั้งหมด" total but never appear in
+  // any date-scoped view, even "ALL", and the two numbers would never agree.
+  const rangeEnd = useMemo(() => {
+    if (range !== "ALL") return todayStr();
+    return leads.reduce((max, l) => (l.lead_date > max ? l.lead_date : max), todayStr());
+  }, [range, leads]);
+
   const matchesOwner = (l: Lead) =>
     ownerFilter === "all" ? true : ownerFilter === NO_OWNER ? !l.owner : l.owner === ownerFilter;
 
@@ -471,7 +481,7 @@ export default function KpiPage() {
   // because a bar was clicked (selectedDate), so the chart still shows the
   // surrounding days with that one bar picked out in red.
   const windowFrom = hasCustomRange ? (customFrom as string) : rangeStart;
-  const windowTo = hasCustomRange ? (customTo as string) : todayStr();
+  const windowTo = hasCustomRange ? (customTo as string) : rangeEnd;
 
   const dateData = useMemo(() => {
     const counts = new Map<string, number>();
@@ -489,7 +499,7 @@ export default function KpiPage() {
   // Leads inside the chosen date scope, before the owner filter is applied —
   // the per-owner summary is computed from these.
   const scopeFrom = hasCustomRange ? (customFrom as string) : selectedDate ?? rangeStart;
-  const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? todayStr();
+  const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? rangeEnd;
 
   const rangeLeads = useMemo(
     () => leads.filter((l) => l.lead_date >= scopeFrom && l.lead_date <= scopeTo),

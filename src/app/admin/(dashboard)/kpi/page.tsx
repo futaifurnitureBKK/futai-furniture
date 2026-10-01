@@ -453,25 +453,33 @@ export default function KpiPage() {
   const searchQuery = customerSearch.trim().toLowerCase();
   const matchesSearch = (l: Lead) => !searchQuery || l.customer_name.toLowerCase().includes(searchQuery);
 
+  // A custom "จาก–ถึง" range (if both ends are picked) takes priority over a
+  // single picked date, which in turn takes priority over the 1D/5D/1M/5M/ALL
+  // preset buttons — same idea, just three ways to land on a date scope.
+  const hasCustomRange = !!(customFrom && customTo);
+
+  // The window of bars the "ลีดรายวัน" chart draws — the full custom range,
+  // or the full preset range, but NEVER narrowed down to a single day just
+  // because a bar was clicked (selectedDate), so the chart still shows the
+  // surrounding days with that one bar picked out in red.
+  const windowFrom = hasCustomRange ? (customFrom as string) : rangeStart;
+  const windowTo = hasCustomRange ? (customTo as string) : todayStr();
+
   const dateData = useMemo(() => {
     const counts = new Map<string, number>();
     leads.filter((l) => matchesOwner(l) && matchesSearch(l)).forEach((l) => counts.set(l.lead_date, (counts.get(l.lead_date) || 0) + 1));
     const days: { date: string; count: number }[] = [];
-    const end = new Date(todayStr());
-    for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
+    const end = new Date(windowTo);
+    for (let d = new Date(windowFrom); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalDateStr(d);
       days.push({ date: dateStr, count: counts.get(dateStr) || 0 });
     }
     return days;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, rangeStart, ownerFilter, searchQuery]);
+  }, [leads, windowFrom, windowTo, ownerFilter, searchQuery]);
 
   // Leads inside the chosen date scope, before the owner filter is applied —
   // the per-owner summary is computed from these.
-  // A custom "จาก–ถึง" range (if both ends are picked) takes priority over a
-  // single picked date, which in turn takes priority over the 1D/5D/1M/5M/ALL
-  // preset buttons — same idea, just three ways to land on a date scope.
-  const hasCustomRange = !!(customFrom && customTo);
   const scopeFrom = hasCustomRange ? (customFrom as string) : selectedDate ?? rangeStart;
   const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? todayStr();
 
@@ -845,7 +853,7 @@ export default function KpiPage() {
                     setCustomTo(null);
                   }}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                    !hasCustomRange && range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
                   }`}
                 >
                   {r.key}

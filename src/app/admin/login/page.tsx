@@ -3,11 +3,6 @@ import { useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-// Short nicknames for the login screen only — separate from the full
-// SALESPEOPLE roster used on quotes/leads/etc., just for a quick "who's
-// logged in" label in the login history.
-const LOGIN_NAMES = ["Kan", "Xy", "Jane", "Nee", "YEE", "ayton", "Ramen", "June"];
-
 function LoginForm() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -54,18 +49,15 @@ function LoginForm() {
             <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">
               ชื่อผู้เข้าใช้
             </label>
-            <select
+            <input
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="เช่น Kan"
               required
               autoFocus
-              className="w-full border border-[#E8E5E0] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
-            >
-              <option value="" disabled>เลือกชื่อ...</option>
-              {LOGIN_NAMES.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+              className="w-full border border-[#E8E5E0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+            />
           </div>
 
           <div>

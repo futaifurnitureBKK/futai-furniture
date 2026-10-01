@@ -501,12 +501,12 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
           <div className="border border-dashed border-[#E8E5E0] rounded-lg p-3 space-y-2">
             <div className="flex gap-2">
               <ImageUploadTile image={form.slip_url} onChange={(url) => setForm((f) => ({ ...f, slip_url: url }))} />
-              <div className="flex-1 grid grid-cols-2 gap-2">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Input type="date" className="h-8 text-xs" value={form.paid_date} onChange={(e) => setForm((f) => ({ ...f, paid_date: e.target.value }))} />
                 <Input type="number" className="h-8 text-xs" placeholder={t("จำนวนเงิน", "Amount", "金额")} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Input type="number" className="h-8 text-xs" placeholder="%" value={form.percent} onChange={(e) => setForm((f) => ({ ...f, percent: e.target.value }))} />
               <Select value={form.payment_type} onValueChange={(v) => setForm((f) => ({ ...f, payment_type: v as PaymentType }))}>
                 <SelectTrigger size="sm" className="h-8 text-xs">
@@ -1382,7 +1382,7 @@ function QuoteBuilderInner() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>{t("วันที่", "Date", "日期")}</Label>
                 <Input type="date" className="mt-1" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -1393,8 +1393,8 @@ function QuoteBuilderInner() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
                 <Label>{t("ชื่อลูกค้า / บริษัท", "Customer / Company Name", "客户/公司名称")}</Label>
                 <div className="mt-1">
                   <CompanyPicker savedList={savedList} onPick={pickCompany} />
@@ -1408,11 +1408,11 @@ function QuoteBuilderInner() {
               </div>
               {!isDeliveryNote && (
                 <>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label>{t("ที่อยู่", "Address", "地址")}</Label>
                     <Textarea className="mt-1" rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label>{t("เลขผู้เสียภาษี", "Tax ID", "纳税人识别号")}</Label>
                     <Input className="mt-1" value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value)} />
                   </div>
@@ -1425,8 +1425,8 @@ function QuoteBuilderInner() {
               (shipping address/date can differ from the billing details above) */}
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <p className="text-sm font-semibold text-[#1A1A1A]">{t("ข้อมูลจัดส่ง", "Delivery Info", "发货信息")}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
                 <Label>{t("ที่อยู่จัดส่ง", "Delivery Address", "发货地址")}</Label>
                 <Textarea className="mt-1" rows={2} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} />
               </div>
@@ -1438,11 +1438,11 @@ function QuoteBuilderInner() {
                 <Label>{t("บุคคลที่ติดต่อ", "Contact Person", "联系人")}</Label>
                 <Input className="mt-1" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} />
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Label>{t("หมายเลขโทรศัพท์", "Phone", "电话")}</Label>
                 <Input className="mt-1" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Label>{t("ผู้ดูแลออเดอร์", "Sales / Order Owner", "负责人")}</Label>
                 <Select value={salesperson || "__none"} onValueChange={(v) => setSalesperson(!v || v === "__none" ? "" : v)}>
                   <SelectTrigger className="mt-1 w-full">
@@ -1456,7 +1456,7 @@ function QuoteBuilderInner() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Label>{t("หมายเหตุ", "Note", "备注")}</Label>
                 <Textarea
                   className="mt-1"
@@ -1489,9 +1489,9 @@ function QuoteBuilderInner() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Input
-                    className="h-8 text-xs col-span-2"
+                    className="h-8 text-xs sm:col-span-2"
                     placeholder={t("ชื่อสินค้า", "Item Name", "产品名称")}
                     value={it.name}
                     onChange={(e) => updateItem(it.id, { name: e.target.value })}
@@ -1510,7 +1510,7 @@ function QuoteBuilderInner() {
                   />
                 </div>
 
-                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
+                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
                   <Input
                     type="number"
                     className="h-8 text-xs"
@@ -1580,7 +1580,7 @@ function QuoteBuilderInner() {
           </div>
 
           {!isDeliveryNote && (
-            <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
                 <Input type="number" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />

@@ -1159,7 +1159,7 @@ export default function KpiPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t("วันแรกที่ลูกค้าทักเข้ามา", "First Contact Date", "客户咨询日期")}</Label>
               <Input
@@ -1229,7 +1229,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Label>{t("รายละเอียดของลูกค้า", "Customer Details", "客户详情")}</Label>
               <Textarea
                 className="mt-1"
@@ -1289,7 +1289,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Label>{t("ผู้ดูแลลีด", "Lead Owner", "负责人")}</Label>
               <Select value={form.owner || "__none"} onValueChange={(v) => setForm({ ...form, owner: !v || v === "__none" ? "" : v })}>
                 <SelectTrigger className="mt-1 w-full">
@@ -1304,7 +1304,7 @@ export default function KpiPage() {
               </Select>
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Label>{t("สถานะติดตาม", "Follow-up Status", "跟进状态")}</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}>
                 <SelectTrigger className="mt-1 w-full">
@@ -1319,7 +1319,7 @@ export default function KpiPage() {
             </div>
 
             {form.status === "lost" && (
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Label>{t("เหตุผลที่เสียลูกค้า", "Reason Lost", "流失原因")}</Label>
                 <Select value={form.lost_reason} onValueChange={(v) => setForm({ ...form, lost_reason: v ?? "" })}>
                   <SelectTrigger className="mt-1 w-full">
@@ -1359,7 +1359,7 @@ export default function KpiPage() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Label>{t("ติดตามรายละเอียดเพิ่มเติม", "Additional Follow-up Notes", "更多跟进详情")}</Label>
               <Textarea
                 className="mt-1"

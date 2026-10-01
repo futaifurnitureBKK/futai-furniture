@@ -45,8 +45,19 @@ interface SavedQuoteListItem {
   vat_pct: number;
 }
 
+// Local calendar-day string (not UTC) — using toISOString() here shifts the
+// date back by one during 00:00–06:59 Thailand time, since that's still the
+// previous day in UTC. That bug made "today"'s Ad Spend box (and the chart's
+// last bar) silently write to/read from the wrong date for part of the day.
+function toLocalDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return toLocalDateStr(new Date());
 }
 
 type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
@@ -61,7 +72,7 @@ const RANGES: { key: RangeKey; days: number | null }[] = [
 function daysAgoStr(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 
 const BOARD_COLUMNS: {
@@ -448,7 +459,7 @@ export default function KpiPage() {
     const days: { date: string; count: number }[] = [];
     const end = new Date(todayStr());
     for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = toLocalDateStr(d);
       days.push({ date: dateStr, count: counts.get(dateStr) || 0 });
     }
     return days;

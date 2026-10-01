@@ -166,7 +166,7 @@ export default function KpiPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [range, setRange] = useState<RangeKey>("1M");
+  const [range, setRange] = useState<RangeKey>("1D");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [customFrom, setCustomFrom] = useState<string | null>(null);
   const [customTo, setCustomTo] = useState<string | null>(null);

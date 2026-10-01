@@ -75,6 +75,27 @@ function daysAgoStr(n: number) {
   return toLocalDateStr(d);
 }
 
+function computeKpiStats(rows: Lead[]) {
+  const total = rows.length;
+  const followed = rows.filter((l) => l.status !== "new").length;
+  const responded = rows.filter((l) => ["engaged", "quoted", "converted"].includes(l.status)).length;
+  const converted = rows.filter((l) => l.status === "converted");
+  const followUpRate = total ? (followed / total) * 100 : 0;
+  const responseRate = followed ? (responded / followed) * 100 : 0;
+  const conversionRate = total ? (converted.length / total) * 100 : 0;
+
+  const cycleTimes = converted
+    .filter((l) => l.converted_at)
+    .map((l) => (new Date(l.converted_at as string).getTime() - new Date(l.lead_date).getTime()) / 86400000);
+  const avgCycleDays = cycleTimes.length ? cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length : null;
+
+  const deals = converted.filter((l) => l.deal_value != null).map((l) => l.deal_value as number);
+  const aov = deals.length ? deals.reduce((a, b) => a + b, 0) / deals.length : null;
+  const revenue = deals.reduce((a, b) => a + b, 0);
+
+  return { total, followed, followUpRate, responseRate, conversionRate, avgCycleDays, aov, revenue };
+}
+
 const BOARD_COLUMNS: {
   key: string;
   th: string;
@@ -416,26 +437,13 @@ export default function KpiPage() {
   }
 
   // ── KPIs ──────────────────────────────────────────────────────────
-  const kpi = useMemo(() => {
-    const total = leads.length;
-    const followed = leads.filter((l) => l.status !== "new").length;
-    const responded = leads.filter((l) => ["engaged", "quoted", "converted"].includes(l.status)).length;
-    const converted = leads.filter((l) => l.status === "converted");
-    const followUpRate = total ? (followed / total) * 100 : 0;
-    const responseRate = followed ? (responded / followed) * 100 : 0;
-    const conversionRate = total ? (converted.length / total) * 100 : 0;
-
-    const cycleTimes = converted
-      .filter((l) => l.converted_at)
-      .map((l) => (new Date(l.converted_at as string).getTime() - new Date(l.lead_date).getTime()) / 86400000);
-    const avgCycleDays = cycleTimes.length ? cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length : null;
-
-    const deals = converted.filter((l) => l.deal_value != null).map((l) => l.deal_value as number);
-    const aov = deals.length ? deals.reduce((a, b) => a + b, 0) / deals.length : null;
-    const revenue = deals.reduce((a, b) => a + b, 0);
-
-    return { total, followed, followUpRate, responseRate, conversionRate, avgCycleDays, aov, revenue };
-  }, [leads]);
+  // `kpi` (from ALL leads, every date) backs the Excel export's "KPI
+  // Dashboard" sheet, which is meant to be a full historical dump regardless
+  // of whatever date range happens to be on screen. `scopedKpi` (below, once
+  // leadsInScope exists) backs the 6 cards shown on screen, so they agree
+  // with the date-range-filtered charts/table/board underneath instead of
+  // always showing an all-time number next to a filtered one.
+  const kpi = useMemo(() => computeKpiStats(leads), [leads]);
 
   // One bar per day over the chosen range. Clicking a bar (or picking a date)
   // narrows the platform chart + lead list to that day; changing the range
@@ -493,6 +501,11 @@ export default function KpiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rangeLeads, ownerFilter, searchQuery]
   );
+
+  // Backs the 6 KPI cards on screen — scoped the same way as everything else
+  // on the page (date range, owner filter, search), so "ลีดทั้งหมด" here
+  // agrees with the "ทั้งหมด" row in the owner-summary table underneath.
+  const scopedKpi = useMemo(() => computeKpiStats(leadsInScope), [leadsInScope]);
 
   // Ad spend is logged per single day, so the "ค่ายิง Ads" cell is only
   // directly editable when the current scope IS one day: a single bar
@@ -770,12 +783,12 @@ export default function KpiPage() {
       {/* ── KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: t("ลีดทั้งหมด", "Total Leads", "线索数"), value: kpi.total,                                              sub: t("▲ 20%/เดือน เป้าหมาย", "▲ 20%/mo target", "▲ 20%/月 目标") },
-          { label: t("อัตราติดตาม", "Follow-up Rate", "跟进率"),  value: `${kpi.followUpRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 80%", "Target ≥ 80%", "目标 ≥ 80%") },
-          { label: t("อัตราตอบรับ", "Response Rate", "回复率"),   value: `${kpi.responseRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 30%", "Target ≥ 30%", "目标 ≥ 30%") },
-          { label: t("อัตราปิดการขาย", "Conversion Rate", "转化率"), value: `${kpi.conversionRate.toFixed(0)}%`,                     sub: t("เป้า 10–15%", "Target 10–15%", "目标 10–15%") },
-          { label: t("ระยะเวลาปิดดีล", "Cycle Time", "成交周期"),      value: kpi.avgCycleDays != null ? `${kpi.avgCycleDays.toFixed(0)} ${t("วัน", "days", "天")}` : "-", sub: t("เป้า ≤ 14 วัน", "Target ≤ 14 days", "目标 ≤ 14天") },
-          { label: t("มูลค่าเฉลี่ยต่อออเดอร์", "AOV", "客单价"), value: kpi.aov != null ? kpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: t("บาท/ออเดอร์", "THB/order", "泰铢/订单") },
+          { label: t("ลีดทั้งหมด", "Total Leads", "线索数"), value: scopedKpi.total,                                              sub: t("▲ 20%/เดือน เป้าหมาย", "▲ 20%/mo target", "▲ 20%/月 目标") },
+          { label: t("อัตราติดตาม", "Follow-up Rate", "跟进率"),  value: `${scopedKpi.followUpRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 80%", "Target ≥ 80%", "目标 ≥ 80%") },
+          { label: t("อัตราตอบรับ", "Response Rate", "回复率"),   value: `${scopedKpi.responseRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 30%", "Target ≥ 30%", "目标 ≥ 30%") },
+          { label: t("อัตราปิดการขาย", "Conversion Rate", "转化率"), value: `${scopedKpi.conversionRate.toFixed(0)}%`,                     sub: t("เป้า 10–15%", "Target 10–15%", "目标 10–15%") },
+          { label: t("ระยะเวลาปิดดีล", "Cycle Time", "成交周期"),      value: scopedKpi.avgCycleDays != null ? `${scopedKpi.avgCycleDays.toFixed(0)} ${t("วัน", "days", "天")}` : "-", sub: t("เป้า ≤ 14 วัน", "Target ≤ 14 days", "目标 ≤ 14天") },
+          { label: t("มูลค่าเฉลี่ยต่อออเดอร์", "AOV", "客单价"), value: scopedKpi.aov != null ? scopedKpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: t("บาท/ออเดอร์", "THB/order", "泰铢/订单") },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl shadow-sm p-4">
             <p className="text-xs text-[#6B6B6B]">{c.label}</p>

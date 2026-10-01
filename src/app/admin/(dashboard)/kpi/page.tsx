@@ -486,9 +486,12 @@ export default function KpiPage() {
     [rangeLeads, ownerFilter, searchQuery]
   );
 
-  // The day being edited in each owner's "ค่ายิง Ads" cell — a single picked
-  // date, or "today" while viewing a range (spend is logged per day).
-  const adSpendEditDate = selectedDate ?? todayStr();
+  // The day being edited in each owner's "ค่ายิง Ads" cell — spend is logged
+  // per single day, so this only has a real target when the current scope IS
+  // one day: either a single bar clicked on the chart, or a single day picked
+  // in the "เลือกช่วงวันที่" calendar (from === to). A genuine multi-day range
+  // has no one day to edit, so it falls back to "today".
+  const adSpendEditDate = scopeFrom === scopeTo ? scopeFrom : todayStr();
 
   const ownerSummary = useMemo(() => {
     // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row

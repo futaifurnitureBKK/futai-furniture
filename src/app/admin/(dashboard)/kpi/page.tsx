@@ -486,12 +486,13 @@ export default function KpiPage() {
     [rangeLeads, ownerFilter, searchQuery]
   );
 
-  // The day being edited in each owner's "ค่ายิง Ads" cell — spend is logged
-  // per single day, so this only has a real target when the current scope IS
-  // one day: either a single bar clicked on the chart, or a single day picked
-  // in the "เลือกช่วงวันที่" calendar (from === to). A genuine multi-day range
-  // has no one day to edit, so it falls back to "today".
-  const adSpendEditDate = scopeFrom === scopeTo ? scopeFrom : todayStr();
+  // Ad spend is logged per single day, so the "ค่ายิง Ads" cell is only
+  // directly editable when the current scope IS one day: a single bar
+  // clicked on the chart, or a single day picked in the calendar (from ===
+  // to). Otherwise (a real multi-day range) it shows the sum across that
+  // range instead, read-only.
+  const isSingleDay = scopeFrom === scopeTo;
+  const adSpendEditDate = isSingleDay ? scopeFrom : todayStr();
 
   const ownerSummary = useMemo(() => {
     // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row
@@ -501,17 +502,24 @@ export default function KpiPage() {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
       const editDayAmount = adSpendRows.find((r) => r.owner === name && r.date === adSpendEditDate)?.amount ?? 0;
+      const rangeAdAmount = adSpendRows
+        .filter((r) => r.owner === name && r.date >= scopeFrom && r.date <= scopeTo)
+        .reduce((sum, r) => sum + r.amount, 0);
       return {
         name,
         count: rows.length,
         converted: converted.length,
         rate: rows.length ? (converted.length / rows.length) * 100 : 0,
         editDayAmount,
+        rangeAdAmount,
       };
     });
-  }, [rangeLeads, leads, adSpendRows, adSpendEditDate]);
+  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo]);
 
-  const adSpendEditDateTotal = useMemo(() => ownerSummary.reduce((sum, o) => sum + o.editDayAmount, 0), [ownerSummary]);
+  const adSpendScopeTotal = useMemo(
+    () => ownerSummary.reduce((sum, o) => sum + (isSingleDay ? o.editDayAmount : o.rangeAdAmount), 0),
+    [ownerSummary, isSingleDay]
+  );
 
   async function saveAdSpend(date: string, owner: string, amount: number) {
     const res = await fetch("/api/admin/ad-spend", {
@@ -960,7 +968,7 @@ export default function KpiPage() {
                     <td className="py-1 text-right">
                       {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
                     </td>
-                    <td className="py-1 text-center">{adSpendEditDateTotal ? adSpendEditDateTotal.toLocaleString("th-TH") : "-"}</td>
+                    <td className="py-1 text-center">{adSpendScopeTotal ? adSpendScopeTotal.toLocaleString("th-TH") : "-"}</td>
                   </tr>
                   {ownerSummary.map((o) => (
                     <tr
@@ -973,18 +981,30 @@ export default function KpiPage() {
                       <td className="py-1 text-right">{o.converted}</td>
                       <td className="py-1 text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
                       <td className="py-1 text-right">
-                        <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
+                        {isSingleDay ? (
+                          <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
+                        ) : (
+                          <span className="inline-block w-14 text-center text-[11px] font-medium text-[#1A1A1A]">
+                            {o.rangeAdAmount ? o.rangeAdAmount.toLocaleString("th-TH") : "-"}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p className="text-[10px] text-[#9CA3AF] mt-1">
-                {t(
-                  `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่ ${adSpendEditDate}`,
-                  `Click a name to filter the charts and board — the Ad Spend box edits ${adSpendEditDate}`,
-                  `点击姓名筛选图表和看板——广告费栏编辑 ${adSpendEditDate} 当天`
-                )}
+                {isSingleDay
+                  ? t(
+                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่ ${adSpendEditDate}`,
+                      `Click a name to filter the charts and board — the Ad Spend box edits ${adSpendEditDate}`,
+                      `点击姓名筛选图表和看板——广告费栏编辑 ${adSpendEditDate} 当天`
+                    )
+                  : t(
+                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แสดงผลรวมของช่วง ${scopeFrom} → ${scopeTo} (เลือกวันเดียวเพื่อแก้ไข)`,
+                      `Click a name to filter the charts and board — the Ad Spend column shows the total for ${scopeFrom} → ${scopeTo} (pick a single day to edit it)`,
+                      `点击姓名筛选图表和看板——广告费栏显示 ${scopeFrom} → ${scopeTo} 期间的总额（选择单日可编辑）`
+                    )}
               </p>
             </div>
 

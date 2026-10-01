@@ -539,17 +539,6 @@ export default function KpiPage() {
     [leadsInScope]
   );
 
-  const channelInScope = useMemo(
-    () =>
-      CHANNELS.map((c) => ({
-        value: c.value,
-        label: t(c.th, c.en, c.zh),
-        color: c.color,
-        count: leadsInScope.filter((l) => l.channel === c.value).length,
-      })).filter((c) => c.count > 0),
-    [leadsInScope, t]
-  );
-
   const channelData = useMemo(
     () =>
       CHANNELS.map((c) => ({
@@ -985,35 +974,6 @@ export default function KpiPage() {
               </p>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-[#1A1A1A] mb-2">
-                {t("ลีด", "Leads", "线索")} {scopeLabel} ({leadsInScope.length})
-              </p>
-              {leadsInScope.length === 0 ? (
-                <p className="text-xs text-[#9CA3AF] text-center py-4">{t("ไม่มีลีดในช่วงนี้", "No leads in this period", "该期间无线索")}</p>
-              ) : (
-                <div>
-                  <p className="text-[10px] font-semibold text-[#6B6B6B] mb-1">
-                    {t("Leads ต่อ Channel (มาจาก platform ไหน)", "Leads by Channel (which platform)", "各渠道线索数（来自哪个平台）")}
-                  </p>
-                  <div className="space-y-1">
-                    {channelInScope.map((c) => (
-                      <div key={c.value} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                        <span className="w-16 shrink-0 text-[#1A1A1A]">{c.label}</span>
-                        <div className="flex-1 h-2 bg-[#F0EDE6] rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${(c.count / leadsInScope.length) * 100}%`, backgroundColor: c.color }}
-                          />
-                        </div>
-                        <span className="font-semibold text-[#1A1A1A] w-5 text-right">{c.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

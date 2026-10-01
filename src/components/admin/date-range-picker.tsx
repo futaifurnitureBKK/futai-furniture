@@ -7,8 +7,11 @@ import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/store/language";
 
-function toDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function toDate(s: string | null): Date {
+  const [y, m, d] = (s ?? todayStr()).split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 function toStr(d: Date): string {
@@ -22,13 +25,15 @@ function toStr(d: Date): string {
 // start day, then the end day (or drag across them); the range previews
 // live as you move the mouse before the second click.
 export function DateRangePicker({
-  from, to, onChange, onClear, className,
+  from, to, onChange, onClear, className, placeholder,
 }: {
-  from: string;
-  to: string;
+  from: string | null;
+  to: string | null;
   onChange: (from: string, to: string) => void;
   onClear?: () => void;
   className?: string;
+  /** Shown on the trigger button while from/to are both unset (null). */
+  placeholder?: string;
 }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -61,7 +66,7 @@ export function DateRangePicker({
         )}
       >
         <CalendarDays size={13} className="text-[#6B6B6B]" />
-        {from === to ? from : `${from} → ${to}`}
+        {!from && !to ? placeholder ?? t("เลือกช่วงวันที่", "Pick a date range", "选择日期范围") : from === to ? from : `${from} → ${to}`}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="end">

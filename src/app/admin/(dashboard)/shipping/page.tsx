@@ -13,6 +13,7 @@ import {
   computeDepositAmount, computeGrandTotal, fmtMoney,
 } from "@/lib/saved-quote-options";
 import type { SavedQuote, SavedQuoteStatus, SavedQuotePayment } from "@/types";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 
 type PaymentRow = Pick<SavedQuotePayment, "id" | "paid_date" | "amount" | "percent" | "payment_type" | "method" | "slip_url">;
 
@@ -344,6 +345,12 @@ export default function ShippingPage() {
   const { t } = useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  // Filters by when the document was created (doc_date, which every row
+  // always has) rather than shipping_date, since not every status has a
+  // shipping date set yet — picking a range here should never silently hide
+  // an order just because it has no shipping date.
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -390,30 +397,50 @@ export default function ShippingPage() {
     if (!res.ok) setRows(prev);
   }
 
+  const dateFilteredRows = useMemo(() => {
+    if (!dateFrom || !dateTo) return rows;
+    return rows.filter((r) => r.doc_date >= dateFrom && r.doc_date <= dateTo);
+  }, [rows, dateFrom, dateTo]);
+
   const awaitingShipment = useMemo(
     () =>
-      rows
+      dateFilteredRows
         .filter((r) => r.status === "awaiting_shipment")
         .sort((a, b) => (a.shipping_date || "9999").localeCompare(b.shipping_date || "9999")),
-    [rows]
+    [dateFilteredRows]
   );
 
   const otherColumns = useMemo(
-    () => OTHER_STATUSES.map((s) => ({ key: s, rows: rows.filter((r) => r.status === s) })),
-    [rows]
+    () => OTHER_STATUSES.map((s) => ({ key: s, rows: dateFilteredRows.filter((r) => r.status === s) })),
+    [dateFilteredRows]
   );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดส่งสินค้า", "Shipping", "发货")}</h1>
-        <p className="text-sm text-[#6B6B6B] mt-0.5">
-          {t(
-            "ติดตามสถานะใบเสนอราคา/ใบแจ้งหนี้/ใบส่งของ ตั้งแต่รอตอบกลับจนถึงจัดส่งเสร็จ",
-            "Track quotation/invoice/delivery note status from awaiting response through to shipped",
-            "跟踪报价单/发票/送货单状态，从待回复到发货完成"
-          )}
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดส่งสินค้า", "Shipping", "发货")}</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">
+            {t(
+              "ติดตามสถานะใบเสนอราคา/ใบแจ้งหนี้/ใบส่งของ ตั้งแต่รอตอบกลับจนถึงจัดส่งเสร็จ",
+              "Track quotation/invoice/delivery note status from awaiting response through to shipped",
+              "跟踪报价单/发票/送货单状态，从待回复到发货完成"
+            )}
+          </p>
+        </div>
+        <DateRangePicker
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, tt) => {
+            setDateFrom(f);
+            setDateTo(tt);
+          }}
+          onClear={() => {
+            setDateFrom(null);
+            setDateTo(null);
+          }}
+          placeholder={t("กรองตามวันที่สร้าง", "Filter by date created", "按创建日期筛选")}
+        />
       </div>
 
       {loading ? (
@@ -426,6 +453,14 @@ export default function ShippingPage() {
             'ยังไม่มีเอกสาร — สร้างได้ที่หน้า "สร้างใบเสนอราคา"',
             'No documents yet — create one from "Quote Builder"',
             '暂无文件 — 请到"生成报价单"页面创建'
+          )}
+        </div>
+      ) : dateFilteredRows.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
+          {t(
+            "ไม่พบเอกสารที่สร้างในช่วงวันที่นี้",
+            "No documents created in this date range",
+            "该日期范围内没有创建的文件"
           )}
         </div>
       ) : (

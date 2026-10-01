@@ -33,6 +33,23 @@ export const CHANNEL_ORDER: SavedQuoteChannel[] = ["facebook", "shopee", "tiktok
 // keeps, not free text, so it stays consistent across quotes.
 export const SALESPEOPLE = ["Kan & J", "Xiaoying", "P'Jane", "P'NEE", "Mr.Yee", "Ayton", "Ramen", "K.June Fish", "P'Jie", "อาหลาน"];
 
+// Short login usernames — separate from the display name above, since
+// typing "Kan & J" every time to log in is clunky. Logging in with the
+// username resolves to its `name` (the SALESPEOPLE value), which is what
+// gets stored as the owner on sessions/logins so stats stay consistent.
+export const LOGIN_USERNAMES: { username: string; name: string }[] = [
+  { username: "Kan", name: "Kan & J" },
+  { username: "Xy", name: "Xiaoying" },
+  { username: "Jane", name: "P'Jane" },
+  { username: "Nee", name: "P'NEE" },
+  { username: "yee", name: "Mr.Yee" },
+  { username: "ayton", name: "Ayton" },
+  { username: "Ramen", name: "Ramen" },
+  { username: "June", name: "K.June Fish" },
+  { username: "P'Jie", name: "P'Jie" },
+  { username: "อาหลาน", name: "อาหลาน" },
+];
+
 export const PAYMENT_METHOD_META: Record<PaymentMethod, TriText> = {
   cash:        { th: "เงินสด",     en: "Cash",           zh: "现金" },
   transfer:    { th: "โอนเงิน",    en: "Bank Transfer",  zh: "银行转账" },

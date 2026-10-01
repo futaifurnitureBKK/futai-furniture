@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSession, revokeAdminSession } from "@/lib/admin-session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyPassword } from "@/lib/password-hash";
-import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import { LOGIN_USERNAMES } from "@/lib/saved-quote-options";
 
 const COOKIE = "futai_admin_auth";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -55,11 +55,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "รหัสผ่านไม่ถูกต้อง" }, { status: 401 });
   }
 
-  // Only names already recognized elsewhere in the system (the salesperson
-  // roster used for leads/quotes) can log in — keeps "who's online" and
-  // sales-by-owner stats tied to one consistent spelling per person.
+  // Only a recognized short username can log in — it resolves to the
+  // matching salesperson name, which is what's stored on sessions/logins so
+  // "who's online" and sales-by-owner stats stay tied to one consistent
+  // spelling per person.
   const trimmedName = String(name || "").trim();
-  const canonicalName = SALESPEOPLE.find((n) => n.toLowerCase() === trimmedName.toLowerCase());
+  const canonicalName = LOGIN_USERNAMES.find((u) => u.username.toLowerCase() === trimmedName.toLowerCase())?.name;
   if (!canonicalName) {
     return NextResponse.json({ error: "ไม่พบชื่อผู้ใช้นี้ในระบบ กรุณาติดต่อแอดมิน" }, { status: 401 });
   }

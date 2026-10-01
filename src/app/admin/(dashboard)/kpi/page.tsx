@@ -569,7 +569,7 @@ export default function KpiPage() {
 
       const logSheet = XLSX.utils.json_to_sheet(
         leads.map((l) => ({
-          วันที่: l.lead_date,
+          วันแรกที่ลูกค้าทักเข้ามา: l.lead_date,
           "หมายเลขลูกค้า": l.customer_id || "",
           ลูกค้า: l.customer_name,
           ที่อยู่: l.address || "",
@@ -585,7 +585,7 @@ export default function KpiPage() {
           "จะมาโชว์รูม": YES_NO_UNKNOWN.find((o) => o.value === l.will_visit_showroom)?.th || "",
           "ต้องการใช้ภายในวันที่": l.needed_by_date || "",
           หมายเหตุ: l.notes,
-          ติดตามครั้งถัดไป: l.next_followup_date || "",
+          วันที่ลูกค้ายืนยันจ่ายเงิน: l.next_followup_date || "",
           มูลค่าดีล: l.deal_value ?? "",
           เหตุผลที่เสีย: l.lost_reason || "",
         }))
@@ -1058,7 +1058,7 @@ export default function KpiPage() {
                         {lead.notes && <p className="text-xs text-[#6B6B6B] line-clamp-2">{lead.notes}</p>}
 
                         <div className={`text-[10px] ${overdue ? "text-red-600 font-semibold" : "text-[#9CA3AF]"}`}>
-                          {t("ติดตามถัดไป", "Next follow-up", "下次跟进")}: {lead.next_followup_date || "-"}
+                          {t("ยืนยันจ่ายเงิน", "Payment confirmed", "成交日期")}: {lead.next_followup_date || "-"}
                           {overdue && ` ⚠ ${t("เลยกำหนด", "Overdue", "已逾期")}`}
                         </div>
 
@@ -1161,7 +1161,7 @@ export default function KpiPage() {
 
             <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>{t("วันที่ติดตาม", "Lead Date", "跟进日期")}</Label>
+              <Label>{t("วันแรกที่ลูกค้าทักเข้ามา", "First Contact Date", "客户咨询日期")}</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -1340,7 +1340,7 @@ export default function KpiPage() {
             )}
 
             <div>
-              <Label>{t("วันติดตามครั้งถัดไป", "Next Follow-up Date", "下次跟进日期")}</Label>
+              <Label>{t("วันที่ลูกค้ายืนยันจ่ายเงิน", "Payment Confirmed Date", "成交日期")}</Label>
               <Input
                 type="date"
                 className="mt-1"

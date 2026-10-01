@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSession, revokeAdminSession } from "@/lib/admin-session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyPassword } from "@/lib/password-hash";
+import { SALESPEOPLE } from "@/lib/saved-quote-options";
 
 const COOKIE = "futai_admin_auth";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -54,14 +55,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "รหัสผ่านไม่ถูกต้อง" }, { status: 401 });
   }
 
-  if (attempt) await db.from("login_attempts").delete().eq("ip", ip);
+  // Only names already recognized elsewhere in the system (the salesperson
+  // roster used for leads/quotes) can log in — keeps "who's online" and
+  // sales-by-owner stats tied to one consistent spelling per person.
   const trimmedName = String(name || "").trim();
+  const canonicalName = SALESPEOPLE.find((n) => n.toLowerCase() === trimmedName.toLowerCase());
+  if (!canonicalName) {
+    return NextResponse.json({ error: "ไม่พบชื่อผู้ใช้นี้ในระบบ กรุณาติดต่อแอดมิน" }, { status: 401 });
+  }
+
+  if (attempt) await db.from("login_attempts").delete().eq("ip", ip);
   const userAgent = req.headers.get("user-agent") || "";
-  await db.from("admin_logins").insert({ ip, name: trimmedName, user_agent: userAgent });
+  await db.from("admin_logins").insert({ ip, name: canonicalName, user_agent: userAgent });
 
   let sessionId: string;
   try {
-    sessionId = await createAdminSession({ ip, name: trimmedName, userAgent, maxAgeSeconds: MAX_AGE });
+    sessionId = await createAdminSession({ ip, name: canonicalName, userAgent, maxAgeSeconds: MAX_AGE });
   } catch (err) {
     console.error(err);
     return NextResponse.json(

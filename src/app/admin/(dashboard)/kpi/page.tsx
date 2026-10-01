@@ -127,7 +127,7 @@ function AdSpendInput({
   const [value, setValue] = useState(String(initialAmount));
   const [saving, setSaving] = useState(false);
   return (
-    <div className="flex justify-center">
+    <div className="flex justify-end">
       <Input
         type="number"
         className="h-6 w-14 min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -985,7 +985,7 @@ export default function KpiPage() {
                     <th className="py-1 font-medium text-right">{t("ลีด", "Leads", "线索")}</th>
                     <th className="py-1 font-medium text-right">{t("ปิด", "Closed", "成交")}</th>
                     <th className="py-1 font-medium text-right">{t("อัตรา", "Rate", "成交率")}</th>
-                    <th className="py-1 font-medium text-center">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
+                    <th className="py-1 font-medium text-right">{t("ค่ายิง Ads ฿", "Ad spend ฿", "广告费 ฿")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -999,7 +999,7 @@ export default function KpiPage() {
                     <td className="py-1 text-right">
                       {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
                     </td>
-                    <td className="py-1 text-center">{adSpendScopeTotal ? adSpendScopeTotal.toLocaleString("th-TH") : "-"}</td>
+                    <td className="py-1 text-right">{adSpendScopeTotal ? adSpendScopeTotal.toLocaleString("th-TH") : "-"}</td>
                   </tr>
                   {ownerSummary.map((o) => (
                     <tr
@@ -1015,7 +1015,7 @@ export default function KpiPage() {
                         {isSingleDay ? (
                           <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
                         ) : (
-                          <span className="inline-block w-14 text-center text-[11px] font-medium text-[#1A1A1A]">
+                          <span className="inline-block text-[11px] font-medium text-[#1A1A1A]">
                             {o.rangeAdAmount ? o.rangeAdAmount.toLocaleString("th-TH") : "-"}
                           </span>
                         )}

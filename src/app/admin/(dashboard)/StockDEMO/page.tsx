@@ -2,7 +2,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
-  Search, Download, Eye, EyeOff, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
+  Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
   Loader2, Upload, History, Database, RefreshCw,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
@@ -194,7 +194,10 @@ export default function StockPage() {
   const [cat, setCat] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [limit, setLimit] = useState(PAGE);
-  const [showCost, setShowCost] = useState(false);
+  // The "owner mode / show cost" toggle was removed from the toolbar — kept
+  // as a constant (rather than deleting every showCost-gated branch) so the
+  // landed-cost column/export field stay easy to bring back later.
+  const showCost = false;
 
   const [detailId, setDetailId] = useState<number | null>(null);
   const [draft, setDraft] = useState({ code: "", category: "", description: "", color: "", material: "", boxes_per_item: 1, image_url: "" });
@@ -576,10 +579,6 @@ export default function StockPage() {
               <Plus size={14} className="mr-1.5" /> {t("เพิ่มสินค้า", "Add product", "添加产品")}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => setShowCost((v) => !v)}>
-            {showCost ? <EyeOff size={14} className="mr-1.5" /> : <Eye size={14} className="mr-1.5" />}
-            {showCost ? t("ซ่อนต้นทุน", "Hide cost", "隐藏成本") : t("โหมดเจ้าของ (ดูต้นทุน)", "Owner mode (show cost)", "老板模式（显示成本）")}
-          </Button>
           {!archivedView && products.length > 0 && (
             <Button size="sm" variant="outline" onClick={openSync}>
               <RefreshCw size={14} className="mr-1.5" /> {t("อัปเดตจากไฟล์ล่าสุด", "Update from latest file", "从最新文件更新")}
@@ -761,7 +760,6 @@ export default function StockPage() {
                   <TableHead className="text-xs w-24">{t("พร้อมขาย", "Available", "可售")}</TableHead>
                   <TableHead className="text-xs w-24">{t("จอง/รอส่ง", "Reserved", "已预订")}</TableHead>
                   <TableHead className="text-xs w-24">{t("ตำหนิ/เคลม", "Defective", "瑕疵")}</TableHead>
-                  <TableHead className="text-xs w-24">{t("จุดสั่งซื้อ", "Reorder pt.", "补货点")}</TableHead>
                   <TableHead className="text-xs w-32">{t("ตำแหน่งเก็บ", "Location", "库位")}</TableHead>
                   <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
                   <TableHead className="text-xs" />
@@ -770,7 +768,7 @@ export default function StockPage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-[#6B6B6B]">
+                    <TableCell colSpan={9} className="text-center py-12 text-[#6B6B6B]">
                       <PackageSearch size={28} className="mx-auto mb-2 opacity-40" />
                       {t("ไม่พบสินค้าที่ตรงกับตัวกรอง", "No products match your filters", "没有符合筛选条件的产品")}
                     </TableCell>
@@ -832,7 +830,7 @@ export default function StockPage() {
                                       {v.note && <span className="ml-1.5 font-normal text-[#9CA3AF]">· {v.note}</span>}
                                     </p>
                                   </TableCell>
-                                  {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => (
+                                  {(["available", "reserved", "defective"] as const).map((f) => (
                                     <TableCell key={f}>
                                       <Input
                                         type="number"

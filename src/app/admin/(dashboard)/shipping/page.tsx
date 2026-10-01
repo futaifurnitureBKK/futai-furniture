@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Printer, UserRound, FileText, MapPin, CalendarDays, Phone, CheckCircle2, Search, ChevronRight, StickyNote } from "lucide-react";
+import { Printer, UserRound, FileText, MapPin, CalendarDays, Phone, CheckCircle2, Search, ChevronRight, StickyNote, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -351,6 +351,7 @@ export default function ShippingPage() {
   // an order just because it has no shipping date.
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -402,17 +403,22 @@ export default function ShippingPage() {
     return rows.filter((r) => r.doc_date >= dateFrom && r.doc_date <= dateTo);
   }, [rows, dateFrom, dateTo]);
 
+  const searchQuery = customerSearch.trim().toLowerCase();
+  const searchedRows = searchQuery
+    ? dateFilteredRows.filter((r) => r.customer_name.toLowerCase().includes(searchQuery))
+    : dateFilteredRows;
+
   const awaitingShipment = useMemo(
     () =>
-      dateFilteredRows
+      searchedRows
         .filter((r) => r.status === "awaiting_shipment")
         .sort((a, b) => (a.shipping_date || "9999").localeCompare(b.shipping_date || "9999")),
-    [dateFilteredRows]
+    [searchedRows]
   );
 
   const otherColumns = useMemo(
-    () => OTHER_STATUSES.map((s) => ({ key: s, rows: dateFilteredRows.filter((r) => r.status === s) })),
-    [dateFilteredRows]
+    () => OTHER_STATUSES.map((s) => ({ key: s, rows: searchedRows.filter((r) => r.status === s) })),
+    [searchedRows]
   );
 
   return (
@@ -428,19 +434,41 @@ export default function ShippingPage() {
             )}
           </p>
         </div>
-        <DateRangePicker
-          from={dateFrom}
-          to={dateTo}
-          onChange={(f, tt) => {
-            setDateFrom(f);
-            setDateTo(tt);
-          }}
-          onClear={() => {
-            setDateFrom(null);
-            setDateTo(null);
-          }}
-          placeholder={t("กรองตามวันที่สร้าง", "Filter by date created", "按创建日期筛选")}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+            <input
+              type="text"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              placeholder={t("ค้นหาชื่อบริษัท/ลูกค้า", "Search company/customer", "搜索公司/客户名称")}
+              className="h-8 w-48 rounded-lg border border-[#E8E5E0] bg-white pl-7 pr-7 text-xs text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+            />
+            {customerSearch && (
+              <button
+                type="button"
+                onClick={() => setCustomerSearch("")}
+                aria-label={t("ล้าง", "Clear", "清除")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#1A1A1A]"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onChange={(f, tt) => {
+              setDateFrom(f);
+              setDateTo(tt);
+            }}
+            onClear={() => {
+              setDateFrom(null);
+              setDateTo(null);
+            }}
+            placeholder={t("กรองตามวันที่สร้าง", "Filter by date created", "按创建日期筛选")}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -455,13 +483,19 @@ export default function ShippingPage() {
             '暂无文件 — 请到"生成报价单"页面创建'
           )}
         </div>
-      ) : dateFilteredRows.length === 0 ? (
+      ) : searchedRows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm py-12 text-center text-sm text-[#6B6B6B]">
-          {t(
-            "ไม่พบเอกสารที่สร้างในช่วงวันที่นี้",
-            "No documents created in this date range",
-            "该日期范围内没有创建的文件"
-          )}
+          {searchQuery
+            ? t(
+                "ไม่พบเอกสารที่ตรงกับคำค้นหา",
+                "No documents match this search",
+                "没有符合搜索条件的文件"
+              )
+            : t(
+                "ไม่พบเอกสารที่สร้างในช่วงวันที่นี้",
+                "No documents created in this date range",
+                "该日期范围内没有创建的文件"
+              )}
         </div>
       ) : (
         <div className="space-y-4">

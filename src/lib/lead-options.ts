@@ -8,14 +8,19 @@ export const CHANNELS: { value: LeadChannel; th: string; en: string; zh: string;
   { value: "other",    th: "อื่นๆ",     en: "Other",    zh: "其他",     color: "#9CA3AF" },
 ];
 
+// Icon/color per status matches the board column (BOARD_COLUMNS in the KPI
+// page) that status lands in, so the dropdown gives a visual hint of where
+// picking it will move the card: orange = "No Response Yet" (new..engaged),
+// amber = "Pending Approval" (quoted), green = "Confirmed/Paid" (converted),
+// red = "Rejected" (lost).
 export const STATUSES: { value: LeadStatus; th: string; en: string; zh: string; color: string }[] = [
-  { value: "new",            th: "⭕ ยังไม่เคยติดตาม",     en: "⭕ Not followed up yet",    zh: "⭕ 尚未跟进",       color: "bg-[#E8E5E0] text-[#6B6B6B]" },
-  { value: "followed_1",     th: "🟡 ติดตามแล้ว 1 ครั้ง",  en: "🟡 Followed up once",       zh: "🟡 已跟进1次",      color: "bg-yellow-100 text-yellow-700" },
+  { value: "new",            th: "🟠 ยังไม่เคยติดตาม",     en: "🟠 Not followed up yet",    zh: "🟠 尚未跟进",       color: "bg-orange-100 text-orange-700" },
+  { value: "followed_1",     th: "🟠 ติดตามแล้ว 1 ครั้ง",  en: "🟠 Followed up once",       zh: "🟠 已跟进1次",      color: "bg-orange-100 text-orange-700" },
   { value: "followed_2plus", th: "🟠 ติดตามแล้ว 2+ ครั้ง", en: "🟠 Followed up 2+ times",   zh: "🟠 已跟进2次以上",  color: "bg-orange-100 text-orange-700" },
-  { value: "engaged",        th: "🟢 ตอบรับแล้ว",          en: "🟢 Responded",              zh: "🟢 已回应",         color: "bg-green-100 text-green-700" },
-  { value: "quoted",         th: "✅ ส่งใบเสนอราคาแล้ว",   en: "✅ Quote sent",             zh: "✅ 已发送报价单",   color: "bg-blue-100 text-blue-700" },
-  { value: "converted",      th: "🎯 ปิดการขาย",           en: "🎯 Converted",              zh: "🎯 成交",           color: "bg-emerald-600 text-white" },
-  { value: "lost",           th: "❌ เสียลูกค้า",          en: "❌ Lost",                   zh: "❌ 流失",           color: "bg-red-100 text-red-700" },
+  { value: "engaged",        th: "🟠 ตอบรับแล้ว",          en: "🟠 Responded",              zh: "🟠 已回应",         color: "bg-orange-100 text-orange-700" },
+  { value: "quoted",         th: "🟡 ส่งใบเสนอราคาแล้ว",   en: "🟡 Quote sent",             zh: "🟡 已发送报价单",   color: "bg-amber-100 text-amber-700" },
+  { value: "converted",      th: "🟢 ปิดการขาย",           en: "🟢 Converted",              zh: "🟢 成交",           color: "bg-emerald-600 text-white" },
+  { value: "lost",           th: "🔴 เสียลูกค้า",          en: "🔴 Lost",                   zh: "🔴 流失",           color: "bg-red-100 text-red-700" },
 ];
 
 export const CONTACT_METHODS: { value: LeadContactMethod; th: string; en: string; zh: string }[] = [

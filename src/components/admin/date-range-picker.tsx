@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { DayPicker, type DateRange } from "react-day-picker";
+import { th, zhCN, enUS } from "react-day-picker/locale";
 import "react-day-picker/style.css";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,8 @@ export function DateRangePicker({
   /** Shown on the trigger button while from/to are both unset (null). */
   placeholder?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const calendarLocale = lang === "th" ? th : lang === "zh" ? zhCN : enUS;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>({ from: toDate(from), to: toDate(to) });
 
@@ -73,7 +75,9 @@ export function DateRangePicker({
           <Popover.Popup className="z-50 rounded-xl bg-white p-3 shadow-lg ring-1 ring-[#E8E5E0] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
             <DayPicker
               mode="range"
-              numberOfMonths={2}
+              numberOfMonths={1}
+              weekStartsOn={1}
+              locale={calendarLocale}
               defaultMonth={toDate(from)}
               selected={draft}
               onSelect={setDraft}

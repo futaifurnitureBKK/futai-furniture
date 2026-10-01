@@ -762,12 +762,12 @@ export default function KpiPage() {
       {/* ── KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Leads",     value: kpi.total,                                              sub: t("▲ 20%/เดือน เป้าหมาย", "▲ 20%/mo target", "▲ 20%/月 目标") },
+          { label: t("ลีดทั้งหมด", "Total Leads", "线索数"), value: kpi.total,                                              sub: t("▲ 20%/เดือน เป้าหมาย", "▲ 20%/mo target", "▲ 20%/月 目标") },
           { label: t("อัตราติดตาม", "Follow-up Rate", "跟进率"),  value: `${kpi.followUpRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 80%", "Target ≥ 80%", "目标 ≥ 80%") },
           { label: t("อัตราตอบรับ", "Response Rate", "回复率"),   value: `${kpi.responseRate.toFixed(0)}%`,                       sub: t("เป้า ≥ 30%", "Target ≥ 30%", "目标 ≥ 30%") },
           { label: t("อัตราปิดการขาย", "Conversion Rate", "转化率"), value: `${kpi.conversionRate.toFixed(0)}%`,                     sub: t("เป้า 10–15%", "Target 10–15%", "目标 10–15%") },
           { label: t("ระยะเวลาปิดดีล", "Cycle Time", "成交周期"),      value: kpi.avgCycleDays != null ? `${kpi.avgCycleDays.toFixed(0)} ${t("วัน", "days", "天")}` : "-", sub: t("เป้า ≤ 14 วัน", "Target ≤ 14 days", "目标 ≤ 14天") },
-          { label: "AOV",             value: kpi.aov != null ? kpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: t("บาท/ออเดอร์", "THB/order", "泰铢/订单") },
+          { label: t("มูลค่าเฉลี่ยต่อออเดอร์", "AOV", "客单价"), value: kpi.aov != null ? kpi.aov.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-", sub: t("บาท/ออเดอร์", "THB/order", "泰铢/订单") },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl shadow-sm p-4">
             <p className="text-xs text-[#6B6B6B]">{c.label}</p>

@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     .from("stock_products")
     .select("*, stock_variants(*)")
     .eq("archived", archived)
+    .order("sort_order", { ascending: true })
     .order("id", { ascending: true });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -30,9 +31,16 @@ export async function POST(req: NextRequest) {
   }
 
   const db = supabaseAdmin();
+  const { data: last } = await db
+    .from("stock_products")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  const nextSortOrder = (last?.[0]?.sort_order ?? -1) + 1;
+
   const { data: product, error } = await db
     .from("stock_products")
-    .insert({ ...pick(body, PRODUCT_FIELDS), code: String(body.code).trim() })
+    .insert({ ...pick(body, PRODUCT_FIELDS), code: String(body.code).trim(), sort_order: nextSortOrder })
     .select()
     .single();
   if (error) {

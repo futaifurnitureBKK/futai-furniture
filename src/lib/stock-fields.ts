@@ -11,6 +11,7 @@ export const PRODUCT_FIELDS = [
   "archived",
   "in_showroom",
   "image_urls",
+  "sort_order",
 ] as const;
 
 export const VARIANT_FIELDS = [

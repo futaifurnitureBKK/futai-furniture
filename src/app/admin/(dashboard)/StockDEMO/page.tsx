@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon,
+  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon, ChevronUp, ChevronDown,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ interface DbProduct {
   from_stock: boolean;
   archived: boolean;
   in_showroom: boolean;
+  sort_order: number;
   stock_variants: DbVariant[];
 }
 interface Movement {
@@ -563,6 +564,45 @@ export default function StockPage() {
     return out;
   }, [products, query, cat, statusFilter, archivedView, showroomOnly]);
 
+  // Swaps sort_order with whichever product sits next to it in the
+  // currently filtered/visible list — not the whole unfiltered catalog —
+  // since that's the "neighbor" the person actually sees and means to swap
+  // with.
+  async function moveProduct(p: DbProduct, direction: "up" | "down") {
+    const idx = rows.findIndex((r) => r.p.id === p.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= rows.length) return;
+    const neighbor = rows[swapIdx].p;
+    const [aOrder, bOrder] = [p.sort_order, neighbor.sort_order];
+
+    setProducts((list) =>
+      list
+        .map((x) => {
+          if (x.id === p.id) return { ...x, sort_order: bOrder };
+          if (x.id === neighbor.id) return { ...x, sort_order: aOrder };
+          return x;
+        })
+        .sort((a, b) => a.sort_order - b.sort_order)
+    );
+
+    const [r1, r2] = await Promise.all([
+      fetch(`/api/admin/stock/${p.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sort_order: bOrder }),
+      }),
+      fetch(`/api/admin/stock/${neighbor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sort_order: aOrder }),
+      }),
+    ]);
+    if (!r1.ok || !r2.ok) {
+      toast.error(t("ย้ายตำแหน่งไม่สำเร็จ", "Could not move item", "移动失败"));
+      setReloadTick((n) => n + 1);
+    }
+  }
+
   // Best sellers (units sold in 2025-2026, from the old sales sheets) with what's left in stock.
   const bestSellers = useMemo(() => {
     const byCode = new Map<string, { available: number; sizes: number }>();
@@ -917,7 +957,31 @@ export default function StockPage() {
                               {first && (
                                 <>
                                   <TableCell rowSpan={span} className="align-top">
-                                    <p className="text-sm font-mono font-medium">{p.code}</p>
+                                    <div className="flex items-start gap-1">
+                                      <p className="text-sm font-mono font-medium">{p.code}</p>
+                                      {!archivedView && (
+                                        <div className="flex flex-col -mt-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => moveProduct(p, "up")}
+                                            disabled={rows.findIndex((r) => r.p.id === p.id) <= 0}
+                                            title={t("เลื่อนขึ้น", "Move up", "上移")}
+                                            className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
+                                          >
+                                            <ChevronUp size={14} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => moveProduct(p, "down")}
+                                            disabled={rows.findIndex((r) => r.p.id === p.id) >= rows.length - 1}
+                                            title={t("เลื่อนลง", "Move down", "下移")}
+                                            className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
+                                          >
+                                            <ChevronDown size={14} />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                     <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
                                     <button
                                       type="button"

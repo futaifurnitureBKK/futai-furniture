@@ -84,6 +84,11 @@ const CATEGORIES = raw.categories as Cat[];
 const PAGE = 40;
 const CUSTOM = "custom";
 
+// "sample" was a leftover pseudo-category (a catch-all for show-room pieces
+// with no real category) — hidden from the page entirely per request. Its
+// products stay in the database untouched, just no longer shown or counted.
+const HIDDEN_CATEGORIES = new Set(["sample"]);
+
 interface TopSeller {
   code: string;
   qty: number;
@@ -443,13 +448,22 @@ export default function StockPage() {
   const catCounts = useMemo(() => {
     const m = new Map<string, number>();
     products.forEach((p) => {
+      if (HIDDEN_CATEGORIES.has(p.category)) return;
       const k = isCustom(p) ? CUSTOM : p.category;
       m.set(k, (m.get(k) || 0) + 1);
     });
     return m;
   }, [products]);
 
-  const showroomCount = useMemo(() => products.filter((p) => p.in_showroom).length, [products]);
+  const visibleProductCount = useMemo(
+    () => products.filter((p) => !HIDDEN_CATEGORIES.has(p.category)).length,
+    [products]
+  );
+
+  const showroomCount = useMemo(
+    () => products.filter((p) => p.in_showroom && !HIDDEN_CATEGORIES.has(p.category)).length,
+    [products]
+  );
 
   const [importingPhotos, setImportingPhotos] = useState(false);
 
@@ -499,6 +513,7 @@ export default function StockPage() {
     const q = query.trim().toLowerCase();
     const out: { p: DbProduct; vs: DbVariant[] }[] = [];
     for (const p of products) {
+      if (HIDDEN_CATEGORIES.has(p.category)) continue;
       if (cat === CUSTOM ? !isCustom(p) : cat !== "all" && (p.category !== cat || isCustom(p))) continue;
       if (showroomOnly && !p.in_showroom) continue;
       const all = archivedView ? p.stock_variants.slice().sort((a, b) => a.sort_order - b.sort_order) : activeVariants(p);
@@ -784,7 +799,7 @@ export default function StockPage() {
                 onClick={() => { setCat("all"); setLimit(PAGE); }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${cat === "all" ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"}`}
               >
-                {t("ทั้งหมด", "All", "全部")} ({products.length})
+                {t("ทั้งหมด", "All", "全部")} ({visibleProductCount})
               </button>
               <button
                 type="button"
@@ -793,7 +808,7 @@ export default function StockPage() {
               >
                 {t("สั่งทำ / Custom / 定制", "Custom order / 定制", "定制 / Custom")} ({catCounts.get(CUSTOM) ?? 0})
               </button>
-              {CATEGORIES.map((c) => (
+              {CATEGORIES.filter((c) => !HIDDEN_CATEGORIES.has(c.key)).map((c) => (
                 <button
                   key={c.key}
                   type="button"

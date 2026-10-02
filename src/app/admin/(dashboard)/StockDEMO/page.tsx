@@ -883,56 +883,27 @@ export default function StockPage() {
                               <TableCell className="align-top">
                                 {(() => {
                                   const photos = effectivePhotos(p, v);
-                                  const ownPhotos = v?.image_urls ?? [];
+                                  // Read-only preview here — adding/removing photos (including
+                                  // per-size ones) happens in "รายละเอียด / แก้ไข" so the row
+                                  // doesn't get cluttered with upload controls on every size.
+                                  if (photos.length === 0) {
+                                    return (
+                                      <button type="button" onClick={() => openDetail(p)} className="text-[10px] text-[#9CA3AF] text-left">-</button>
+                                    );
+                                  }
                                   return (
-                                    <div className="flex flex-col gap-1">
-                                      {photos.length === 0 && (
-                                        // No empty placeholder box when there's no photo yet — "รายละเอียด /
-                                        // แก้ไข" still opens the dialog to add the product's main photo.
-                                        <button type="button" onClick={() => openDetail(p)} className="text-[10px] text-[#9CA3AF] text-left">-</button>
-                                      )}
-                                      {photos.map((url, i) => {
-                                        const isOwn = ownPhotos.includes(url);
-                                        return (
-                                          <div key={url + i} className="relative w-14 h-14 rounded-md bg-white border border-[#E8E5E0] overflow-hidden group">
-                                            <button
-                                              type="button"
-                                              onClick={() => openDetail(p)}
-                                              className="absolute inset-0"
-                                              aria-label={p.code}
-                                            >
-                                              <Image src={url} alt={p.code} fill sizes="56px" unoptimized className="object-contain" />
-                                            </button>
-                                            {v && isOwn && (
-                                              <button
-                                                type="button"
-                                                onClick={() => removeVariantPhoto(p, v, url)}
-                                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[9px] transition-opacity"
-                                              >
-                                                {t("ลบ", "Remove", "删除")}
-                                              </button>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                      {v && ownPhotos.length < 3 && (
-                                        <label
-                                          title={t("เพิ่มรูปเฉพาะขนาดนี้ (ถ้าต่างจากรูปหลัก)", "Add a photo for this size only (if it differs from the main photo)", "为此规格单独添加图片（如与主图不同）")}
-                                          className="w-14 h-14 rounded-md border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] text-[#9CA3AF]"
+                                    <div className="flex flex-col gap-1.5">
+                                      {photos.map((url, i) => (
+                                        <button
+                                          key={url + i}
+                                          type="button"
+                                          onClick={() => openDetail(p)}
+                                          className="relative block w-24 h-24 rounded-lg bg-white overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E] transition-colors"
+                                          aria-label={p.code}
                                         >
-                                          <Plus size={14} />
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                              const f = e.target.files?.[0];
-                                              if (f) addVariantPhoto(p, v, f);
-                                              e.target.value = "";
-                                            }}
-                                          />
-                                        </label>
-                                      )}
+                                          <Image src={url} alt={p.code} fill sizes="96px" unoptimized className="object-contain" />
+                                        </button>
+                                      ))}
                                     </div>
                                   );
                                 })()}
@@ -1181,6 +1152,7 @@ export default function StockPage() {
                     <TableHeader>
                       <TableRow className="bg-[#FAF7F2]">
                         <TableHead className="text-xs">{t("รหัส", "Code", "编号")}</TableHead>
+                        <TableHead className="text-xs">{t("รูป (เฉพาะขนาดนี้)", "Photo (this size)", "图片（仅此规格）")}</TableHead>
                         <TableHead className="text-xs">{t("ขนาด (มม.)", "Size (mm)", "尺寸")}</TableHead>
                         <TableHead className="text-xs">{t("ราคา ฿", "Price ฿", "价格")}</TableHead>
                         <TableHead className="text-xs">{t("หมายเหตุ", "Note", "备注")}</TableHead>
@@ -1200,6 +1172,40 @@ export default function StockPage() {
                       {activeVariants(detail).map((v) => (
                         <TableRow key={v.id}>
                           <TableCell><Input className="h-8 w-28 text-xs font-mono" value={v.code} onChange={(e) => editVariant(detail.id, v.id, { code: e.target.value })} /></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {v.image_urls.map((url, i) => (
+                                <div key={url + i} className="relative w-9 h-9 rounded border border-[#E8E5E0] overflow-hidden group shrink-0">
+                                  <Image src={url} alt="" fill sizes="36px" unoptimized className="object-contain" />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVariantPhoto(detail, v, url)}
+                                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px]"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              {v.image_urls.length < 3 && (
+                                <label
+                                  title={t("ใช้เมื่อขนาดนี้หน้าตาต่างจากรูปหลักของรุ่น", "Use when this size looks different from the model's main photo", "当此规格与主图不同时使用")}
+                                  className="w-9 h-9 rounded border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] text-[#9CA3AF] shrink-0"
+                                >
+                                  <Plus size={12} />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) addVariantPhoto(detail, v, f);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Input className="h-8 w-36 text-xs font-mono" value={v.is_round || v.width_mm == null ? v.size_text : `${v.width_mm}*${v.depth_mm ?? ""}${v.height_mm != null ? "*" + v.height_mm : ""}`} onChange={(e) => editSize(detail.id, v.id, e.target.value)} />
                             {v.flag && <p className="text-[10px] text-amber-700 max-w-[10rem] mt-0.5">{v.flag}</p>}
@@ -1229,7 +1235,7 @@ export default function StockPage() {
                       ))}
                       {activeVariants(detail).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={14} className="text-center text-xs text-[#9CA3AF] py-6">{t("ยังไม่มีขนาด กด \"เพิ่มขนาด\"", "No sizes yet — click Add size", "暂无规格，点击添加规格")}</TableCell>
+                          <TableCell colSpan={15} className="text-center text-xs text-[#9CA3AF] py-6">{t("ยังไม่มีขนาด กด \"เพิ่มขนาด\"", "No sizes yet — click Add size", "暂无规格，点击添加规格")}</TableCell>
                         </TableRow>
                       )}
                     </TableBody>

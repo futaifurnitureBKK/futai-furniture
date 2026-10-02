@@ -544,6 +544,9 @@ function QuoteBuilderInner() {
   const searchParams = useSearchParams();
   const [docType, setDocType] = useState<DocType>("quotation");
   const [langMode, setLangMode] = useState<LangMode>("th-en-zh");
+  // Editable per-document — defaults to the company's main number, but a
+  // different salesperson's number can be swapped in on the letterhead.
+  const [companyTel, setCompanyTel] = useState(COMPANY.tel);
   const [docNo, setDocNo] = useState(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
   const [channel, setChannel] = useState<SavedQuoteChannel>("other");
   const [date, setDate] = useState(todayStr());
@@ -989,7 +992,7 @@ function QuoteBuilderInner() {
       `${L(TXT.address)}: 99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา อำเภอลำลูกกา จ.ปทุมธานี 12150`,
       { size: 9, align: "center" }
     );
-    splitRow(`${L(TXT.tel)}: ${COMPANY.tel}`, `${L(TXT.web)}: ${COMPANY.web}`, { size: 9 });
+    splitRow(`${L(TXT.tel)}: ${companyTel}`, `${L(TXT.web)}: ${COMPANY.web}`, { size: 9 });
     splitRow(`${L(TXT.taxId)}: ${COMPANY.taxId}`, `${L(TXT.email)}: ${COMPANY.email}`, { size: 9 });
     nextRow();
 
@@ -1127,6 +1130,15 @@ function QuoteBuilderInner() {
           #print-area tr, #print-area .no-break {
             break-inside: avoid;
             page-break-inside: avoid;
+          }
+          /* The phone number field is a plain <input> so it's editable
+             on-screen — strip any browser input chrome so it prints as
+             plain text, matching the rest of the letterhead. */
+          .company-tel-input {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            box-shadow: none !important;
           }
         }
       `}</style>
@@ -1633,7 +1645,13 @@ function QuoteBuilderInner() {
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.address)} :</td>
                   <td colSpan={4}>99/9, 99/11 หมู่ที่ 5 ถนนลำลูกกา ตำบลลำลูกกา</td>
                   <td colSpan={2} className="whitespace-nowrap pr-1">{L(TXT.tel)} :</td>
-                  <td>{COMPANY.tel}</td>
+                  <td>
+                    <input
+                      value={companyTel}
+                      onChange={(e) => setCompanyTel(e.target.value)}
+                      className="company-tel-input w-full bg-transparent border-none p-0 text-[11px] leading-snug focus:outline-none focus:ring-1 focus:ring-[#C8102E]/40 rounded"
+                    />
+                  </td>
                 </tr>
                 <tr className="text-[9.5px]">
                   <td colSpan={2} />

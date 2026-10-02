@@ -815,14 +815,20 @@ export default function StockPage() {
                               {first && (
                                 <>
                                   <TableCell rowSpan={span} className="align-top">
-                                    <button
-                                      type="button"
-                                      onClick={() => openDetail(p)}
-                                      className="relative block w-28 h-28 rounded-lg bg-white overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E] transition-colors"
-                                      aria-label={p.code}
-                                    >
-                                      {p.image_url && <Image src={p.image_url} alt={p.code} fill sizes="112px" unoptimized className="object-contain" />}
-                                    </button>
+                                    {p.image_url ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => openDetail(p)}
+                                        className="relative block w-28 h-28 rounded-lg bg-white overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E] transition-colors"
+                                        aria-label={p.code}
+                                      >
+                                        <Image src={p.image_url} alt={p.code} fill sizes="112px" unoptimized className="object-contain" />
+                                      </button>
+                                    ) : (
+                                      // No empty placeholder box when there's no photo yet — "รายละเอียด /
+                                      // แก้ไข" on the right still opens the dialog to add one.
+                                      <span className="text-[10px] text-[#9CA3AF]">-</span>
+                                    )}
                                   </TableCell>
                                   <TableCell rowSpan={span} className="align-top">
                                     <p className="text-sm font-mono font-medium">{p.code}</p>

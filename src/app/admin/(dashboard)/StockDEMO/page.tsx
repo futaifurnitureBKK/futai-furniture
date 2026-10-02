@@ -146,8 +146,14 @@ const productPhotos = (p: DbProduct): string[] => [p.image_url, ...p.image_urls]
 
 // A size/variant's photos if it has its own (some sizes/colors look
 // different from the rest of the model), otherwise the product's shared set.
-const effectivePhotos = (p: DbProduct, v: DbVariant | null): string[] =>
-  v && v.image_urls.length ? v.image_urls : productPhotos(p);
+// `showShared` is true only for a product's first size row — the shared
+// photos are shown there once, not repeated identically on every size row,
+// which just looked cluttered. A size with its own override photo always
+// shows that, on any row.
+const effectivePhotos = (p: DbProduct, v: DbVariant | null, showShared: boolean): string[] => {
+  if (v && v.image_urls.length) return v.image_urls;
+  return showShared ? productPhotos(p) : [];
+};
 
 // No price on any size = made-to-order. Showroom samples stay where they are.
 const isCustom = (p: DbProduct) =>
@@ -882,7 +888,7 @@ export default function StockPage() {
                             <TableRow key={v?.id ?? "empty"} className={`hover:bg-[#FAF7F2]/50 ${first ? "border-t-2 border-t-[#E8E5E0]" : ""}`}>
                               <TableCell className="align-top">
                                 {(() => {
-                                  const photos = effectivePhotos(p, v);
+                                  const photos = effectivePhotos(p, v, first);
                                   // Read-only preview here — adding/removing photos (including
                                   // per-size ones) happens in "รายละเอียด / แก้ไข" so the row
                                   // doesn't get cluttered with upload controls on every size.

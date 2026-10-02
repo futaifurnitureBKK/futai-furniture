@@ -957,31 +957,7 @@ export default function StockPage() {
                               {first && (
                                 <>
                                   <TableCell rowSpan={span} className="align-top">
-                                    <div className="flex items-start gap-1">
-                                      <p className="text-sm font-mono font-medium">{p.code}</p>
-                                      {!archivedView && (
-                                        <div className="flex flex-col -mt-0.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => moveProduct(p, "up")}
-                                            disabled={rows.findIndex((r) => r.p.id === p.id) <= 0}
-                                            title={t("เลื่อนขึ้น", "Move up", "上移")}
-                                            className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
-                                          >
-                                            <ChevronUp size={14} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => moveProduct(p, "down")}
-                                            disabled={rows.findIndex((r) => r.p.id === p.id) >= rows.length - 1}
-                                            title={t("เลื่อนลง", "Move down", "下移")}
-                                            className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
-                                          >
-                                            <ChevronDown size={14} />
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
+                                    <p className="text-sm font-mono font-medium">{p.code}</p>
                                     <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
                                     <button
                                       type="button"
@@ -1059,15 +1035,39 @@ export default function StockPage() {
                               )}
                               {first && (
                                 <TableCell rowSpan={span} className="align-top">
-                                  {archivedView ? (
-                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setProductArchived(p.id, false)}>
-                                      <ArchiveRestore size={12} className="mr-1" /> {t("กู้คืน", "Restore", "恢复")}
-                                    </Button>
-                                  ) : (
-                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openDetail(p)}>
-                                      {t("รายละเอียด / แก้ไข", "Details / Edit", "详情 / 编辑")}
-                                    </Button>
-                                  )}
+                                  <div className="flex items-start gap-1.5">
+                                    {archivedView ? (
+                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setProductArchived(p.id, false)}>
+                                        <ArchiveRestore size={12} className="mr-1" /> {t("กู้คืน", "Restore", "恢复")}
+                                      </Button>
+                                    ) : (
+                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openDetail(p)}>
+                                        {t("รายละเอียด / แก้ไข", "Details / Edit", "详情 / 编辑")}
+                                      </Button>
+                                    )}
+                                    {!archivedView && (
+                                      <div className="flex flex-col">
+                                        <button
+                                          type="button"
+                                          onClick={() => moveProduct(p, "up")}
+                                          disabled={rows.findIndex((r) => r.p.id === p.id) <= 0}
+                                          title={t("เลื่อนขึ้น", "Move up", "上移")}
+                                          className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
+                                        >
+                                          <ChevronUp size={14} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => moveProduct(p, "down")}
+                                          disabled={rows.findIndex((r) => r.p.id === p.id) >= rows.length - 1}
+                                          title={t("เลื่อนลง", "Move down", "下移")}
+                                          className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
+                                        >
+                                          <ChevronDown size={14} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </TableCell>
                               )}
                             </TableRow>

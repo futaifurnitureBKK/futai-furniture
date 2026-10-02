@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon, ChevronUp, ChevronDown,
+  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon, GripVertical,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
@@ -205,6 +205,8 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [archivedView, setArchivedView] = useState(false);
+  const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
+  const [dragOverProductId, setDragOverProductId] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [seeding, setSeeding] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -564,40 +566,40 @@ export default function StockPage() {
     return out;
   }, [products, query, cat, statusFilter, archivedView, showroomOnly]);
 
-  // Swaps sort_order with whichever product sits next to it in the
-  // currently filtered/visible list — not the whole unfiltered catalog —
-  // since that's the "neighbor" the person actually sees and means to swap
-  // with.
-  async function moveProduct(p: DbProduct, direction: "up" | "down") {
-    const idx = rows.findIndex((r) => r.p.id === p.id);
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (idx < 0 || swapIdx < 0 || swapIdx >= rows.length) return;
-    const neighbor = rows[swapIdx].p;
-    const [aOrder, bOrder] = [p.sort_order, neighbor.sort_order];
+  // Drag-to-reorder: moves the dragged product to sit where the drop target
+  // is, within the currently filtered/visible list only. The sort_order
+  // "slots" already used by this visible set are kept and just handed out in
+  // the new order, so products outside the current filter are never touched.
+  async function reorderProducts(draggedId: number, targetId: number) {
+    if (draggedId === targetId) return;
+    const ids = rows.map((r) => r.p.id);
+    const fromIdx = ids.indexOf(draggedId);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const slots = rows.map((r) => r.p.sort_order).sort((a, b) => a - b);
+    const newIds = ids.slice();
+    const [moved] = newIds.splice(fromIdx, 1);
+    newIds.splice(toIdx, 0, moved);
+    const orderById = new Map(newIds.map((id, i) => [id, slots[i]]));
 
     setProducts((list) =>
       list
-        .map((x) => {
-          if (x.id === p.id) return { ...x, sort_order: bOrder };
-          if (x.id === neighbor.id) return { ...x, sort_order: aOrder };
-          return x;
-        })
+        .map((x) => (orderById.has(x.id) ? { ...x, sort_order: orderById.get(x.id) as number } : x))
         .sort((a, b) => a.sort_order - b.sort_order)
     );
 
-    const [r1, r2] = await Promise.all([
-      fetch(`/api/admin/stock/${p.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sort_order: bOrder }),
-      }),
-      fetch(`/api/admin/stock/${neighbor.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sort_order: aOrder }),
-      }),
-    ]);
-    if (!r1.ok || !r2.ok) {
+    const changed = rows.filter((r) => orderById.get(r.p.id) !== r.p.sort_order);
+    const results = await Promise.all(
+      changed.map((r) =>
+        fetch(`/api/admin/stock/${r.p.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sort_order: orderById.get(r.p.id) }),
+        })
+      )
+    );
+    if (results.some((r) => !r.ok)) {
       toast.error(t("ย้ายตำแหน่งไม่สำเร็จ", "Could not move item", "移动失败"));
       setReloadTick((n) => n + 1);
     }
@@ -925,7 +927,27 @@ export default function StockPage() {
                           const first = n === 0;
                           const st = v ? statusOf(v) : "untracked";
                           return (
-                            <TableRow key={v?.id ?? "empty"} className={`hover:bg-[#FAF7F2]/50 ${first ? "border-t-2 border-t-[#E8E5E0]" : ""}`}>
+                            <TableRow
+                              key={v?.id ?? "empty"}
+                              onDragOver={(e) => {
+                                if (draggedProductId == null || draggedProductId === p.id) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                                if (dragOverProductId !== p.id) setDragOverProductId(p.id);
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverProductId === p.id) setDragOverProductId(null);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedProductId != null) reorderProducts(draggedProductId, p.id);
+                                setDraggedProductId(null);
+                                setDragOverProductId(null);
+                              }}
+                              className={`hover:bg-[#FAF7F2]/50 ${first ? "border-t-2 border-t-[#E8E5E0]" : ""} ${
+                                dragOverProductId === p.id ? "bg-[#C8102E]/5 outline outline-2 outline-[#C8102E]/40 -outline-offset-2" : ""
+                              } ${draggedProductId === p.id ? "opacity-50" : ""}`}
+                            >
                               <TableCell className="align-top">
                                 {(() => {
                                   const photos = effectivePhotos(p, v, first);
@@ -1046,25 +1068,20 @@ export default function StockPage() {
                                       </Button>
                                     )}
                                     {!archivedView && (
-                                      <div className="flex flex-col">
-                                        <button
-                                          type="button"
-                                          onClick={() => moveProduct(p, "up")}
-                                          disabled={rows.findIndex((r) => r.p.id === p.id) <= 0}
-                                          title={t("เลื่อนขึ้น", "Move up", "上移")}
-                                          className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
-                                        >
-                                          <ChevronUp size={14} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => moveProduct(p, "down")}
-                                          disabled={rows.findIndex((r) => r.p.id === p.id) >= rows.length - 1}
-                                          title={t("เลื่อนลง", "Move down", "下移")}
-                                          className="text-[#9CA3AF] hover:text-[#1A1A1A] disabled:opacity-30 disabled:hover:text-[#9CA3AF]"
-                                        >
-                                          <ChevronDown size={14} />
-                                        </button>
+                                      <div
+                                        draggable
+                                        onDragStart={(e) => {
+                                          setDraggedProductId(p.id);
+                                          e.dataTransfer.effectAllowed = "move";
+                                        }}
+                                        onDragEnd={() => {
+                                          setDraggedProductId(null);
+                                          setDragOverProductId(null);
+                                        }}
+                                        title={t("คลิกค้างแล้วลากเพื่อย้ายตำแหน่ง", "Click and hold, then drag to reorder", "按住并拖动以排序")}
+                                        className="cursor-grab active:cursor-grabbing text-[#9CA3AF] hover:text-[#1A1A1A] self-center"
+                                      >
+                                        <GripVertical size={16} />
                                       </div>
                                     )}
                                   </div>

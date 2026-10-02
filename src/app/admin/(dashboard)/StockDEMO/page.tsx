@@ -62,6 +62,7 @@ interface DbProduct {
   code: string;
   category: string;
   image_url: string | null;
+  image_urls: string[];
   description: string;
   color: string;
   material: string;
@@ -207,7 +208,7 @@ export default function StockPage() {
   const showCost = false;
 
   const [detailId, setDetailId] = useState<number | null>(null);
-  const [draft, setDraft] = useState({ code: "", category: "", description: "", color: "", material: "", boxes_per_item: 1, image_url: "" });
+  const [draft, setDraft] = useState({ code: "", category: "", description: "", color: "", material: "", boxes_per_item: 1, image_url: "", image_urls: [] as string[] });
   const [movements, setMovements] = useState<Movement[]>([]);
   const [uploading, setUploading] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
@@ -296,6 +297,7 @@ export default function StockPage() {
     setDraft({
       code: p.code, category: p.category, description: p.description, color: p.color,
       material: p.material, boxes_per_item: p.boxes_per_item, image_url: p.image_url ?? "",
+      image_urls: p.image_urls ?? [],
     });
     setMovements([]);
     (async () => {
@@ -1021,6 +1023,41 @@ export default function StockPage() {
                       }}
                     />
                   </label>
+
+                  {/* Up to 2 extra photos (3 total with the main one above) — same model
+                      from another angle, a detail shot, etc. */}
+                  <div>
+                    <Label className="text-xs">{t("รูปเพิ่มเติม (สูงสุด 2 รูป)", "Extra photos (up to 2)", "更多图片（最多2张）")}</Label>
+                    <div className="flex gap-2 mt-1">
+                      {draft.image_urls.map((url, i) => (
+                        <div key={url + i} className="relative w-16 h-16 rounded-md bg-white border border-[#E8E5E0] overflow-hidden group">
+                          <Image src={url} alt="" fill sizes="64px" unoptimized className="object-contain" />
+                          <button
+                            type="button"
+                            onClick={() => setDraft((d) => ({ ...d, image_urls: d.image_urls.filter((_, j) => j !== i) }))}
+                            className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs transition-opacity"
+                          >
+                            {t("ลบ", "Remove", "删除")}
+                          </button>
+                        </div>
+                      ))}
+                      {draft.image_urls.length < 2 && (
+                        <label className="w-16 h-16 rounded-md border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] text-[#9CA3AF]">
+                          <Plus size={16} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadFor((url) => setDraft((d) => ({ ...d, image_urls: [...d.image_urls, url] })), f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-3 content-start">
                   <div>

@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database, RefreshCw, Store,
+  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
@@ -451,6 +451,27 @@ export default function StockPage() {
 
   const showroomCount = useMemo(() => products.filter((p) => p.in_showroom).length, [products]);
 
+  const [importingPhotos, setImportingPhotos] = useState(false);
+
+  // One-off backfill: borrow a photo from a saved quotation's line item that
+  // shares the same SKU, for any product that doesn't have one yet — a
+  // stand-in until a real product photo is taken. Never overwrites a photo a
+  // product already has.
+  async function importPhotosFromQuotes() {
+    setImportingPhotos(true);
+    const res = await fetch("/api/admin/stock/import-photos-from-quotes", { method: "POST" });
+    const data = await res.json();
+    setImportingPhotos(false);
+    if (res.ok) {
+      toast.success(
+        t(`นำเข้ารูปสำเร็จ ${data.updated} รายการ`, `Imported ${data.updated} photos`, `已导入 ${data.updated} 张图片`)
+      );
+      if (data.updated > 0) setReloadTick((n) => n + 1);
+    } else {
+      toast.error(data.error || t("นำเข้าไม่สำเร็จ", "Import failed", "导入失败"));
+    }
+  }
+
   // Toggling which stock items are currently set up in the physical
   // showroom — immediate save, no dialog, since this gets flipped often.
   async function toggleShowroom(p: DbProduct) {
@@ -603,6 +624,12 @@ export default function StockPage() {
           {!archivedView && products.length > 0 && (
             <Button size="sm" variant="outline" onClick={openSync}>
               <RefreshCw size={14} className="mr-1.5" /> {t("อัปเดตจากไฟล์ล่าสุด", "Update from latest file", "从最新文件更新")}
+            </Button>
+          )}
+          {!archivedView && products.length > 0 && (
+            <Button size="sm" variant="outline" onClick={importPhotosFromQuotes} disabled={importingPhotos}>
+              {importingPhotos ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <ImageIcon size={14} className="mr-1.5" />}
+              {t("นำเข้ารูปจากใบเสนอราคา", "Import photos from quotations", "从报价单导入图片")}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={exportExcel} disabled={!products.length}>

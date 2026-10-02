@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database, RefreshCw,
+  Loader2, Upload, History, Database, RefreshCw, Store,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
@@ -68,6 +68,7 @@ interface DbProduct {
   boxes_per_item: number;
   from_stock: boolean;
   archived: boolean;
+  in_showroom: boolean;
   stock_variants: DbVariant[];
 }
 interface Movement {
@@ -192,6 +193,7 @@ export default function StockPage() {
 
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string>("all");
+  const [showroomOnly, setShowroomOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [limit, setLimit] = useState(PAGE);
   // The "owner mode / show cost" toggle was removed from the toolbar — kept
@@ -447,6 +449,24 @@ export default function StockPage() {
     return m;
   }, [products]);
 
+  const showroomCount = useMemo(() => products.filter((p) => p.in_showroom).length, [products]);
+
+  // Toggling which stock items are currently set up in the physical
+  // showroom — immediate save, no dialog, since this gets flipped often.
+  async function toggleShowroom(p: DbProduct) {
+    const next = !p.in_showroom;
+    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_showroom: next } : x)));
+    const res = await fetch(`/api/admin/stock/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ in_showroom: next }),
+    });
+    if (!res.ok) {
+      setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_showroom: !next } : x)));
+      toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    }
+  }
+
   const STATUS_LABEL: Record<StatusKey, string> = {
     ok: t("พร้อมขาย", "In stock", "有货"),
     low: t("ใกล้หมด", "Low stock", "库存偏低"),
@@ -459,6 +479,7 @@ export default function StockPage() {
     const out: { p: DbProduct; vs: DbVariant[] }[] = [];
     for (const p of products) {
       if (cat === CUSTOM ? !isCustom(p) : cat !== "all" && (p.category !== cat || isCustom(p))) continue;
+      if (showroomOnly && !p.in_showroom) continue;
       const all = archivedView ? p.stock_variants.slice().sort((a, b) => a.sort_order - b.sort_order) : activeVariants(p);
       if (q) {
         const c = CATEGORIES.find((c) => c.key === p.category);
@@ -472,7 +493,7 @@ export default function StockPage() {
       if (vs.length || (statusFilter === "all" && all.length === 0)) out.push({ p, vs });
     }
     return out;
-  }, [products, query, cat, statusFilter, archivedView]);
+  }, [products, query, cat, statusFilter, archivedView, showroomOnly]);
 
   // Best sellers (units sold in 2025-2026, from the old sales sheets) with what's left in stock.
   const bestSellers = useMemo(() => {
@@ -720,6 +741,14 @@ export default function StockPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <button
+                type="button"
+                onClick={() => { setShowroomOnly((v) => !v); setLimit(PAGE); }}
+                className={`inline-flex items-center gap-1.5 px-3 rounded-md text-xs font-semibold transition-colors ${showroomOnly ? "bg-purple-600 text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"}`}
+              >
+                <Store size={14} />
+                {t("เฉพาะในโชว์รูม", "Showroom only", "仅展厅")} ({showroomCount})
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-1.5">
@@ -798,6 +827,17 @@ export default function StockPage() {
                                   <TableCell rowSpan={span} className="align-top">
                                     <p className="text-sm font-mono font-medium">{p.code}</p>
                                     <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleShowroom(p)}
+                                      title={t("กดเพื่อตั้ง/ยกเลิกว่าอยู่ในโชว์รูมตอนนี้", "Click to toggle whether this is currently in the showroom", "点击切换是否当前陈列在展厅")}
+                                      className={`mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                                        p.in_showroom ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "bg-[#F0EDE6] text-[#9CA3AF] hover:bg-[#E8E5E0]"
+                                      }`}
+                                    >
+                                      <Store size={10} />
+                                      {t("โชว์รูม", "Showroom", "展厅")}
+                                    </button>
                                     {p.from_stock && (
                                       <p className="text-[10px] text-amber-700">{t("มีเฉพาะในตารางสต็อกเดิม (ยังไม่มีในไฟล์รหัสสินค้า)", "only in the old stock sheet (not in the product-code file)", "仅在旧库存表中（编号文件中没有）")}</p>
                                     )}

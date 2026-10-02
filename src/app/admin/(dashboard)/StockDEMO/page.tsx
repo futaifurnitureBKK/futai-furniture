@@ -56,6 +56,7 @@ interface DbVariant {
   stock_note: string;
   tracked: boolean;
   archived: boolean;
+  image_urls: string[];
 }
 interface DbProduct {
   id: number;
@@ -139,6 +140,14 @@ function parseDims(text: string) {
 
 const activeVariants = (p: DbProduct) =>
   p.stock_variants.filter((v) => !v.archived).sort((a, b) => a.sort_order - b.sort_order);
+
+// A product's own shared photos (main photo first, then the extras).
+const productPhotos = (p: DbProduct): string[] => [p.image_url, ...p.image_urls].filter((u): u is string => !!u);
+
+// A size/variant's photos if it has its own (some sizes/colors look
+// different from the rest of the model), otherwise the product's shared set.
+const effectivePhotos = (p: DbProduct, v: DbVariant | null): string[] =>
+  v && v.image_urls.length ? v.image_urls : productPhotos(p);
 
 // No price on any size = made-to-order. Showroom samples stay where they are.
 const isCustom = (p: DbProduct) =>
@@ -258,6 +267,21 @@ export default function StockPage() {
 
   function editSize(pid: number, vid: number, text: string) {
     editVariant(pid, vid, { size_text: text, ...parseDims(text) });
+  }
+
+  // Attaches a photo to this one size/variant — once a variant has its own
+  // photo(s), those replace the product's shared photos for that row only.
+  async function addVariantPhoto(p: DbProduct, v: DbVariant, file: File) {
+    try {
+      const url = await uploadImage(file);
+      editVariant(p.id, v.id, { image_urls: [...v.image_urls, url] });
+    } catch {
+      toast.error(t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+    }
+  }
+
+  function removeVariantPhoto(p: DbProduct, v: DbVariant, url: string) {
+    editVariant(p.id, v.id, { image_urls: v.image_urls.filter((u) => u !== url) });
   }
 
   async function archiveVariant(pid: number, vid: number) {
@@ -856,24 +880,65 @@ export default function StockPage() {
                           const st = v ? statusOf(v) : "untracked";
                           return (
                             <TableRow key={v?.id ?? "empty"} className={`hover:bg-[#FAF7F2]/50 ${first ? "border-t-2 border-t-[#E8E5E0]" : ""}`}>
+                              <TableCell className="align-top">
+                                {(() => {
+                                  const photos = effectivePhotos(p, v);
+                                  const ownPhotos = v?.image_urls ?? [];
+                                  return (
+                                    <div className="flex flex-col gap-1">
+                                      {photos.length === 0 && (
+                                        // No empty placeholder box when there's no photo yet — "รายละเอียด /
+                                        // แก้ไข" still opens the dialog to add the product's main photo.
+                                        <button type="button" onClick={() => openDetail(p)} className="text-[10px] text-[#9CA3AF] text-left">-</button>
+                                      )}
+                                      {photos.map((url, i) => {
+                                        const isOwn = ownPhotos.includes(url);
+                                        return (
+                                          <div key={url + i} className="relative w-14 h-14 rounded-md bg-white border border-[#E8E5E0] overflow-hidden group">
+                                            <button
+                                              type="button"
+                                              onClick={() => openDetail(p)}
+                                              className="absolute inset-0"
+                                              aria-label={p.code}
+                                            >
+                                              <Image src={url} alt={p.code} fill sizes="56px" unoptimized className="object-contain" />
+                                            </button>
+                                            {v && isOwn && (
+                                              <button
+                                                type="button"
+                                                onClick={() => removeVariantPhoto(p, v, url)}
+                                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[9px] transition-opacity"
+                                              >
+                                                {t("ลบ", "Remove", "删除")}
+                                              </button>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                      {v && ownPhotos.length < 3 && (
+                                        <label
+                                          title={t("เพิ่มรูปเฉพาะขนาดนี้ (ถ้าต่างจากรูปหลัก)", "Add a photo for this size only (if it differs from the main photo)", "为此规格单独添加图片（如与主图不同）")}
+                                          className="w-14 h-14 rounded-md border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] text-[#9CA3AF]"
+                                        >
+                                          <Plus size={14} />
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              const f = e.target.files?.[0];
+                                              if (f) addVariantPhoto(p, v, f);
+                                              e.target.value = "";
+                                            }}
+                                          />
+                                        </label>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </TableCell>
                               {first && (
                                 <>
-                                  <TableCell rowSpan={span} className="align-top">
-                                    {p.image_url ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => openDetail(p)}
-                                        className="relative block w-28 h-28 rounded-lg bg-white overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E] transition-colors"
-                                        aria-label={p.code}
-                                      >
-                                        <Image src={p.image_url} alt={p.code} fill sizes="112px" unoptimized className="object-contain" />
-                                      </button>
-                                    ) : (
-                                      // No empty placeholder box when there's no photo yet — "รายละเอียด /
-                                      // แก้ไข" on the right still opens the dialog to add one.
-                                      <span className="text-[10px] text-[#9CA3AF]">-</span>
-                                    )}
-                                  </TableCell>
                                   <TableCell rowSpan={span} className="align-top">
                                     <p className="text-sm font-mono font-medium">{p.code}</p>
                                     <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>

@@ -34,6 +34,7 @@ export const VARIANT_FIELDS = [
   "stock_note",
   "tracked",
   "archived",
+  "image_urls",
 ] as const;
 
 // Numeric stock columns whose every change is written to stock_movements.

@@ -815,6 +815,27 @@ function QuoteBuilderInner() {
     }
   }
 
+  async function deleteQuote(id: number, docNo: string) {
+    if (
+      !confirm(
+        t(
+          `ลบเอกสาร ${docNo} เลยใช่ไหม? ลบแล้วจะหายไปเลย กู้คืนไม่ได้ ยืนยันใช่ไหม?`,
+          `Delete document ${docNo}? This is permanent and cannot be undone. Are you sure?`,
+          `确定要删除文件 ${docNo} 吗？删除后将永久消失，无法恢复，确定吗？`
+        )
+      )
+    )
+      return;
+    const res = await fetch(`/api/admin/saved-quotes/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setSavedList((prev) => prev.filter((q) => q.id !== id));
+      if (savedId === id) resetForm();
+      toast.success(t("ลบแล้ว", "Deleted", "已删除"));
+    } else {
+      toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
+    }
+  }
+
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
     setDocNo((prev) => {
@@ -1333,6 +1354,9 @@ function QuoteBuilderInner() {
                             <Archive size={13} className="text-[#6B6B6B]" />
                           </Button>
                         )}
+                        <Button size="icon-sm" variant="ghost" onClick={() => deleteQuote(q.id, q.doc_no)} aria-label={t("ลบ", "Delete", "删除")}>
+                          <Trash2 size={13} className="text-red-500" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

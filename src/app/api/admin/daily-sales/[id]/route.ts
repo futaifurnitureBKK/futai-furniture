@@ -14,6 +14,7 @@ const EDITABLE_FIELDS = [
   "customer_phone",
   "salesperson",
   "po_no",
+  "from_reserved",
 ] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,26 +31,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const db = supabaseAdmin();
 
-  // Keep StockDEMO's "available" count in sync whenever the item or quantity
-  // sold changes — see syncStockDeduction for why this restores-then-applies
-  // instead of just subtracting the new quantity.
-  if ("sku" in body || "qty" in body) {
+  // Keep StockDEMO's available/reserved counts in sync whenever the item,
+  // quantity, or the "จากของที่จองไว้" checkbox changes — see
+  // syncStockDeduction for why this restores-then-applies instead of just
+  // subtracting the new quantity.
+  if ("sku" in body || "qty" in body || "from_reserved" in body) {
     const { data: existing } = await db
       .from("daily_sales_rows")
-      .select("sku, qty, stock_variant_id, stock_deducted_qty")
+      .select("sku, qty, from_reserved, stock_variant_id, stock_deducted_qty, stock_deducted_field")
       .eq("id", id)
       .single();
     if (existing) {
       const newSku = "sku" in body ? String(body.sku ?? "") : existing.sku;
       const newQty = "qty" in body ? Number(body.qty) || 0 : existing.qty;
+      const fromReserved = "from_reserved" in body ? !!body.from_reserved : existing.from_reserved;
       const result = await syncStockDeduction(db, {
         previousVariantId: existing.stock_variant_id,
         previousQty: existing.stock_deducted_qty,
+        previousField: existing.stock_deducted_field,
         newSku,
         newQty,
+        fromReserved,
       });
       update.stock_variant_id = result.variantId;
       update.stock_deducted_qty = result.deductedQty;
+      update.stock_deducted_field = result.field;
     }
   }
 
@@ -69,15 +75,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { data: existing } = await db
     .from("daily_sales_rows")
-    .select("stock_variant_id, stock_deducted_qty")
+    .select("stock_variant_id, stock_deducted_qty, stock_deducted_field")
     .eq("id", id)
     .single();
   if (existing?.stock_variant_id && existing.stock_deducted_qty) {
     await syncStockDeduction(db, {
       previousVariantId: existing.stock_variant_id,
       previousQty: existing.stock_deducted_qty,
+      previousField: existing.stock_deducted_field,
       newSku: "",
       newQty: 0,
+      fromReserved: false,
     });
   }
 

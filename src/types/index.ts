@@ -254,8 +254,10 @@ export interface DailySalesRow {
   salesperson: string | null;
   po_no: string;
   source_quote_id: number | null;
+  from_reserved: boolean;
   stock_variant_id: number | null;
   stock_deducted_qty: number;
+  stock_deducted_field: "available" | "reserved";
   created_at: string;
   updated_at: string;
 }

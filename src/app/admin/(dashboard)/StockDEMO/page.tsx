@@ -278,6 +278,41 @@ export default function StockPage() {
     editVariant(pid, vid, { size_text: text, ...parseDims(text) });
   }
 
+  // Quick "+N came in" instead of having to retype the new total by hand —
+  // every container/batch arrival just adds to what's already there.
+  function receiveStock(p: DbProduct, v: DbVariant) {
+    const input = prompt(
+      t(`รับเข้าเพิ่มกี่ชิ้น? (ตอนนี้พร้อมขาย ${v.available})`, `How many came in? (currently ${v.available} available)`, `入库多少件？（当前可售 ${v.available}）`)
+    );
+    if (!input) return;
+    const qty = Number(input);
+    if (!qty || qty <= 0) return;
+    editVariant(p.id, v.id, { available: v.available + qty });
+  }
+
+  // Moves stock from "พร้อมขาย" to "จอง" as one step, so a reservation never
+  // has to be hand-calculated across two separate number fields.
+  function reserveStock(p: DbProduct, v: DbVariant) {
+    const input = prompt(
+      t(`ลูกค้าจองกี่ชิ้น? (พร้อมขายตอนนี้ ${v.available})`, `How many did the customer reserve? (currently ${v.available} available)`, `客户预订多少件？（当前可售 ${v.available}）`)
+    );
+    if (!input) return;
+    const qty = Number(input);
+    if (!qty || qty <= 0) return;
+    if (
+      qty > v.available &&
+      !confirm(
+        t(
+          `มีพร้อมขายแค่ ${v.available} ชิ้น จะจอง ${qty} ชิ้นเลยไหม (พร้อมขายจะติดลบ)?`,
+          `Only ${v.available} available — reserve ${qty} anyway (available will go negative)?`,
+          `仅剩 ${v.available} 件可售 —— 仍要预订 ${qty} 件吗？（可售将变为负数）`
+        )
+      )
+    )
+      return;
+    editVariant(p.id, v.id, { available: v.available - qty, reserved: v.reserved + qty });
+  }
+
   // Attaches a photo to this one size/variant — once a variant has its own
   // photo(s), those replace the product's shared photos for that row only.
   async function addVariantPhoto(p: DbProduct, v: DbVariant, file: File) {
@@ -1052,6 +1087,26 @@ export default function StockPage() {
                                         placeholder="0"
                                         onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
                                       />
+                                      {f === "available" && !archivedView && (
+                                        <div className="flex gap-1 mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => receiveStock(p, v)}
+                                            title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")}
+                                            className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                          >
+                                            {t("+รับเข้า", "+Receive", "+入库")}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => reserveStock(p, v)}
+                                            title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")}
+                                            className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                          >
+                                            {t("จอง", "Reserve", "预订")}
+                                          </button>
+                                        </div>
+                                      )}
                                     </TableCell>
                                   ))}
                                   <TableCell>

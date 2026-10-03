@@ -42,11 +42,13 @@ export async function POST(req: NextRequest) {
     quote.items.map(async (it, i) => {
       const sku = it.sku || "";
       const qty = it.qty ?? 1;
-      const { variantId, deductedQty } = await syncStockDeduction(db, {
+      const { variantId, deductedQty, field } = await syncStockDeduction(db, {
         previousVariantId: null,
         previousQty: 0,
+        previousField: "available",
         newSku: sku,
         newQty: qty,
+        fromReserved: false,
       });
       return {
         sale_date,
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
         source_quote_id: quote.id,
         stock_variant_id: variantId,
         stock_deducted_qty: deductedQty,
+        stock_deducted_field: field,
       };
     })
   );

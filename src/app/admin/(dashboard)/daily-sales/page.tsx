@@ -598,10 +598,23 @@ export default function DailySalesPage() {
                   onChange={(e) => patchLocal(r.id, { sku: e.target.value })}
                   onBlur={(e) => saveRow(r.id, { sku: e.target.value })}
                 />
+                <label className="flex items-center gap-1 text-[9px] mt-0.5 text-[#6B6B6B] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-3 h-3"
+                    checked={r.from_reserved}
+                    onChange={(e) => saveRow(r.id, { from_reserved: e.target.checked })}
+                  />
+                  {t("จากของที่จองไว้", "From reserved stock", "来自已预订库存")}
+                </label>
                 {r.sku.trim() && (
                   <p className={`text-[9px] mt-0.5 ${r.stock_variant_id ? "text-emerald-600" : "text-[#9CA3AF]"}`}>
                     {r.stock_variant_id
-                      ? t("✓ ตัดสต็อกแล้ว", "✓ Stock deducted", "✓ 已扣库存")
+                      ? t(
+                          `✓ ตัด${r.stock_deducted_field === "reserved" ? "ของที่จองไว้" : "พร้อมขาย"}แล้ว`,
+                          `✓ Deducted from ${r.stock_deducted_field === "reserved" ? "reserved" : "available"}`,
+                          `✓ 已从${r.stock_deducted_field === "reserved" ? "预订库存" : "可售库存"}扣除`
+                        )
                       : t("ไม่พบในสต็อก — ไม่ตัดอัตโนมัติ", "Not found in Stock — not auto-deducted", "库存中未找到 — 未自动扣减")}
                   </p>
                 )}

@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
         previousField: "available",
         newSku: sku,
         newQty: qty,
+        newSizeText: it.size || "",
         fromReserved: false,
       });
       return {

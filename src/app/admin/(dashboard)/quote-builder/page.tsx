@@ -105,10 +105,11 @@ const TXT = {
   colUnitPrice:   { th: "ราคาต่อหน่วย",     en: "Unit Price",   zh: "单价" },
   colAmount:      { th: "จำนวนเงินทั้งหมด", en: "Amount",       zh: "总价" },
   colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
-  subtotal:       { th: "ราคารวมก่อนภาษี", en: "Subtotal",     zh: "小计" },
-  discount:       { th: "ส่วนลด",           en: "Discount",     zh: "折扣" },
+  subtotal:       { th: "รวมเป็นเงิน / รวมราคาสินค้า", en: "Subtotal",     zh: "小计" },
+  discount:       { th: "หัก ส่วนลด",           en: "Discount",     zh: "折扣" },
+  afterDiscount:  { th: "ราคาหลังหักส่วนลด / ยอดรวมก่อนภาษี", en: "Total after discount (before VAT)", zh: "折扣后金额（税前）" },
   vatAmountLabel: { th: "ภาษีมูลค่าเพิ่ม", en: "VAT",          zh: "增值税" },
-  grandTotal:     { th: "ราคารวมทั้งหมด",  en: "Grand Total",  zh: "总价" },
+  grandTotal:     { th: "ราคารวมทั้งสิ้น / ยอดรวมสุทธิ",  en: "Grand Total",  zh: "总价" },
   depositAmount:  { th: "เงินมัดจำ",        en: "Deposit",      zh: "定金" },
   balance:        { th: "ยอดคงเหลือหลังจัดส่งและติดตั้ง", en: "Balance", zh: "余款" },
   term1: {
@@ -1041,7 +1042,10 @@ function QuoteBuilderInner() {
     // Totals
     if (!isDeliveryNote) {
       totalRow(L(TXT.subtotal), subtotal);
-      if (discountPct > 0) totalRow(`${L(TXT.discount)} (${discountPct}%)`, -discountAmount, { color: RED });
+      if (discountPct > 0) {
+        totalRow(`${L(TXT.discount)} (${discountPct}%)`, -discountAmount, { color: RED });
+        totalRow(L(TXT.afterDiscount), subtotalAfterDiscount);
+      }
       totalRow(`${L(TXT.vatAmountLabel)} (${vatPct}%)`, vatAmount);
       totalRow(L(TXT.grandTotal), grandTotal, { bold: true });
       if (depositPct > 0) {
@@ -1764,10 +1768,16 @@ function QuoteBuilderInner() {
                     <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotal)}</td>
                   </tr>
                   {discountPct > 0 && (
-                    <tr>
-                      <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
-                      <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
-                    </tr>
+                    <>
+                      <tr>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
+                        <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.afterDiscount)}</td>
+                        <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(subtotalAfterDiscount)}</td>
+                      </tr>
+                    </>
                   )}
                   <tr>
                     <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.vatAmountLabel)} ({vatPct}%)</td>

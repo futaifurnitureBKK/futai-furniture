@@ -781,15 +781,32 @@ export default function StockPage() {
                 { label: t("พร้อมขาย", "Available", "可售"), value: fmt(totals.available), sub: t("ชิ้น (ทุกขนาดรวมกัน)", "pcs (all sizes)", "件（所有尺寸）") },
                 { label: t("จอง/รอส่ง", "Reserved", "已预订/待发"), value: fmt(totals.reserved), sub: t("ชิ้น", "pcs", "件") },
                 { label: t("มีตำหนิ/รอเคลม", "Defective", "瑕疵/待索赔"), value: fmt(totals.defective), sub: t("ชิ้น", "pcs", "件") },
-                { label: t("ขนาดที่ใกล้หมด", "Sizes low", "库存偏低规格"), value: fmt(totals.low), sub: t("ถึงจุดสั่งซื้อ", "at reorder point", "已到补货点") },
-                { label: t("ขนาดที่หมดสต็อก", "Sizes out", "缺货规格"), value: fmt(totals.out), sub: `${fmt(totals.tracked)} ${t("ขนาดที่ตั้งค่าแล้ว", "sizes tracked", "已设置规格")}` },
-              ].map((c) => (
-                <div key={c.label} className="bg-white rounded-xl shadow-sm p-4">
-                  <p className="text-xs text-[#6B6B6B]">{c.label}</p>
-                  <p className="text-2xl font-bold text-[#1A1A1A] mt-1">{c.value}</p>
-                  <p className="text-[10px] text-[#9CA3AF] mt-1">{c.sub}</p>
-                </div>
-              ))}
+                { label: t("ขนาดที่ใกล้หมด", "Sizes low", "库存偏低规格"), value: fmt(totals.low), sub: t("ถึงจุดสั่งซื้อ — กดเพื่อดู", "at reorder point — click to view", "已到补货点 — 点击查看"), filter: "low" as StatusFilter },
+                { label: t("ขนาดที่หมดสต็อก", "Sizes out", "缺货规格"), value: fmt(totals.out), sub: t("กดเพื่อดูรายการที่หมด", "Click to view out-of-stock items", "点击查看缺货项目"), filter: "out" as StatusFilter },
+              ].map((c) => {
+                const clickable = "filter" in c;
+                const active = clickable && statusFilter === c.filter;
+                return (
+                  <button
+                    key={c.label}
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => {
+                      if (!clickable) return;
+                      setStatusFilter((f) => (f === c.filter ? "all" : (c.filter as StatusFilter)));
+                      setCat("all");
+                      setLimit(PAGE);
+                    }}
+                    className={`bg-white rounded-xl shadow-sm p-4 text-left ${clickable ? "cursor-pointer hover:shadow-md transition-shadow" : ""} ${
+                      active ? "ring-2 ring-[#C8102E]" : ""
+                    }`}
+                  >
+                    <p className="text-xs text-[#6B6B6B]">{c.label}</p>
+                    <p className="text-2xl font-bold text-[#1A1A1A] mt-1">{c.value}</p>
+                    <p className="text-[10px] text-[#9CA3AF] mt-1">{c.sub}</p>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -897,7 +914,7 @@ export default function StockPage() {
 
           <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-[#FAF7F2]">
                   <TableHead className="text-xs w-32">{t("รูป", "Photo", "图片")}</TableHead>
                   <TableHead className="text-xs">{t("รหัสสินค้า", "Code", "编号")}</TableHead>

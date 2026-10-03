@@ -254,6 +254,8 @@ export interface DailySalesRow {
   salesperson: string | null;
   po_no: string;
   source_quote_id: number | null;
+  stock_variant_id: number | null;
+  stock_deducted_qty: number;
   created_at: string;
   updated_at: string;
 }

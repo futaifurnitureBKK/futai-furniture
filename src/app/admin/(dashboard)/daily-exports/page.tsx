@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, Search, Loader2, Boxes, ListChecks, RefreshCw } from "lucide-react";
+import { Plus, Trash2, FileDown, Search, Loader2, Boxes, ListChecks, RefreshCw, ImageOff, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,15 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { useLanguage } from "@/store/language";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import {
+  PICTURE_COL_WIDTH, DATA_ROW_HEIGHT, TITLE_ROW_HEIGHT, THIN_BORDER, DATA_CELL_ALIGNMENT,
+  styleHeaderRow, embedRowImage, downloadWorkbook,
+} from "@/lib/daily-sheets-excel";
 import type { DailyExportRow } from "@/types";
 
 function todayStr() {
@@ -24,6 +31,18 @@ function fmt(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 1 });
 }
 
+const EXPORT_HEADERS = [
+  "序号\nNo. (เลขที่)",
+  "型号\nModel (แบบอย่าง)",
+  "图片\nPicture (รูปภาพ)",
+  "规格\n(mm) (ขนาด)",
+  "数量\nQuantity (ปริมาณ)",
+  "备注\nRemark (หมายเหตุ)",
+  "客户\nCustomer (ชื่อลูกค้า)",
+  "经手人\nStaff (ผู้ดำเนินการ)",
+  "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
+];
+
 interface FlatVariant {
   variantId: number;
   code: string;
@@ -32,15 +51,120 @@ interface FlatVariant {
   available: number;
 }
 
-// Searches live Stock (not a static price list) and always hands back one
-// exact variant — this is the whole point of this page: never guess which
-// size was taken out from a typed SKU, always pick it.
-function StockVariantPicker({ onPick, autoFocus }: { onPick: (v: FlatVariant) => void; autoFocus?: boolean }) {
+// A wall of big photos + the live available qty, so an item is picked by
+// recognizing it at a glance instead of typing a search query first. Always
+// hands back one exact variant — the whole point of this page is to never
+// guess which size was taken out.
+function StockGridPickerDialog({
+  open, onOpenChange, variants, onPick,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  variants: FlatVariant[];
+  onPick: (v: FlatVariant) => void;
+}) {
   const { t } = useLanguage();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const matches = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return variants.slice(0, 90);
+    return variants.filter((v) => v.code.toLowerCase().includes(query) || v.size_text.toLowerCase().includes(query)).slice(0, 90);
+  }, [variants, q]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl sm:max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{t("เลือกสินค้าจากสต็อก", "Pick from Stock", "从库存选择")}</DialogTitle>
+        </DialogHeader>
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <Input
+            autoFocus
+            className="pl-8"
+            placeholder={t("พิมพ์เพื่อค้นหา (ไม่พิมพ์ก็เลือกจากรูปได้เลย)...", "Type to narrow down (or just tap a photo)...", "输入以筛选（也可直接点击图片）...")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pb-2">
+            {matches.map((m) => (
+              <button
+                key={m.variantId}
+                type="button"
+                onClick={() => onPick(m)}
+                className="text-left bg-white border border-[#E8E5E0] rounded-lg overflow-hidden hover:border-[#C8102E]/50 hover:shadow-sm transition-all"
+              >
+                <div className="relative aspect-square bg-[#F5F3EF]">
+                  {m.image_url ? (
+                    <Image src={m.image_url} alt="" fill sizes="220px" className="object-contain p-2" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#C8C5BE]">
+                      <ImageOff size={24} />
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{m.code}</p>
+                  <p className="text-[11px] text-[#6B6B6B] truncate">{m.size_text || "-"}</p>
+                  <p className={`text-[11px] font-semibold ${m.available > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {t("พร้อมขาย", "Available", "可售")} {fmt(m.available)}
+                  </p>
+                </div>
+              </button>
+            ))}
+            {matches.length === 0 && (
+              <div className="col-span-full text-center py-10 text-sm text-[#9CA3AF]">{t("ไม่พบสินค้า", "No products found", "未找到商品")}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function DailyExportsPage() {
+  const { t } = useLanguage();
+  const [date, setDate] = useState(todayStr());
+  const [rows, setRows] = useState<DailyExportRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [variants, setVariants] = useState<FlatVariant[]>([]);
 
+  async function load() {
+    setLoading(true);
+    const res = await fetch(`/api/admin/daily-exports?date=${date}`);
+    const data = await res.json();
+    if (res.ok) setRows(data.rows);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const res = await fetch(`/api/admin/daily-exports?date=${date}`);
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) setRows(data.rows);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+
+  // Fetched once — the grid picker reuses this same list every time it opens.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -67,98 +191,6 @@ function StockVariantPicker({ onPick, autoFocus }: { onPick: (v: FlatVariant) =>
     };
   }, []);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return variants.filter((v) => v.code.toLowerCase().includes(q) || v.size_text.toLowerCase().includes(q)).slice(0, 20);
-  }, [variants, query]);
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-        <Input
-          autoFocus={autoFocus}
-          className="h-8 pl-7 text-xs"
-          placeholder={t("ค้นหารหัสสินค้าหรือขนาดในสต็อก...", "Search stock by code or size...", "搜索库存编号或规格...")}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-        />
-      </div>
-      {open && matches.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
-          {matches.map((m) => (
-            <button
-              key={m.variantId}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onPick(m);
-                setQuery("");
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
-            >
-              <div className="relative w-12 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
-                {m.image_url && <Image src={m.image_url} alt="" fill sizes="48px" className="object-contain" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{m.code}</p>
-                <p className="text-[11px] text-[#6B6B6B] truncate">{m.size_text || "-"}</p>
-              </div>
-              <p className={`text-[11px] font-semibold shrink-0 ${m.available > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                {t("พร้อมขาย", "Avail.", "可售")} {fmt(m.available)}
-              </p>
-            </button>
-          ))}
-        </div>
-      )}
-      {open && query.trim() && matches.length === 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-[#E8E5E0] rounded-lg shadow-lg px-3 py-3 text-xs text-[#9CA3AF] text-center">
-          {t("ไม่พบในสต็อก", "Not found in Stock", "库存中未找到")}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function DailyExportsPage() {
-  const { t } = useLanguage();
-  const [date, setDate] = useState(todayStr());
-  const [rows, setRows] = useState<DailyExportRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    const res = await fetch(`/api/admin/daily-exports?date=${date}`);
-    const data = await res.json();
-    if (res.ok) setRows(data.rows);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const res = await fetch(`/api/admin/daily-exports?date=${date}`);
-      const data = await res.json();
-      if (!cancelled) {
-        if (res.ok) setRows(data.rows);
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [date]);
-
   async function addRow(v: FlatVariant) {
     setAdding(true);
     const res = await fetch("/api/admin/daily-exports", {
@@ -177,6 +209,7 @@ export default function DailyExportsPage() {
     setAdding(false);
     if (res.ok) {
       setRows((prev) => [...prev, data.row]);
+      setPickerOpen(false);
       toast.success(t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`));
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));
@@ -217,6 +250,9 @@ export default function DailyExportsPage() {
 
   const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
 
+  // Styled the same way as the Daily Sales / Daily Shipping export — title
+  // bar, bordered + centered cells, embedded 1:1 product photos — just with
+  // this document's own columns (no price, since it isn't a sales record).
   async function exportExcel() {
     setExporting(true);
     try {
@@ -224,42 +260,27 @@ export default function DailyExportsPage() {
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Daily Export");
       ws.columns = [
-        { header: "ลำดับ\nNo.", key: "no", width: 6 },
-        { header: "รหัสสินค้า\nSKU", key: "sku", width: 16 },
-        { header: "ขนาด\nSize", key: "size", width: 20 },
-        { header: "จำนวนที่ตัด\nQty", key: "qty", width: 10 },
-        { header: "หมายเหตุ\nRemark", key: "remark", width: 24 },
-        { header: "ลูกค้า\nCustomer", key: "customer", width: 20 },
-        { header: "ผู้ดำเนินการ\nStaff", key: "staff", width: 16 },
-        { header: "เลขที่ใบสั่งซื้อ\nPO No.", key: "po", width: 16 },
+        { width: 6 }, { width: 16 }, { width: PICTURE_COL_WIDTH }, { width: 16 },
+        { width: 10 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 16 },
       ];
-      ws.getRow(1).font = { bold: true };
-      ws.getRow(1).alignment = { wrapText: true, vertical: "middle" };
-      rows.forEach((r, i) => {
-        ws.addRow({
-          no: i + 1,
-          sku: r.sku,
-          size: r.size_text,
-          qty: r.qty,
-          remark: r.remark,
-          customer: r.customer_name,
-          staff: r.salesperson || "",
-          po: r.po_no,
-        });
-      });
-      ws.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
-        });
-      });
-      const buffer = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `daily-export-${date}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      ws.mergeCells("A1:I1");
+      const title = ws.getCell("A1");
+      title.value = "单日出库表格\nDaily Export (แบบฟอร์มการส่งออกสินค้ารายวัน) " + date;
+      title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
+      title.font = { bold: true, size: 13 };
+      ws.getRow(1).height = TITLE_ROW_HEIGHT;
+
+      styleHeaderRow(ws.addRow(EXPORT_HEADERS));
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const row = ws.addRow([i + 1, r.sku, "", r.size_text, r.qty, r.remark, r.customer_name, r.salesperson || "", r.po_no]);
+        row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = DATA_CELL_ALIGNMENT; });
+        row.height = DATA_ROW_HEIGHT;
+        await embedRowImage(wb, ws, row, r.image_url, 2);
+      }
+
+      await downloadWorkbook(wb, `daily-export-${date}.xlsx`);
     } finally {
       setExporting(false);
     }
@@ -312,14 +333,13 @@ export default function DailyExportsPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <p className="text-xs font-semibold text-[#1A1A1A] mb-2 flex items-center gap-1.5">
-          <Plus size={14} /> {t("เพิ่มรายการ — เลือกสินค้าจากสต็อก", "Add item — pick from Stock", "添加项目 — 从库存中选择")}
-        </p>
-        <div className="max-w-md">
-          <StockVariantPicker onPick={addRow} />
-        </div>
-        {adding && <p className="text-xs text-[#9CA3AF] mt-2"><Loader2 size={12} className="inline animate-spin mr-1" /> {t("กำลังเพิ่ม...", "Adding...", "添加中...")}</p>}
+        <Button onClick={() => setPickerOpen(true)} disabled={adding}>
+          {adding ? <Loader2 size={16} className="mr-1.5 animate-spin" /> : <Plus size={16} className="mr-1.5" />}
+          {t("เพิ่มรายการ — เลือกสินค้าจากสต็อก", "Add item — pick from Stock", "添加项目 — 从库存中选择")}
+        </Button>
       </div>
+
+      <StockGridPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} variants={variants} onPick={addRow} />
 
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
         {loading ? (
@@ -345,7 +365,7 @@ export default function DailyExportsPage() {
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-sm text-[#9CA3AF]">
-                    {t('ยังไม่มีรายการของวันนี้ — ค้นหาสินค้าด้านบนเพื่อเริ่มตัดสต็อก', 'No rows for this date yet — search for an item above to start deducting Stock', '该日期暂无记录 — 在上方搜索商品以开始扣减库存')}
+                    {t('ยังไม่มีรายการของวันนี้ — กด "เพิ่มรายการ" เพื่อเริ่มตัดสต็อก', 'No rows for this date yet — click "Add item" to start deducting Stock', '该日期暂无记录 — 点击"添加项目"以开始扣减库存')}
                   </TableCell>
                 </TableRow>
               ) : (

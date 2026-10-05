@@ -64,8 +64,8 @@ export const SHIPPING_HEADERS = [
   "联系电话\nTel. (เบอร์ติดต่อ)",
 ];
 
-const PICTURE_COL_WIDTH = 12;
-const DATA_ROW_HEIGHT = 56;
+export const PICTURE_COL_WIDTH = 12;
+export const DATA_ROW_HEIGHT = 56;
 // Excel's "column width" unit and points-per-row don't map 1:1 to pixels;
 // these are the standard approximations (Calibri 11 default font) so the
 // embedded image sizes exactly to the actual cell instead of guessing.
@@ -80,11 +80,11 @@ const IMAGE_PADDING_PX = 4;
 const IMAGE_SQUARE_PX = Math.max(8, Math.min(PICTURE_COL_PX, DATA_ROW_PX) - IMAGE_PADDING_PX * 2);
 const IMAGE_COL_OFFSET = (PICTURE_COL_PX - IMAGE_SQUARE_PX) / 2 / PICTURE_COL_PX;
 const IMAGE_ROW_OFFSET = (DATA_ROW_PX - IMAGE_SQUARE_PX) / 2 / DATA_ROW_PX;
-const TITLE_ROW_HEIGHT = 46;
-const THIN_BORDER = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } as const;
-const DATA_CELL_ALIGNMENT = { horizontal: "center", vertical: "middle", wrapText: true } as const;
+export const TITLE_ROW_HEIGHT = 46;
+export const THIN_BORDER = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } as const;
+export const DATA_CELL_ALIGNMENT = { horizontal: "center", vertical: "middle", wrapText: true } as const;
 
-function styleHeaderRow(row: ExcelJSNamespace.Row) {
+export function styleHeaderRow(row: ExcelJSNamespace.Row) {
   row.eachCell((c) => {
     c.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
     c.font = { bold: true, size: 9 };
@@ -92,7 +92,7 @@ function styleHeaderRow(row: ExcelJSNamespace.Row) {
   });
 }
 
-async function embedRowImage(
+export async function embedRowImage(
   wb: ExcelJSNamespace.Workbook,
   ws: ExcelJSNamespace.Worksheet,
   row: ExcelJSNamespace.Row,

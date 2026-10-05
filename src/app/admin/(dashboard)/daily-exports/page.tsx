@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Plus, Trash2, FileDown, FileSearch, Search, Loader2, Boxes, ListChecks, Wallet, RefreshCw, ImageOff, X } from "lucide-react";
 import { toast } from "sonner";
@@ -311,6 +312,12 @@ function CustomerPicker({
   const [customers, setCustomers] = useState<CustomerLite[]>([]);
   const [creating, setCreating] = useState(false);
   const [quotes, setQuotes] = useState<OutstandingQuote[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // The table this field lives in scrolls/clips its own overflow, which cut
+  // the dropdown off — rendering it into a portal at a fixed, measured
+  // position (instead of a plain absolutely-positioned child) escapes that.
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -337,6 +344,42 @@ function CustomerPicker({
     };
   }, [open, query]);
 
+  function updatePosition() {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const estHeight = 288;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < estHeight && rect.top > spaceBelow;
+    setPos({
+      left: rect.left,
+      width: Math.max(rect.width, 256),
+      top: openUp ? undefined : rect.bottom + 4,
+      bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      maxHeight: Math.max(120, (openUp ? rect.top : spaceBelow) - 16),
+    });
+  }
+
+  // Recomputed on open and kept in sync with scroll/resize while open —
+  // flips to open upward when there isn't enough room below.
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => updatePosition();
+    handler();
+    window.addEventListener("scroll", handler, true);
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("scroll", handler, true);
+      window.removeEventListener("resize", handler);
+    };
+  }, [open]);
+
+  function openDropdown() {
+    updatePosition();
+    setHighlightedIndex(-1);
+    setOpen(true);
+  }
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return customers.slice(0, 8);
@@ -346,6 +389,8 @@ function CustomerPicker({
   const exactMatch = customers.some(
     (c) => c.name.toLowerCase() === query.trim().toLowerCase() || c.company.toLowerCase() === query.trim().toLowerCase()
   );
+  const showAddNew = !exactMatch && query.trim().length > 0;
+  const hasAnyResults = quotes.length > 0 || matches.length > 0 || showAddNew;
 
   async function addNewCustomer() {
     const name = query.trim();
@@ -369,87 +414,137 @@ function CustomerPicker({
     }
   }
 
+  function pickQuoteAt(i: number) {
+    onPickQuote(quotes[i].id);
+    setOpen(false);
+  }
+  function pickCustomerAt(i: number) {
+    const c = matches[i];
+    onSave(c.name);
+    setQuery(c.name);
+    setOpen(false);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open) return;
+    const total = quotes.length + matches.length + (showAddNew ? 1 : 0);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (total > 0) setHighlightedIndex((i) => Math.min(total - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (total > 0) setHighlightedIndex((i) => Math.max(0, i - 1));
+    } else if (e.key === "Enter") {
+      if (highlightedIndex < 0) return;
+      e.preventDefault();
+      if (highlightedIndex < quotes.length) {
+        pickQuoteAt(highlightedIndex);
+      } else if (highlightedIndex < quotes.length + matches.length) {
+        pickCustomerAt(highlightedIndex - quotes.length);
+      } else {
+        addNewCustomer();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }
+
   return (
     <div className="relative">
       <Input
+        ref={inputRef}
         className="h-8 text-xs w-36"
         value={displayValue}
         onChange={(e) => {
           setQuery(e.target.value);
-          setOpen(true);
+          openDropdown();
         }}
         onFocus={() => {
           setQuery(value);
           setFocused(true);
-          setOpen(true);
+          openDropdown();
         }}
+        onKeyDown={onKeyDown}
         onBlur={() => setTimeout(() => {
           setOpen(false);
           setFocused(false);
           if (query !== value) onSave(query);
         }, 150)}
       />
-      {open && (matches.length > 0 || quotes.length > 0 || query.trim()) && (
-        <div className="absolute z-20 mt-1 w-64 max-h-72 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
-          {quotes.length > 0 && (
-            <>
-              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
-                {t("ใบเสนอราคาค้างส่ง", "Outstanding quotations", "待发货报价单")}
+      {open && pos &&
+        createPortal(
+          <div
+            style={{ position: "fixed", left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, zIndex: 9999 }}
+            className="overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg"
+          >
+            {quotes.length > 0 && (
+              <>
+                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
+                  {t("ใบเสนอราคาค้างส่ง", "Outstanding quotations", "待发货报价单")}
+                </p>
+                {quotes.map((qt, i) => (
+                  <button
+                    key={qt.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickQuoteAt(i)}
+                    className={`w-full text-left px-3 py-2 border-b border-[#F0EDE7] ${highlightedIndex === i ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
+                  >
+                    <p className="text-xs font-medium text-[#1A1A1A] truncate">
+                      {qt.doc_no} — {qt.customer_name}
+                    </p>
+                    <p className="text-[11px] text-[#6B6B6B] truncate">
+                      ฿{fmtMoney(qt.total)} · {t(`ส่งแล้ว ${fmt(qt.shippedUnits)}/${fmt(qt.orderedUnits)} ชิ้น`, `Shipped ${qt.shippedUnits}/${qt.orderedUnits}`, `已发 ${qt.shippedUnits}/${qt.orderedUnits}`)}
+                    </p>
+                  </button>
+                ))}
+              </>
+            )}
+            {matches.length > 0 && (
+              <>
+                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
+                  {t("ลูกค้า", "Customers", "客户")}
+                </p>
+                {matches.map((c, i) => {
+                  const idx = quotes.length + i;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pickCustomerAt(i)}
+                      className={`w-full text-left px-3 py-2 border-b border-[#F0EDE7] last:border-0 ${highlightedIndex === idx ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
+                    >
+                      <p className="text-xs font-medium text-[#1A1A1A] truncate">{c.name}</p>
+                      {c.company && <p className="text-[11px] text-[#6B6B6B] truncate">{c.company}</p>}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+            {showAddNew && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={addNewCustomer}
+                disabled={creating}
+                className={`w-full text-left px-3 py-2 text-xs text-[#C8102E] flex items-center gap-1.5 ${
+                  highlightedIndex === quotes.length + matches.length ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                {t(`เพิ่ม "${query.trim()}" เป็นลูกค้าใหม่`, `Add "${query.trim()}" as a new customer`, `添加 "${query.trim()}" 为新客户`)}
+              </button>
+            )}
+            {!hasAnyResults && (
+              <p className="px-3 py-3 text-xs text-[#9CA3AF] text-center">
+                {t("ไม่พบใบเสนอราคาหรือลูกค้า", "No quotations or customers found", "未找到报价单或客户")}
               </p>
-              {quotes.map((qt) => (
-                <button
-                  key={qt.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    onPickQuote(qt.id);
-                    setOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7]"
-                >
-                  <p className="text-xs font-medium text-[#1A1A1A] truncate">
-                    {qt.doc_no} — {qt.customer_name}
-                  </p>
-                  <p className="text-[11px] text-[#6B6B6B] truncate">
-                    ฿{fmtMoney(qt.total)} · {t(`ส่งแล้ว ${fmt(qt.shippedUnits)}/${fmt(qt.orderedUnits)} ชิ้น`, `Shipped ${qt.shippedUnits}/${qt.orderedUnits}`, `已发 ${qt.shippedUnits}/${qt.orderedUnits}`)}
-                  </p>
-                </button>
-              ))}
-              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
-                {t("ลูกค้า", "Customers", "客户")}
-              </p>
-            </>
-          )}
-          {matches.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onSave(c.name);
-                setQuery(c.name);
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
-            >
-              <p className="text-xs font-medium text-[#1A1A1A] truncate">{c.name}</p>
-              {c.company && <p className="text-[11px] text-[#6B6B6B] truncate">{c.company}</p>}
-            </button>
-          ))}
-          {!exactMatch && query.trim() && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={addNewCustomer}
-              disabled={creating}
-              className="w-full text-left px-3 py-2 text-xs text-[#C8102E] hover:bg-[#FAF7F2] flex items-center gap-1.5"
-            >
-              {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-              {t(`เพิ่ม "${query.trim()}" เป็นลูกค้าใหม่`, `Add "${query.trim()}" as a new customer`, `添加 "${query.trim()}" 为新客户`)}
-            </button>
-          )}
-        </div>
-      )}
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

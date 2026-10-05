@@ -31,6 +31,7 @@ interface MatchingQuoteItem {
   shipped: number;
   remaining: number;
   unitPrice: number;
+  image: string | null;
 }
 interface OutstandingQuote {
   id: number;
@@ -542,15 +543,26 @@ function CustomerPicker({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => bindQuoteItemAt(i)}
-                    className={`w-full text-left px-3 py-2 border-b border-[#F0EDE7] ${highlightedIndex === i ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
+                    className={`w-full flex items-center gap-2 text-left px-3 py-2 border-b border-[#F0EDE7] ${highlightedIndex === i ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
                   >
-                    <p className="text-xs font-medium text-[#1A1A1A] truncate">
-                      {row.docNo} — {row.customerName}
-                    </p>
-                    <p className="text-[11px] text-[#6B6B6B] truncate">
-                      {row.item.size || "-"} ·{" "}
-                      {t(`ค้างส่ง ${fmt(row.item.remaining)} ชิ้น`, `${row.item.remaining} left`, `剩余 ${row.item.remaining}`)}
-                    </p>
+                    <div className="relative w-9 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                      {row.item.image ? (
+                        <Image src={row.item.image} alt="" fill sizes="36px" className="object-contain" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[#C8C5BE]">
+                          <ImageOff size={12} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[#1A1A1A] truncate">
+                        {row.docNo} — {row.customerName}
+                      </p>
+                      <p className="text-[11px] text-[#6B6B6B] truncate">
+                        {row.item.size || "-"} ·{" "}
+                        {t(`ค้างส่ง ${fmt(row.item.remaining)} ชิ้น`, `${row.item.remaining} left`, `剩余 ${row.item.remaining}`)}
+                      </p>
+                    </div>
                   </button>
                 ))}
               </>
@@ -998,6 +1010,15 @@ function QuoteFulfillDialog({
                               disabled={!canCheck}
                               onChange={(e) => updateSelection(it.item_id, { checked: e.target.checked })}
                             />
+                            <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
+                              {it.image ? (
+                                <Image src={it.image} alt="" fill sizes="44px" className="object-contain" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[#C8C5BE]">
+                                  <ImageOff size={14} />
+                                </div>
+                              )}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{it.sku || it.name}</p>
                               <p className="text-[11px] text-[#6B6B6B]">

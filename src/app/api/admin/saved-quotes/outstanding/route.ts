@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       const matchingItems = perItem
         .map((p) => {
           const it = skuItems.find((i) => i.item_id === p.item_id)!;
-          return { item_id: p.item_id, size: it.size, qty: it.qty, shipped: p.shipped, remaining: p.remaining, unitPrice: it.unitPrice };
+          return { item_id: p.item_id, size: it.size, qty: it.qty, shipped: p.shipped, remaining: p.remaining, unitPrice: it.unitPrice, image: it.image };
         })
         .filter((m) => m.remaining > 0);
       if (!matchingItems.length) continue;

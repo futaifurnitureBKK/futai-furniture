@@ -540,6 +540,95 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
   );
 }
 
+interface FulfillmentLineItem {
+  item_id?: string;
+  name: string;
+  sku: string;
+  size: string;
+  qty: number;
+  shipped: number;
+  remaining: number;
+}
+interface FulfillmentHistoryRow {
+  id: number;
+  export_date: string;
+  sku: string;
+  size_text: string;
+  qty: number;
+  salesperson: string | null;
+}
+
+// Read-only — shipped/remaining per line and the actual export history,
+// both pulled live from Daily Export's own records (never a separately
+// tracked number, so it can't drift). Recording a shipment only ever
+// happens from Daily Export itself, never from here.
+function ShipmentHistorySection({ quoteId }: { quoteId: number | null }) {
+  const { t } = useLanguage();
+  const [items, setItems] = useState<FulfillmentLineItem[]>([]);
+  const [history, setHistory] = useState<FulfillmentHistoryRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!quoteId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const res = await fetch(`/api/admin/saved-quotes/${quoteId}/fulfillment`);
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) {
+          setItems(data.items);
+          setHistory(data.history);
+        }
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteId]);
+
+  if (!quoteId || (!loading && !history.length)) return null;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+      <p className="text-sm font-semibold text-[#1A1A1A]">
+        {t("ประวัติการส่งออก (จากหน้าการส่งออกรายวัน)", "Export History (from Daily Export)", "出库记录（来自每日出库）")}
+      </p>
+      {loading ? (
+        <Loader2 size={16} className="animate-spin text-[#9CA3AF]" />
+      ) : (
+        <>
+          <div className="space-y-1">
+            {items.map((it) => (
+              <div key={it.item_id || it.sku} className="flex items-center justify-between text-xs gap-2">
+                <span className="text-[#6B6B6B] truncate">
+                  {it.sku || it.name} · {it.size}
+                </span>
+                <span className={`font-medium shrink-0 ${it.remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                  {t(`ส่งแล้ว ${it.shipped}/${it.qty}`, `${it.shipped}/${it.qty} shipped`, `已发 ${it.shipped}/${it.qty}`)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-[#F0EDE7] pt-2 space-y-1">
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between text-[11px] text-[#9CA3AF] gap-2">
+                <span className="truncate">
+                  {h.export_date} · {h.sku} {h.size_text}
+                </span>
+                <span className="shrink-0">
+                  {t(`${h.qty} ชิ้น`, `${h.qty} pcs`, `${h.qty} 件`)} · {h.salesperson || "-"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function QuoteBuilderInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
@@ -659,6 +748,7 @@ function QuoteBuilderInner() {
       deposit_pct: depositPct,
       items: items.map(
         (it): SavedQuoteItem => ({
+          item_id: it.id,
           name: it.name,
           sku: it.sku,
           size: it.size,
@@ -719,7 +809,9 @@ function QuoteBuilderInner() {
       q.items.length
         ? q.items.map((it) => ({
             ...it,
-            id: Math.random().toString(36).slice(2),
+            // Preserved across edits — quotes saved before this field
+            // existed get a fresh one here, same as the self-heal on read.
+            id: it.item_id || Math.random().toString(36).slice(2),
             seats: it.seats ?? 1,
             baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
             remarkImage: it.remarkImage ?? null,
@@ -1649,6 +1741,7 @@ function QuoteBuilderInner() {
           )}
 
           <PaymentsSection quoteId={savedId} />
+          <ShipmentHistorySection quoteId={savedId} />
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}

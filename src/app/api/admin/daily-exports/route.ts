@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import type { SavedQuoteItem } from "@/types";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -44,14 +45,66 @@ export async function POST(req: NextRequest) {
   }
   const qty = Number(body.qty) || 1;
   const unitPrice = Number(body.unit_price) || 0;
+  const quotationId: number | null = body.quotation_id ? Number(body.quotation_id) : null;
+  const quotationItemId: string | null = body.quotation_item_id || null;
 
   const db = supabaseAdmin();
 
-  const { data: variant } = await db.from("stock_variants").select("available").eq("id", stock_variant_id).single();
-  if (!variant) {
-    return NextResponse.json({ error: "ไม่พบสินค้านี้ในสต็อก" }, { status: 404 });
+  // Pulled from a quotation line — never let this exceed what's still
+  // outstanding on that exact line, no matter what qty the client sends.
+  if (quotationId && quotationItemId) {
+    const { data: quote } = await db.from("saved_quotes").select("items").eq("id", quotationId).single();
+    const item = (quote?.items as SavedQuoteItem[] | undefined)?.find((it) => it.item_id === quotationItemId);
+    if (!item) {
+      return NextResponse.json({ error: "ไม่พบรายการนี้ในใบเสนอราคา" }, { status: 404 });
+    }
+    const { data: shippedRows } = await db
+      .from("daily_export_rows")
+      .select("qty")
+      .eq("quotation_id", quotationId)
+      .eq("quotation_item_id", quotationItemId);
+    const alreadyShipped = (shippedRows || []).reduce((sum, r) => sum + Number(r.qty), 0);
+    if (alreadyShipped + qty > item.qty) {
+      return NextResponse.json({ error: "จำนวนเกินยอดค้างส่งของรายการนี้ในใบเสนอราคา" }, { status: 400 });
+    }
   }
-  await db.from("stock_variants").update({ available: variant.available - qty }).eq("id", stock_variant_id);
+
+  // One atomic SQL statement (see adjust_stock_variant_available) so two
+  // staff picking the last unit at the same instant can't both get through.
+  const { error: deductErr } = await db.rpc("adjust_stock_variant_available", {
+    p_variant_id: stock_variant_id,
+    p_delta: -qty,
+  });
+  if (deductErr) {
+    return NextResponse.json({ error: `สต็อก ${sku || ""} ${size_text || ""} เหลือไม่พอ`.trim() }, { status: 409 });
+  }
+
+  // Picking a size that's already a row for this date just tops up that
+  // row's qty instead of creating a duplicate — but only within the same
+  // origin (two plain picks merge; a quotation line only merges with an
+  // earlier pick of that exact same line), so each quotation item's
+  // shipped/remaining stays attributable to that item alone.
+  let mergeQuery = db.from("daily_export_rows").select("*").eq("export_date", export_date).eq("stock_variant_id", stock_variant_id);
+  mergeQuery = quotationItemId ? mergeQuery.eq("quotation_item_id", quotationItemId) : mergeQuery.is("quotation_item_id", null);
+  const { data: existing } = await mergeQuery.maybeSingle();
+
+  if (existing) {
+    const { data, error } = await db
+      .from("daily_export_rows")
+      .update({
+        qty: existing.qty + qty,
+        stock_deducted_qty: existing.stock_deducted_qty + qty,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (error) {
+      await db.rpc("adjust_stock_variant_available", { p_variant_id: stock_variant_id, p_delta: qty });
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ row: data });
+  }
 
   const { count } = await db
     .from("daily_export_rows")
@@ -69,19 +122,21 @@ export async function POST(req: NextRequest) {
       image_url: image_url || null,
       qty,
       unit_price: unitPrice,
-      discount_pct: 0,
-      channel: null,
-      remark: "",
-      customer_name: "",
+      discount_pct: Number(body.discount_pct) || 0,
+      channel: body.channel || null,
+      remark: body.remark || "",
+      customer_name: body.customer_name || "",
       salesperson: body.salesperson || null,
-      po_no: "",
+      po_no: body.po_no || "",
+      quotation_id: quotationId,
+      quotation_item_id: quotationItemId,
       stock_deducted_qty: qty,
     })
     .select()
     .single();
   if (error) {
     // Roll back the deduction so a failed insert never leaves stock short.
-    await db.from("stock_variants").update({ available: variant.available }).eq("id", stock_variant_id);
+    await db.rpc("adjust_stock_variant_available", { p_variant_id: stock_variant_id, p_delta: qty });
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
   return NextResponse.json({ row: data });

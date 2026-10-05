@@ -70,7 +70,10 @@ function dims(text: string): number[] {
 // True if every dimension on the shorter side also appears on the other —
 // handles a catalog size cell that crams more than one width into one
 // entry (e.g. "W2000/2200*D1600*H750" against a single-width "2200*1600*750").
-function sizeMatches(a: string, b: string): boolean {
+// Exported for Daily Export's "pull from quotation", which uses the same
+// logic to suggest (never auto-confirm) a matching stock_variants row for a
+// quote line's free-text sku/size.
+export function sizeMatches(a: string, b: string): boolean {
   const da = dims(a);
   const db_ = dims(b);
   if (!da.length || !db_.length) return false;

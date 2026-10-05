@@ -73,6 +73,12 @@ export interface SavedQuotePayment {
 }
 
 export interface SavedQuoteItem {
+  // Assigned once when the line is first created and kept for the life of
+  // the quote (never regenerated on edit) — Daily Export's "pull from
+  // quotation" uses it to track how much of this exact line has shipped.
+  // Older quotes saved before this field existed won't have it yet; it
+  // gets backfilled the first time such a quote is read or re-saved.
+  item_id?: string;
   name: string;
   sku: string;
   size: string;
@@ -313,6 +319,8 @@ export interface DailyExportRow {
   salesperson: string | null;
   po_no: string;
   stock_deducted_qty: number;
+  quotation_id: number | null;
+  quotation_item_id: string | null;
   created_at: string;
   updated_at: string;
 }

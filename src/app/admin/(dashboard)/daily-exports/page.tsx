@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, Search, Loader2, Boxes, ListChecks, Wallet, RefreshCw, ImageOff, X } from "lucide-react";
+import { Plus, Trash2, FileDown, FileSearch, Search, Loader2, Boxes, ListChecks, Wallet, RefreshCw, ImageOff, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,41 @@ import {
 } from "@/lib/daily-sheets-excel";
 import rawStock from "@/data/stock-demo.json";
 import type { DailyExportRow, DailyExportChannel } from "@/types";
+
+interface OutstandingQuote {
+  id: number;
+  doc_no: string;
+  customer_name: string;
+  doc_date: string;
+  total: number;
+  orderedUnits: number;
+  shippedUnits: number;
+  status: "not_shipped" | "partial";
+}
+
+interface FulfillmentCandidate {
+  variantId: number;
+  size_text: string;
+  available: number;
+  image_url: string | null;
+}
+interface FulfillmentItem {
+  item_id: string;
+  name: string;
+  sku: string;
+  size: string;
+  qty: number;
+  unitPrice: number;
+  image: string | null;
+  shipped: number;
+  remaining: number;
+  suggestedVariantId: number | null;
+  candidates: FulfillmentCandidate[];
+}
+interface FulfillmentDetail {
+  quote: { id: number; doc_no: string; customer_name: string; discount_pct: number };
+  items: FulfillmentItem[];
+}
 
 function todayStr() {
   const d = new Date();
@@ -254,9 +289,17 @@ interface CustomerLite {
   company: string;
 }
 
-// Autocompletes against the Customers page's own data, and can add a brand
-// new customer (so it shows up there too) right from this field.
-function CustomerPicker({ value, onSave }: { value: string; onSave: (name: string) => void }) {
+// Autocompletes against the Customers page's own data (and can add a brand
+// new customer right from this field), plus quotations that still have
+// something outstanding to ship — picking one of those opens the
+// "pull from quotation" dialog instead of just filling in a name.
+function CustomerPicker({
+  value, onSave, onPickQuote,
+}: {
+  value: string;
+  onSave: (name: string) => void;
+  onPickQuote: (quoteId: number) => void;
+}) {
   const { t } = useLanguage();
   const [query, setQuery] = useState(value);
   // While not focused, the field just mirrors `value` straight from props
@@ -267,6 +310,7 @@ function CustomerPicker({ value, onSave }: { value: string; onSave: (name: strin
   const [open, setOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerLite[]>([]);
   const [creating, setCreating] = useState(false);
+  const [quotes, setQuotes] = useState<OutstandingQuote[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -279,6 +323,19 @@ function CustomerPicker({ value, onSave }: { value: string; onSave: (name: strin
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/admin/saved-quotes/outstanding?q=${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      if (!cancelled && res.ok) setQuotes(data.quotes);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, query]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -332,8 +389,37 @@ function CustomerPicker({ value, onSave }: { value: string; onSave: (name: strin
           if (query !== value) onSave(query);
         }, 150)}
       />
-      {open && (matches.length > 0 || query.trim()) && (
-        <div className="absolute z-20 mt-1 w-56 max-h-56 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
+      {open && (matches.length > 0 || quotes.length > 0 || query.trim()) && (
+        <div className="absolute z-20 mt-1 w-64 max-h-72 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
+          {quotes.length > 0 && (
+            <>
+              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
+                {t("ใบเสนอราคาค้างส่ง", "Outstanding quotations", "待发货报价单")}
+              </p>
+              {quotes.map((qt) => (
+                <button
+                  key={qt.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onPickQuote(qt.id);
+                    setOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7]"
+                >
+                  <p className="text-xs font-medium text-[#1A1A1A] truncate">
+                    {qt.doc_no} — {qt.customer_name}
+                  </p>
+                  <p className="text-[11px] text-[#6B6B6B] truncate">
+                    ฿{fmtMoney(qt.total)} · {t(`ส่งแล้ว ${fmt(qt.shippedUnits)}/${fmt(qt.orderedUnits)} ชิ้น`, `Shipped ${qt.shippedUnits}/${qt.orderedUnits}`, `已发 ${qt.shippedUnits}/${qt.orderedUnits}`)}
+                  </p>
+                </button>
+              ))}
+              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
+                {t("ลูกค้า", "Customers", "客户")}
+              </p>
+            </>
+          )}
           {matches.map((c) => (
             <button
               key={c.id}
@@ -368,6 +454,287 @@ function CustomerPicker({ value, onSave }: { value: string; onSave: (name: strin
   );
 }
 
+interface SelectionState {
+  [itemId: string]: { checked: boolean; qty: number; variantId: number | null };
+}
+
+// "Pull from quotation" — either opened straight onto one quote (from a
+// row's customer field) or in search mode first (from the top-level
+// button). Quote lines are free-text, never tied to a stock_variants row,
+// so each one here only gets a *suggested* match; staff still confirm (or
+// pick a different size of the same code) before anything is deducted.
+function QuoteFulfillDialog({
+  open, onOpenChange, initialQuoteId, exportDate, salesperson, availableByVariant, onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initialQuoteId: number | null;
+  exportDate: string;
+  salesperson: string | null;
+  availableByVariant: Map<number, number>;
+  onCreated: (rows: DailyExportRow[], deltas: { variantId: number; qty: number }[], quoteCustomerName: string) => void;
+}) {
+  const { t } = useLanguage();
+  const [pickedQuoteId, setPickedQuoteId] = useState<number | null>(null);
+  const effectiveQuoteId = pickedQuoteId ?? initialQuoteId;
+  const [search, setSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<OutstandingQuote[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detail, setDetail] = useState<FulfillmentDetail | null>(null);
+  const [selection, setSelection] = useState<SelectionState>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open || effectiveQuoteId) return;
+    let cancelled = false;
+    (async () => {
+      setSearching(true);
+      const res = await fetch(`/api/admin/saved-quotes/outstanding?q=${encodeURIComponent(search.trim())}`);
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) setSearchResults(data.quotes);
+        setSearching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, effectiveQuoteId, search]);
+
+  useEffect(() => {
+    if (!open || !effectiveQuoteId) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingDetail(true);
+      const res = await fetch(`/api/admin/saved-quotes/${effectiveQuoteId}/fulfillment`);
+      const data = await res.json();
+      if (!cancelled) {
+        if (res.ok) {
+          setDetail(data);
+          const init: SelectionState = {};
+          for (const it of data.items as FulfillmentItem[]) {
+            if (it.remaining > 0) init[it.item_id] = { checked: false, qty: it.remaining, variantId: it.suggestedVariantId };
+          }
+          setSelection(init);
+        } else {
+          toast.error(data.error || t("โหลดไม่สำเร็จ", "Failed to load", "加载失败"));
+        }
+        setLoadingDetail(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, effectiveQuoteId, t]);
+
+  function updateSelection(itemId: string, patch: Partial<SelectionState[string]>) {
+    setSelection((prev) => ({ ...prev, [itemId]: { ...prev[itemId], ...patch } }));
+  }
+
+  async function handleConfirm() {
+    if (!detail) return;
+    const picks = Object.entries(selection).filter(([, s]) => s.checked && s.qty > 0 && s.variantId);
+    if (!picks.length) {
+      toast.error(t("เลือกรายการและยืนยันสินค้าในสต็อกก่อน", "Pick at least one item and confirm its stock match", "请先选择项目并确认库存商品"));
+      return;
+    }
+    setSubmitting(true);
+    const createdRows: DailyExportRow[] = [];
+    // Tracked separately from createdRows: a pulled item may merge into a
+    // row this same session already created, so the row's own qty is its
+    // new *total*, not the amount newly deducted by this one pick.
+    const deltas: { variantId: number; qty: number }[] = [];
+    for (const [itemId, sel] of picks) {
+      const item = detail.items.find((it) => it.item_id === itemId);
+      if (!item) continue;
+      const res = await fetch("/api/admin/daily-exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          export_date: exportDate,
+          stock_variant_id: sel.variantId,
+          sku: item.sku,
+          size_text: item.size,
+          image_url: item.image,
+          qty: sel.qty,
+          unit_price: item.unitPrice,
+          discount_pct: detail.quote.discount_pct,
+          customer_name: detail.quote.customer_name,
+          po_no: detail.quote.doc_no,
+          salesperson,
+          quotation_id: detail.quote.id,
+          quotation_item_id: itemId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(`${item.sku}: ${data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败")}`);
+        continue;
+      }
+      createdRows.push(data.row);
+      deltas.push({ variantId: sel.variantId as number, qty: sel.qty });
+    }
+    setSubmitting(false);
+    if (createdRows.length) {
+      onCreated(createdRows, deltas, detail.quote.customer_name);
+      toast.success(
+        t(`ดึงจากใบเสนอราคาแล้ว ${createdRows.length} รายการ`, `Pulled ${createdRows.length} item(s) from the quotation`, `已从报价单拉取 ${createdRows.length} 项`)
+      );
+      onOpenChange(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>
+            {detail
+              ? `${detail.quote.doc_no} — ${detail.quote.customer_name}`
+              : t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单拉取")}
+          </DialogTitle>
+        </DialogHeader>
+
+        {!effectiveQuoteId && (
+          <div className="flex-1 min-h-0 flex flex-col gap-2">
+            <Input
+              autoFocus
+              placeholder={t("ค้นหาด้วยเลขใบเสนอราคาหรือชื่อลูกค้า...", "Search by quote no. or customer...", "按报价单号或客户搜索...")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+              {searching ? (
+                <div className="py-10 text-center text-sm text-[#9CA3AF]">
+                  <Loader2 size={18} className="mx-auto mb-2 animate-spin" />
+                  {t("กำลังค้นหา...", "Searching...", "搜索中...")}
+                </div>
+              ) : searchResults.length === 0 ? (
+                <p className="py-10 text-center text-sm text-[#9CA3AF]">
+                  {t("ไม่พบใบเสนอราคาที่ค้างส่ง", "No outstanding quotations found", "未找到待发货报价单")}
+                </p>
+              ) : (
+                searchResults.map((qt) => (
+                  <button
+                    key={qt.id}
+                    type="button"
+                    onClick={() => setPickedQuoteId(qt.id)}
+                    className="w-full text-left px-3 py-2 rounded-lg border border-[#E8E5E0] hover:border-[#C8102E] hover:bg-[#FAF7F2]"
+                  >
+                    <p className="text-sm font-medium text-[#1A1A1A]">
+                      {qt.doc_no} — {qt.customer_name}
+                    </p>
+                    <p className="text-xs text-[#6B6B6B]">
+                      ฿{fmtMoney(qt.total)} ·{" "}
+                      {t(`ส่งแล้ว ${fmt(qt.shippedUnits)}/${fmt(qt.orderedUnits)} ชิ้น`, `Shipped ${qt.shippedUnits}/${qt.orderedUnits}`, `已发 ${qt.shippedUnits}/${qt.orderedUnits}`)}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {effectiveQuoteId && (
+          <div className="flex-1 min-h-0 flex flex-col">
+            {loadingDetail || !detail ? (
+              <div className="py-10 text-center text-sm text-[#9CA3AF]">
+                <Loader2 size={18} className="mx-auto mb-2 animate-spin" />
+                {t("กำลังโหลด...", "Loading...", "加载中...")}
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+                {detail.items.filter((it) => it.remaining > 0).length === 0 ? (
+                  <p className="py-10 text-center text-sm text-[#9CA3AF]">
+                    {t("ใบนี้ส่งครบแล้วทุกรายการ", "Every line on this quote has shipped in full", "此单所有项目均已发货完毕")}
+                  </p>
+                ) : (
+                  detail.items
+                    .filter((it) => it.remaining > 0)
+                    .map((it) => {
+                      const sel = selection[it.item_id] ?? { checked: false, qty: it.remaining, variantId: it.suggestedVariantId };
+                      const ceiling = sel.variantId
+                        ? Math.min(it.remaining, availableByVariant.get(sel.variantId) ?? it.remaining)
+                        : it.remaining;
+                      return (
+                        <div key={it.item_id} className="flex items-start gap-2 p-2 border border-[#E8E5E0] rounded-lg">
+                          <input
+                            type="checkbox"
+                            className="mt-1.5"
+                            checked={sel.checked}
+                            disabled={!sel.variantId}
+                            onChange={(e) => updateSelection(it.item_id, { checked: e.target.checked })}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{it.sku || it.name}</p>
+                            <p className="text-[11px] text-[#6B6B6B]">
+                              {it.size} · {t(`ค้างส่ง ${fmt(it.remaining)}/${fmt(it.qty)} ชิ้น`, `${it.remaining}/${it.qty} left`, `剩余 ${it.remaining}/${it.qty}`)}
+                            </p>
+                            {it.candidates.length === 0 ? (
+                              <p className="text-[11px] text-red-500 mt-1">{t("ไม่พบสินค้านี้ในสต็อก", "Not found in Stock", "库存中未找到")}</p>
+                            ) : it.candidates.length === 1 ? (
+                              <p className="text-[11px] text-[#6B6B6B] mt-1">
+                                {it.candidates[0].size_text || "-"} ({fmt(availableByVariant.get(it.candidates[0].variantId) ?? it.candidates[0].available)})
+                              </p>
+                            ) : (
+                              <Select
+                                value={sel.variantId ? String(sel.variantId) : "__none"}
+                                onValueChange={(v) => updateSelection(it.item_id, { variantId: v === "__none" ? null : Number(v) })}
+                              >
+                                <SelectTrigger size="sm" className="h-7 text-xs w-full mt-1">
+                                  <SelectValue>
+                                    {(v: string) => {
+                                      const c = it.candidates.find((c) => String(c.variantId) === v);
+                                      return c ? `${c.size_text || "-"} (${fmt(availableByVariant.get(c.variantId) ?? c.available)})` : t("เลือกขนาด", "Pick size", "选择尺寸");
+                                    }}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none">{t("เลือกขนาด", "Pick size", "选择尺寸")}</SelectItem>
+                                  {it.candidates.map((c) => (
+                                    <SelectItem key={c.variantId} value={String(c.variantId)}>
+                                      {c.size_text || "-"} ({fmt(availableByVariant.get(c.variantId) ?? c.available)})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={ceiling}
+                            disabled={!sel.checked}
+                            className="h-7 text-xs w-16"
+                            value={sel.qty}
+                            onChange={(e) => updateSelection(it.item_id, { qty: Number(e.target.value) || 0 })}
+                          />
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+          </Button>
+          {effectiveQuoteId && (
+            <Button size="sm" onClick={handleConfirm} disabled={submitting || loadingDetail}>
+              {submitting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+              {t("ยืนยันตัดสต็อก", "Confirm & deduct Stock", "确认并扣减库存")}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DailyExportsPage() {
   const { t } = useLanguage();
   const [date, setDate] = useState(todayStr());
@@ -378,6 +745,27 @@ export default function DailyExportsPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [products, setProducts] = useState<GroupedProduct[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [fulfillOpen, setFulfillOpen] = useState(false);
+  const [fulfillQuoteId, setFulfillQuoteId] = useState<number | null>(null);
+  const [fulfillOriginRowId, setFulfillOriginRowId] = useState<number | null>(null);
+  // Stock is fetched once; this ledger tracks every unit deducted/returned
+  // by actions taken in this session since then, so the picker's remaining
+  // counts stay correct without re-fetching the whole catalog on every pick.
+  const [sessionDelta, setSessionDelta] = useState<Record<number, number>>({});
+
+  const liveProducts = useMemo(
+    () =>
+      products.map((p) => ({
+        ...p,
+        variants: p.variants.map((v) => ({ ...v, available: v.available - (sessionDelta[v.variantId] || 0) })),
+      })),
+    [products, sessionDelta]
+  );
+  const liveAvailableByVariant = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const p of liveProducts) for (const v of p.variants) m.set(v.variantId, v.available);
+    return m;
+  }, [liveProducts]);
 
   async function load() {
     setLoading(true);
@@ -455,8 +843,10 @@ export default function DailyExportsPage() {
     const data = await res.json();
     setAdding(false);
     if (res.ok) {
-      setRows((prev) => [...prev, data.row]);
-      setPickerOpen(false);
+      // Picking a size that's already a row for today tops that row up
+      // instead of creating a duplicate — the server returns that same row.
+      setRows((prev) => (prev.some((r) => r.id === data.row.id) ? prev.map((r) => (r.id === data.row.id ? data.row : r)) : [...prev, data.row]));
+      setSessionDelta((prev) => ({ ...prev, [v.variantId]: (prev[v.variantId] || 0) + 1 }));
       toast.success(t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`));
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));
@@ -468,22 +858,30 @@ export default function DailyExportsPage() {
   }
 
   async function saveRow(id: number, change: Partial<DailyExportRow>) {
+    const prevRow = rows.find((r) => r.id === id);
     patchLocal(id, change);
     const res = await fetch(`/api/admin/daily-exports/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(change),
     });
+    const data = await res.json().catch(() => null);
     if (res.ok) {
-      const data = await res.json().catch(() => null);
       if (data?.row) patchLocal(id, data.row);
+      // Only move the stock ledger once the server has confirmed the
+      // change actually went through.
+      if (change.qty !== undefined && prevRow) {
+        const delta = change.qty - prevRow.qty;
+        setSessionDelta((prev) => ({ ...prev, [prevRow.stock_variant_id]: (prev[prevRow.stock_variant_id] || 0) + delta }));
+      }
     } else {
-      toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+      toast.error(data?.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
       load();
     }
   }
 
   async function deleteRow(id: number) {
+    const row = rows.find((r) => r.id === id);
     const prev = rows;
     setRows((list) => list.filter((r) => r.id !== id));
     const res = await fetch(`/api/admin/daily-exports/${id}`, { method: "DELETE" });
@@ -491,6 +889,7 @@ export default function DailyExportsPage() {
       setRows(prev);
       toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
     } else {
+      if (row) setSessionDelta((prevD) => ({ ...prevD, [row.stock_variant_id]: (prevD[row.stock_variant_id] || 0) - row.qty }));
       toast.success(t("ลบแล้ว — คืนจำนวนกลับเข้าสต็อกแล้ว", "Deleted — returned to Stock", "已删除 — 已退回库存"));
     }
   }
@@ -596,14 +995,52 @@ export default function DailyExportsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
+      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-wrap gap-2">
         <Button onClick={() => setPickerOpen(true)} disabled={adding}>
           {adding ? <Loader2 size={16} className="mr-1.5 animate-spin" /> : <Plus size={16} className="mr-1.5" />}
           {t("เพิ่มรายการ — เลือกสินค้าจากสต็อก", "Add item — pick from Stock", "添加项目 — 从库存中选择")}
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setFulfillQuoteId(null);
+            setFulfillOriginRowId(null);
+            setFulfillOpen(true);
+          }}
+        >
+          <FileSearch size={16} className="mr-1.5" />
+          {t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单拉取")}
+        </Button>
       </div>
 
-      <StockGridPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} products={products} onPick={addRow} />
+      <StockGridPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} products={liveProducts} onPick={addRow} />
+
+      <QuoteFulfillDialog
+        open={fulfillOpen}
+        onOpenChange={setFulfillOpen}
+        initialQuoteId={fulfillQuoteId}
+        exportDate={date}
+        salesperson={currentUser}
+        availableByVariant={liveAvailableByVariant}
+        onCreated={(createdRows, deltas, quoteCustomerName) => {
+          // A pulled item may have merged into a row this session already
+          // created (pulling the same line twice) rather than being brand
+          // new — update it in place then instead of appending a duplicate.
+          setRows((prev) => {
+            let next = prev;
+            for (const row of createdRows) {
+              next = next.some((r) => r.id === row.id) ? next.map((r) => (r.id === row.id ? row : r)) : [...next, row];
+            }
+            return next;
+          });
+          setSessionDelta((prev) => {
+            const next = { ...prev };
+            for (const d of deltas) next[d.variantId] = (next[d.variantId] || 0) + d.qty;
+            return next;
+          });
+          if (fulfillOriginRowId) saveRow(fulfillOriginRowId, { customer_name: quoteCustomerName });
+        }}
+      />
 
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
         {loading ? (
@@ -654,6 +1091,8 @@ export default function DailyExportsPage() {
                     <TableCell>
                       <Input
                         type="number"
+                        min={0}
+                        max={(liveAvailableByVariant.get(r.stock_variant_id) ?? 0) + r.qty}
                         className="h-8 text-xs w-16"
                         value={r.qty}
                         onChange={(e) => patchLocal(r.id, { qty: Number(e.target.value) || 0 })}
@@ -711,7 +1150,15 @@ export default function DailyExportsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <CustomerPicker value={r.customer_name} onSave={(name) => saveRow(r.id, { customer_name: name })} />
+                      <CustomerPicker
+                        value={r.customer_name}
+                        onSave={(name) => saveRow(r.id, { customer_name: name })}
+                        onPickQuote={(quoteId) => {
+                          setFulfillQuoteId(quoteId);
+                          setFulfillOriginRowId(r.id);
+                          setFulfillOpen(true);
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Select

@@ -27,6 +27,9 @@ export function salesRowsToShippingRows(rows: DailySalesRow[]): DailyShippingRow
     consignee: "",
     phone: r.customer_phone,
     source_quote_id: r.source_quote_id,
+    stock_variant_id: r.stock_variant_id,
+    stock_deducted_qty: r.stock_deducted_qty,
+    stock_deducted_field: r.stock_deducted_field,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }));

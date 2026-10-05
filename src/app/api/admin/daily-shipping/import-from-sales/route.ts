@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { syncStockDeduction } from "@/lib/stock-auto-deduct";
 import type { DailySalesRow } from "@/types";
 
 // Pulls every row already logged in Daily Sales for a given date into the
@@ -40,10 +41,21 @@ export async function POST(req: NextRequest) {
     .eq("ship_date", ship_date);
   const startOrder = count ?? 0;
 
-  const { data, error } = await db
-    .from("daily_shipping_rows")
-    .insert(
-      salesRows.map((r, i) => ({
+  // Each imported row deducts from StockDEMO independently of whatever
+  // Daily Sales already deducted — recording the sale and it actually
+  // shipping are tracked as two separate events on purpose.
+  const rows = await Promise.all(
+    salesRows.map(async (r, i) => {
+      const { variantId, deductedQty, field } = await syncStockDeduction(db, {
+        previousVariantId: null,
+        previousQty: 0,
+        previousField: "available",
+        newSku: r.sku,
+        newQty: r.qty,
+        newSizeText: r.size_text,
+        fromReserved: false,
+      });
+      return {
         ship_date,
         sort_order: startOrder + i,
         sku: r.sku,
@@ -57,9 +69,14 @@ export async function POST(req: NextRequest) {
         consignee: "",
         phone: r.customer_phone,
         source_quote_id: r.source_quote_id,
-      }))
-    )
-    .select();
+        stock_variant_id: variantId,
+        stock_deducted_qty: deductedQty,
+        stock_deducted_field: field,
+      };
+    })
+  );
+
+  const { data, error } = await db.from("daily_shipping_rows").insert(rows).select();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

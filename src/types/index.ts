@@ -277,6 +277,9 @@ export interface DailyShippingRow {
   consignee: string;
   phone: string;
   source_quote_id: number | null;
+  stock_variant_id: number | null;
+  stock_deducted_qty: number;
+  stock_deducted_field: "available" | "reserved";
   created_at: string;
   updated_at: string;
 }

@@ -166,7 +166,14 @@ export default function DailyShippingPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(change),
     });
-    if (!res.ok) toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    if (res.ok) {
+      // Picks up server-computed fields (e.g. stock_variant_id, set when sku
+      // or qty changed) that the optimistic patch above doesn't know about.
+      const data = await res.json().catch(() => null);
+      if (data?.row) patchLocal(id, data.row);
+    } else {
+      toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    }
   }
 
   function pickProduct(id: number, entry: PriceCatalogEntry) {
@@ -401,6 +408,13 @@ export default function DailyShippingPage() {
                             onChange={(e) => patchLocal(r.id, { sku: e.target.value })}
                             onBlur={(e) => saveRow(r.id, { sku: e.target.value })}
                           />
+                          {r.sku.trim() && (
+                            <p className={`text-[9px] mt-0.5 ${r.stock_variant_id ? "text-emerald-600" : "text-[#9CA3AF]"}`}>
+                              {r.stock_variant_id
+                                ? t("✓ ตัดสต็อกแล้ว", "✓ Stock deducted", "✓ 已扣库存")
+                                : t("ไม่พบในสต็อก — ไม่ตัดอัตโนมัติ", "Not found in Stock — not auto-deducted", "库存中未找到 — 未自动扣减")}
+                            </p>
+                          )}
                           <div className="mt-1">
                             <ProductPicker onPick={(entry) => pickProduct(r.id, entry)} />
                           </div>

@@ -20,6 +20,7 @@ import {
   Warehouse,
   ClipboardList,
   PackageCheck,
+  PackageMinus,
   Menu,
   X,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/admin/quote-builder",     labelTh: "สร้างใบเสนอราคา", labelEn: "Quote Builder", labelZh: "生成报价单", icon: Receipt },
   { href: "/admin/daily-sales",       labelTh: "ยอดขายรายวัน",  labelEn: "Daily Sales",  labelZh: "每日销售",   icon: ClipboardList },
   { href: "/admin/daily-shipping",    labelTh: "จัดส่งสินค้ารายวัน", labelEn: "Daily Shipping", labelZh: "每日出货",   icon: PackageCheck, hidden: true },
+  { href: "/admin/daily-exports",     labelTh: "การส่งออกรายวัน", labelEn: "Daily Export", labelZh: "每日出库",   icon: PackageMinus },
   { href: "/admin/kpi",               labelTh: "KPI ติดตามลูกค้า", labelEn: "Lead Tracker", labelZh: "客户跟进",   icon: Target },
   { href: "/admin/StockDEMO",         labelTh: "สต็อก DEMO",  labelEn: "Stock DEMO",   labelZh: "库存 DEMO",  icon: Warehouse },
   { href: "/admin/products",          labelTh: "สินค้า",       labelEn: "Products",     labelZh: "产品",       icon: Package },

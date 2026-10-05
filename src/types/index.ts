@@ -291,6 +291,27 @@ export interface AdSpend {
   updated_at: string;
 }
 
+// A document built specifically to deduct StockDEMO — every row points at
+// one exact stock_variants row (picked explicitly, never guessed from a
+// typed SKU), so there's never ambiguity about which size was taken out.
+export interface DailyExportRow {
+  id: number;
+  export_date: string;
+  sort_order: number;
+  stock_variant_id: number;
+  sku: string;
+  size_text: string;
+  image_url: string | null;
+  qty: number;
+  remark: string;
+  customer_name: string;
+  salesperson: string | null;
+  po_no: string;
+  stock_deducted_qty: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CheckoutFormValues {
   name: string;
   company: string;

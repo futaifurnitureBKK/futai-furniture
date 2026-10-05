@@ -65,6 +65,26 @@ export async function isSessionValid(token: string | undefined): Promise<boolean
   }
 }
 
+// Used to auto-fill "who's doing this" on forms (e.g. Daily Export's staff
+// field) from the logged-in session instead of making someone pick their own
+// name from a list every time.
+export async function getSessionName(token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      restUrl(`admin_sessions?id=eq.${encodeURIComponent(token)}&select=name,expires_at,revoked_at&limit=1`),
+      { headers: restHeaders() }
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { name: string; expires_at: string; revoked_at: string | null }[];
+    const row = rows[0];
+    if (!row || row.revoked_at || new Date(row.expires_at).getTime() <= Date.now()) return null;
+    return row.name;
+  } catch {
+    return null;
+  }
+}
+
 export async function revokeAdminSession(token: string): Promise<void> {
   await fetch(restUrl(`admin_sessions?id=eq.${encodeURIComponent(token)}`), {
     method: "PATCH",

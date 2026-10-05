@@ -294,6 +294,8 @@ export interface AdSpend {
 // A document built specifically to deduct StockDEMO — every row points at
 // one exact stock_variants row (picked explicitly, never guessed from a
 // typed SKU), so there's never ambiguity about which size was taken out.
+export type DailyExportChannel = "shopee" | "tiktok" | "storefront" | "b2b";
+
 export interface DailyExportRow {
   id: number;
   export_date: string;
@@ -303,6 +305,9 @@ export interface DailyExportRow {
   size_text: string;
   image_url: string | null;
   qty: number;
+  unit_price: number;
+  discount_pct: number;
+  channel: DailyExportChannel | null;
   remark: string;
   customer_name: string;
   salesperson: string | null;

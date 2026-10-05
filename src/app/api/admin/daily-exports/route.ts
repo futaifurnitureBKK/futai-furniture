@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "export_date and stock_variant_id are required" }, { status: 400 });
   }
   const qty = Number(body.qty) || 1;
+  const unitPrice = Number(body.unit_price) || 0;
 
   const db = supabaseAdmin();
 
@@ -67,9 +68,12 @@ export async function POST(req: NextRequest) {
       size_text: size_text || "",
       image_url: image_url || null,
       qty,
+      unit_price: unitPrice,
+      discount_pct: 0,
+      channel: null,
       remark: "",
       customer_name: "",
-      salesperson: null,
+      salesperson: body.salesperson || null,
       po_no: "",
       stock_deducted_qty: qty,
     })

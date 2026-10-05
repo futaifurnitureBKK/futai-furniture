@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 
-const EDITABLE_FIELDS = ["remark", "customer_name", "salesperson", "po_no"] as const;
+const EDITABLE_FIELDS = ["remark", "customer_name", "salesperson", "po_no", "unit_price", "discount_pct", "channel"] as const;
 
 // qty and stock_variant_id are edited through this same route but handled
 // separately below (not in EDITABLE_FIELDS) because changing either one has

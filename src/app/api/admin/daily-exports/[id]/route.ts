@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import type { SavedQuoteItem } from "@/types";
 
-const EDITABLE_FIELDS = ["remark", "customer_name", "salesperson", "po_no", "unit_price", "discount_pct", "channel"] as const;
+const EDITABLE_FIELDS = [
+  "remark", "customer_name", "salesperson", "po_no", "unit_price", "discount_pct", "channel", "quotation_id", "quotation_item_id",
+] as const;
 
 // qty and stock_variant_id are edited through this same route but handled
 // separately below (not in EDITABLE_FIELDS) because changing either one has
@@ -20,6 +23,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   update.updated_at = new Date().toISOString();
 
   const db = supabaseAdmin();
+
+  // Binding this row to a quotation line (from the per-row customer field)
+  // — never let the row's qty exceed what's still outstanding on that line.
+  if (body.quotation_id && body.quotation_item_id) {
+    const { data: quote } = await db.from("saved_quotes").select("items").eq("id", body.quotation_id).single();
+    const item = (quote?.items as SavedQuoteItem[] | undefined)?.find((it) => it.item_id === body.quotation_item_id);
+    if (!item) {
+      return NextResponse.json({ error: "ไม่พบรายการนี้ในใบเสนอราคา" }, { status: 404 });
+    }
+    const { data: shippedRows } = await db
+      .from("daily_export_rows")
+      .select("id, qty")
+      .eq("quotation_id", body.quotation_id)
+      .eq("quotation_item_id", body.quotation_item_id)
+      .neq("id", id);
+    const alreadyShipped = (shippedRows || []).reduce((sum, r) => sum + Number(r.qty), 0);
+    const requestedQty = "qty" in body ? Number(body.qty) || 0 : undefined;
+    if (requestedQty != null && alreadyShipped + requestedQty > item.qty) {
+      return NextResponse.json({ error: "จำนวนเกินยอดค้างส่งของรายการนี้ในใบเสนอราคา" }, { status: 400 });
+    }
+  }
 
   if ("qty" in body || "stock_variant_id" in body) {
     const { data: existing } = await db

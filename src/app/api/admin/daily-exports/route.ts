@@ -123,7 +123,9 @@ export async function POST(req: NextRequest) {
       qty,
       unit_price: unitPrice,
       discount_pct: Number(body.discount_pct) || 0,
-      channel: body.channel || null,
+      // Rows pulled from a quotation default to B2B/project unless the
+      // caller says otherwise — that's overwhelmingly what a quotation is.
+      channel: body.channel || (quotationId ? "b2b" : null),
       remark: body.remark || "",
       customer_name: body.customer_name || "",
       salesperson: body.salesperson || null,

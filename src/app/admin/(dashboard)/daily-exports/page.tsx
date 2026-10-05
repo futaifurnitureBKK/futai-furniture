@@ -24,15 +24,25 @@ import {
 import rawStock from "@/data/stock-demo.json";
 import type { DailyExportRow, DailyExportChannel } from "@/types";
 
+interface MatchingQuoteItem {
+  item_id: string;
+  size: string;
+  qty: number;
+  shipped: number;
+  remaining: number;
+  unitPrice: number;
+}
 interface OutstandingQuote {
   id: number;
   doc_no: string;
   customer_name: string;
   doc_date: string;
   total: number;
+  discount_pct: number;
   orderedUnits: number;
   shippedUnits: number;
   status: "not_shipped" | "partial";
+  matchingItems?: MatchingQuoteItem[];
 }
 
 interface FulfillmentCandidate {
@@ -55,7 +65,7 @@ interface FulfillmentItem {
   candidates: FulfillmentCandidate[];
 }
 interface FulfillmentDetail {
-  quote: { id: number; doc_no: string; customer_name: string; discount_pct: number };
+  quote: { id: number; doc_no: string; customer_name: string; customer_address: string; discount_pct: number; total: number };
   items: FulfillmentItem[];
 }
 
@@ -290,16 +300,31 @@ interface CustomerLite {
   company: string;
 }
 
-// Autocompletes against the Customers page's own data (and can add a brand
-// new customer right from this field), plus quotations that still have
-// something outstanding to ship — picking one of those opens the
-// "pull from quotation" dialog instead of just filling in a name.
+interface QuoteItemRow {
+  quoteId: number;
+  docNo: string;
+  customerName: string;
+  discountPct: number;
+  item: MatchingQuoteItem;
+}
+
+// Autocompletes against this row's own sku: quotations that still owe that
+// exact item come first (binding one fills in customer/price/discount/PO
+// right on this row — no dialog, no new row), then plain customers below
+// for sales with no quotation (storefront/Shopee/etc). Can also add a
+// brand new customer right from this field.
 function CustomerPicker({
-  value, onSave, onPickQuote,
+  value, sku, qty, boundToQuote, onSave, onBind, onClear,
 }: {
   value: string;
+  sku: string;
+  qty: number;
+  boundToQuote: boolean;
   onSave: (name: string) => void;
-  onPickQuote: (quoteId: number) => void;
+  onBind: (payload: {
+    quotation_id: number; quotation_item_id: string; customer_name: string; unit_price: number; discount_pct: number; po_no: string; qty: number;
+  }) => void;
+  onClear: () => void;
 }) {
   const { t } = useLanguage();
   const [query, setQuery] = useState(value);
@@ -332,17 +357,30 @@ function CustomerPicker({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !sku) return;
     let cancelled = false;
     (async () => {
-      const res = await fetch(`/api/admin/saved-quotes/outstanding?q=${encodeURIComponent(query.trim())}`);
+      const res = await fetch(`/api/admin/saved-quotes/outstanding?sku=${encodeURIComponent(sku)}&q=${encodeURIComponent(query.trim())}`);
       const data = await res.json();
       if (!cancelled && res.ok) setQuotes(data.quotes);
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, query]);
+  }, [open, sku, query]);
+
+  // One row per (quote, matching line) pair — a quote with several sizes of
+  // this same sku lists each size as its own pick rather than needing a
+  // separate expand step.
+  const quoteItemRows = useMemo(() => {
+    const rows: QuoteItemRow[] = [];
+    for (const qt of quotes) {
+      for (const item of qt.matchingItems || []) {
+        rows.push({ quoteId: qt.id, docNo: qt.doc_no, customerName: qt.customer_name, discountPct: qt.discount_pct, item });
+      }
+    }
+    return rows;
+  }, [quotes]);
 
   function updatePosition() {
     const el = inputRef.current;
@@ -390,7 +428,8 @@ function CustomerPicker({
     (c) => c.name.toLowerCase() === query.trim().toLowerCase() || c.company.toLowerCase() === query.trim().toLowerCase()
   );
   const showAddNew = !exactMatch && query.trim().length > 0;
-  const hasAnyResults = quotes.length > 0 || matches.length > 0 || showAddNew;
+  const hasAnyResults = quoteItemRows.length > 0 || matches.length > 0 || showAddNew;
+  const searchedNoQuotes = sku && query.trim().length === 0 && quotes.length === 0;
 
   async function addNewCustomer() {
     const name = query.trim();
@@ -414,8 +453,18 @@ function CustomerPicker({
     }
   }
 
-  function pickQuoteAt(i: number) {
-    onPickQuote(quotes[i].id);
+  function bindQuoteItemAt(i: number) {
+    const row = quoteItemRows[i];
+    onBind({
+      quotation_id: row.quoteId,
+      quotation_item_id: row.item.item_id,
+      customer_name: row.customerName,
+      unit_price: row.item.unitPrice,
+      discount_pct: row.discountPct,
+      po_no: row.docNo,
+      qty: Math.min(qty, row.item.remaining),
+    });
+    setQuery(row.customerName);
     setOpen(false);
   }
   function pickCustomerAt(i: number) {
@@ -427,7 +476,7 @@ function CustomerPicker({
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open) return;
-    const total = quotes.length + matches.length + (showAddNew ? 1 : 0);
+    const total = quoteItemRows.length + matches.length + (showAddNew ? 1 : 0);
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (total > 0) setHighlightedIndex((i) => Math.min(total - 1, i + 1));
@@ -437,10 +486,10 @@ function CustomerPicker({
     } else if (e.key === "Enter") {
       if (highlightedIndex < 0) return;
       e.preventDefault();
-      if (highlightedIndex < quotes.length) {
-        pickQuoteAt(highlightedIndex);
-      } else if (highlightedIndex < quotes.length + matches.length) {
-        pickCustomerAt(highlightedIndex - quotes.length);
+      if (highlightedIndex < quoteItemRows.length) {
+        bindQuoteItemAt(highlightedIndex);
+      } else if (highlightedIndex < quoteItemRows.length + matches.length) {
+        pickCustomerAt(highlightedIndex - quoteItemRows.length);
       } else {
         addNewCustomer();
       }
@@ -469,7 +518,11 @@ function CustomerPicker({
         onBlur={() => setTimeout(() => {
           setOpen(false);
           setFocused(false);
-          if (query !== value) onSave(query);
+          if (query.trim() === "" && boundToQuote) {
+            onClear();
+          } else if (query !== value) {
+            onSave(query);
+          }
         }, 150)}
       />
       {open && pos &&
@@ -478,28 +531,34 @@ function CustomerPicker({
             style={{ position: "fixed", left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight, zIndex: 9999 }}
             className="overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg"
           >
-            {quotes.length > 0 && (
+            {quoteItemRows.length > 0 && (
               <>
                 <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[#9CA3AF] uppercase">
-                  {t("ใบเสนอราคาค้างส่ง", "Outstanding quotations", "待发货报价单")}
+                  {t("ใบเสนอราคาค้างส่งสินค้านี้", "Quotations owing this item", "待发此商品的报价单")}
                 </p>
-                {quotes.map((qt, i) => (
+                {quoteItemRows.map((row, i) => (
                   <button
-                    key={qt.id}
+                    key={`${row.quoteId}:${row.item.item_id}`}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => pickQuoteAt(i)}
+                    onClick={() => bindQuoteItemAt(i)}
                     className={`w-full text-left px-3 py-2 border-b border-[#F0EDE7] ${highlightedIndex === i ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"}`}
                   >
                     <p className="text-xs font-medium text-[#1A1A1A] truncate">
-                      {qt.doc_no} — {qt.customer_name}
+                      {row.docNo} — {row.customerName}
                     </p>
                     <p className="text-[11px] text-[#6B6B6B] truncate">
-                      ฿{fmtMoney(qt.total)} · {t(`ส่งแล้ว ${fmt(qt.shippedUnits)}/${fmt(qt.orderedUnits)} ชิ้น`, `Shipped ${qt.shippedUnits}/${qt.orderedUnits}`, `已发 ${qt.shippedUnits}/${qt.orderedUnits}`)}
+                      {row.item.size || "-"} ·{" "}
+                      {t(`ค้างส่ง ${fmt(row.item.remaining)} ชิ้น`, `${row.item.remaining} left`, `剩余 ${row.item.remaining}`)}
                     </p>
                   </button>
                 ))}
               </>
+            )}
+            {searchedNoQuotes && (
+              <p className="px-3 pt-2 pb-1 text-[11px] text-[#9CA3AF]">
+                {t("ไม่มีใบเสนอราคาที่ค้างส่งสินค้านี้", "No quotation still owes this item", "没有待发此商品的报价单")}
+              </p>
             )}
             {matches.length > 0 && (
               <>
@@ -507,7 +566,7 @@ function CustomerPicker({
                   {t("ลูกค้า", "Customers", "客户")}
                 </p>
                 {matches.map((c, i) => {
-                  const idx = quotes.length + i;
+                  const idx = quoteItemRows.length + i;
                   return (
                     <button
                       key={c.id}
@@ -530,7 +589,7 @@ function CustomerPicker({
                 onClick={addNewCustomer}
                 disabled={creating}
                 className={`w-full text-left px-3 py-2 text-xs text-[#C8102E] flex items-center gap-1.5 ${
-                  highlightedIndex === quotes.length + matches.length ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"
+                  highlightedIndex === quoteItemRows.length + matches.length ? "bg-[#FAF7F2]" : "hover:bg-[#FAF7F2]"
                 }`}
               >
                 {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
@@ -552,36 +611,93 @@ function CustomerPicker({
 interface SelectionState {
   [itemId: string]: { checked: boolean; qty: number; variantId: number | null };
 }
+interface ResolvedLabel {
+  label: string;
+  available: number;
+}
 
-// "Pull from quotation" — either opened straight onto one quote (from a
-// row's customer field) or in search mode first (from the top-level
-// button). Quote lines are free-text, never tied to a stock_variants row,
-// so each one here only gets a *suggested* match; staff still confirm (or
-// pick a different size of the same code) before anything is deducted.
+// A quote line with no sku match in Stock at all — lets staff search the
+// whole catalog by code and pick one by hand; that match gets remembered
+// (quotation_sku_mappings) so the same sku auto-suggests correctly next time.
+function UnmatchedSkuPicker({ products, onPick }: { products: GroupedProduct[]; onPick: (variantId: number, label: string, available: number) => void }) {
+  const { t } = useLanguage();
+  const [q, setQ] = useState("");
+  const matches = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return [];
+    const out: { variantId: number; label: string; available: number }[] = [];
+    for (const p of products) {
+      if (!p.code.toLowerCase().includes(query)) continue;
+      for (const v of p.variants) {
+        out.push({ variantId: v.variantId, label: `${p.code} · ${v.size_text || "-"}`, available: v.available });
+        if (out.length >= 8) break;
+      }
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [products, q]);
+
+  return (
+    <div className="mt-1">
+      <Input
+        className="h-7 text-xs"
+        placeholder={t("ค้นหารหัสสินค้าในสต็อก...", "Search Stock by code...", "按编号搜索库存...")}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      {matches.length > 0 && (
+        <div className="mt-1 border border-[#E8E5E0] rounded max-h-28 overflow-auto">
+          {matches.map((m) => (
+            <button
+              key={m.variantId}
+              type="button"
+              onClick={() => onPick(m.variantId, m.label, m.available)}
+              className="w-full text-left px-2 py-1 text-[11px] hover:bg-[#FAF7F2] flex justify-between gap-2"
+            >
+              <span className="font-mono truncate">{m.label}</span>
+              <span className="text-[#9CA3AF] shrink-0">({fmt(m.available)})</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// "Pull from quotation" — always opened in search mode from the top-level
+// button (never preset to a quote; a row's own customer field binds a
+// single matching line directly instead of going through this dialog at
+// all). Step 1 searches outstanding quotes; step 2 shows one quote's
+// remaining lines to check off. Quote lines are free-text, never tied to a
+// stock_variants row, so each one here only gets a *suggested* match —
+// staff still confirm (or correct) it before anything is deducted; the
+// confirm step here calls the same POST as everywhere else in this page,
+// which deducts Stock immediately — nothing here is a draft/unsaved state.
 function QuoteFulfillDialog({
-  open, onOpenChange, initialQuoteId, exportDate, salesperson, availableByVariant, onCreated,
+  open, onOpenChange, exportDate, salesperson, availableByVariant, products, onCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  initialQuoteId: number | null;
   exportDate: string;
   salesperson: string | null;
   availableByVariant: Map<number, number>;
+  products: GroupedProduct[];
   onCreated: (rows: DailyExportRow[], deltas: { variantId: number; qty: number }[], quoteCustomerName: string) => void;
 }) {
   const { t } = useLanguage();
-  const [pickedQuoteId, setPickedQuoteId] = useState<number | null>(null);
-  const effectiveQuoteId = pickedQuoteId ?? initialQuoteId;
+  const [step, setStep] = useState<"search" | "items">("search");
+  const [quoteId, setQuoteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<OutstandingQuote[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detail, setDetail] = useState<FulfillmentDetail | null>(null);
   const [selection, setSelection] = useState<SelectionState>({});
+  const [resolvedLabels, setResolvedLabels] = useState<Record<string, ResolvedLabel>>({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!open || effectiveQuoteId) return;
+    if (!open || step !== "search") return;
     let cancelled = false;
     (async () => {
       setSearching(true);
@@ -595,21 +711,23 @@ function QuoteFulfillDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, effectiveQuoteId, search]);
+  }, [open, step, search]);
 
   useEffect(() => {
-    if (!open || !effectiveQuoteId) return;
+    if (!open || step !== "items" || !quoteId) return;
     let cancelled = false;
     (async () => {
       setLoadingDetail(true);
-      const res = await fetch(`/api/admin/saved-quotes/${effectiveQuoteId}/fulfillment`);
+      const res = await fetch(`/api/admin/saved-quotes/${quoteId}/fulfillment`);
       const data = await res.json();
       if (!cancelled) {
         if (res.ok) {
           setDetail(data);
           const init: SelectionState = {};
           for (const it of data.items as FulfillmentItem[]) {
-            if (it.remaining > 0) init[it.item_id] = { checked: false, qty: it.remaining, variantId: it.suggestedVariantId };
+            if (it.remaining <= 0) continue;
+            const stockAvail = it.suggestedVariantId ? availableByVariant.get(it.suggestedVariantId) ?? 0 : 0;
+            init[it.item_id] = { checked: false, qty: Math.min(it.remaining, stockAvail || it.remaining), variantId: it.suggestedVariantId };
           }
           setSelection(init);
         } else {
@@ -621,26 +739,101 @@ function QuoteFulfillDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, effectiveQuoteId, t]);
+    // availableByVariant intentionally excluded — only used for the initial default, not to re-trigger a refetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, step, quoteId, t]);
+
+  // Best-effort: swallow Escape while on step 2 so it goes back a step
+  // instead of closing outright (closing is still Escape's job on step 1).
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape" && step === "items") {
+        e.preventDefault();
+        e.stopPropagation();
+        goBack();
+      }
+    }
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
+  }, [open, step]);
+
+  function pickQuote(id: number) {
+    setQuoteId(id);
+    setStep("items");
+  }
+  function goBack() {
+    setStep("search");
+    setQuoteId(null);
+    setDetail(null);
+    setResolvedLabels({});
+  }
 
   function updateSelection(itemId: string, patch: Partial<SelectionState[string]>) {
     setSelection((prev) => ({ ...prev, [itemId]: { ...prev[itemId], ...patch } }));
   }
 
+  function resolveManually(itemId: string, sku: string, variantId: number, label: string, available: number) {
+    setResolvedLabels((prev) => ({ ...prev, [itemId]: { label, available } }));
+    updateSelection(itemId, { variantId });
+    fetch("/api/admin/quotation-sku-mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quote_sku: sku, stock_variant_id: variantId }),
+    }).catch(() => {});
+  }
+
+  function itemStock(variantId: number | null) {
+    return variantId ? availableByVariant.get(variantId) ?? 0 : 0;
+  }
+
+  const remainingItems = (detail?.items ?? []).filter((it) => it.remaining > 0);
+  const shippableItemIds = new Set(
+    remainingItems.filter((it) => (selection[it.item_id]?.variantId ?? null) && itemStock(selection[it.item_id]?.variantId ?? null) > 0).map((it) => it.item_id)
+  );
+
+  function selectAllShippable() {
+    setSelection((prev) => {
+      const next = { ...prev };
+      for (const it of remainingItems) {
+        if (!shippableItemIds.has(it.item_id)) continue;
+        const sel = next[it.item_id];
+        const ceiling = Math.min(it.remaining, itemStock(sel.variantId));
+        next[it.item_id] = { ...sel, checked: true, qty: Math.min(sel.qty || ceiling, ceiling) };
+      }
+      return next;
+    });
+  }
+
+  const checkedEntries = Object.entries(selection).filter(([, s]) => s.checked && s.variantId && s.qty > 0);
+  const summaryCount = checkedEntries.length;
+  const summaryQty = checkedEntries.reduce((sum, [, s]) => sum + s.qty, 0);
+  const summaryValue = checkedEntries.reduce((sum, [itemId, s]) => {
+    const it = detail?.items.find((i) => i.item_id === itemId);
+    return sum + (it ? s.qty * it.unitPrice : 0);
+  }, 0);
+
   async function handleConfirm() {
-    if (!detail) return;
-    const picks = Object.entries(selection).filter(([, s]) => s.checked && s.qty > 0 && s.variantId);
-    if (!picks.length) {
-      toast.error(t("เลือกรายการและยืนยันสินค้าในสต็อกก่อน", "Pick at least one item and confirm its stock match", "请先选择项目并确认库存商品"));
-      return;
+    if (!detail || !checkedEntries.length) return;
+    const hasZeroPrice = checkedEntries.some(([itemId]) => detail.items.find((i) => i.item_id === itemId)?.unitPrice === 0);
+    if (hasZeroPrice) {
+      const ok = confirm(
+        t(
+          "มีรายการที่ราคา/หน่วย = 0 — ยืนยันเพิ่มหรือไม่ (เช่น ของแถม/ตัวอย่าง)?",
+          "Some items have unit price = 0 — add anyway? (e.g. a free gift or sample)",
+          "部分项目单价为0 — 仍要添加吗？（如赠品/样品）"
+        )
+      );
+      if (!ok) return;
     }
+
     setSubmitting(true);
     const createdRows: DailyExportRow[] = [];
     // Tracked separately from createdRows: a pulled item may merge into a
     // row this same session already created, so the row's own qty is its
     // new *total*, not the amount newly deducted by this one pick.
     const deltas: { variantId: number; qty: number }[] = [];
-    for (const [itemId, sel] of picks) {
+    for (const [itemId, sel] of checkedEntries) {
       const item = detail.items.find((it) => it.item_id === itemId);
       if (!item) continue;
       const res = await fetch("/api/admin/daily-exports", {
@@ -670,11 +863,13 @@ function QuoteFulfillDialog({
       createdRows.push(data.row);
       deltas.push({ variantId: sel.variantId as number, qty: sel.qty });
     }
+    // Always resets — a partial or total failure must never leave the
+    // confirm button stuck spinning.
     setSubmitting(false);
     if (createdRows.length) {
       onCreated(createdRows, deltas, detail.quote.customer_name);
       toast.success(
-        t(`ดึงจากใบเสนอราคาแล้ว ${createdRows.length} รายการ`, `Pulled ${createdRows.length} item(s) from the quotation`, `已从报价单拉取 ${createdRows.length} 项`)
+        t(`เพิ่ม ${createdRows.length} รายการลงตารางแล้ว`, `Added ${createdRows.length} item(s) to the table`, `已添加 ${createdRows.length} 项到表格`)
       );
       onOpenChange(false);
     }
@@ -685,13 +880,23 @@ function QuoteFulfillDialog({
       <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {detail
-              ? `${detail.quote.doc_no} — ${detail.quote.customer_name}`
-              : t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单拉取")}
+            {step === "items" && detail ? (
+              <div className="flex items-center gap-1.5 text-sm">
+                <button type="button" onClick={goBack} className="text-[#6B6B6B] hover:text-[#C8102E] font-medium shrink-0">
+                  ‹ {t("กลับ", "Back", "返回")}
+                </button>
+                <span className="text-[#C8C5BE]">·</span>
+                <span className="text-[#9CA3AF] font-normal truncate">
+                  {t("ใบเสนอราคา", "Quotation", "报价单")} › <span className="font-semibold text-[#1A1A1A]">{detail.quote.doc_no}</span>
+                </span>
+              </div>
+            ) : (
+              t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单拉取")
+            )}
           </DialogTitle>
         </DialogHeader>
 
-        {!effectiveQuoteId && (
+        {step === "search" && (
           <div className="flex-1 min-h-0 flex flex-col gap-2">
             <Input
               autoFocus
@@ -714,7 +919,7 @@ function QuoteFulfillDialog({
                   <button
                     key={qt.id}
                     type="button"
-                    onClick={() => setPickedQuoteId(qt.id)}
+                    onClick={() => pickQuote(qt.id)}
                     className="w-full text-left px-3 py-2 rounded-lg border border-[#E8E5E0] hover:border-[#C8102E] hover:bg-[#FAF7F2]"
                   >
                     <p className="text-sm font-medium text-[#1A1A1A]">
@@ -731,99 +936,167 @@ function QuoteFulfillDialog({
           </div>
         )}
 
-        {effectiveQuoteId && (
-          <div className="flex-1 min-h-0 flex flex-col">
+        {step === "items" && (
+          <div className="flex-1 min-h-0 flex flex-col gap-2">
             {loadingDetail || !detail ? (
               <div className="py-10 text-center text-sm text-[#9CA3AF]">
                 <Loader2 size={18} className="mx-auto mb-2 animate-spin" />
                 {t("กำลังโหลด...", "Loading...", "加载中...")}
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-                {detail.items.filter((it) => it.remaining > 0).length === 0 ? (
+              <>
+                <div className="bg-[#FAF7F2] rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#1A1A1A] truncate">{detail.quote.customer_name}</p>
+                      {detail.quote.customer_address && <p className="text-[11px] text-[#9CA3AF] truncate">{detail.quote.customer_address}</p>}
+                    </div>
+                    <p className="text-sm font-semibold text-[#1A1A1A] shrink-0">฿{fmtMoney(detail.quote.total)}</p>
+                  </div>
+                  {(() => {
+                    const orderedUnits = detail.items.reduce((s, it) => s + it.qty, 0);
+                    const shippedUnits = detail.items.reduce((s, it) => s + it.shipped, 0);
+                    const pct = orderedUnits > 0 ? Math.min(100, Math.round((shippedUnits / orderedUnits) * 100)) : 0;
+                    return (
+                      <div>
+                        <div className="h-1.5 bg-[#E8E5E0] rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-[11px] text-[#6B6B6B] mt-1">
+                          {t(`ส่งแล้ว ${fmt(shippedUnits)}/${fmt(orderedUnits)} ชิ้น`, `Shipped ${shippedUnits}/${orderedUnits}`, `已发 ${shippedUnits}/${orderedUnits}`)}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {remainingItems.length === 0 ? (
                   <p className="py-10 text-center text-sm text-[#9CA3AF]">
                     {t("ใบนี้ส่งครบแล้วทุกรายการ", "Every line on this quote has shipped in full", "此单所有项目均已发货完毕")}
                   </p>
                 ) : (
-                  detail.items
-                    .filter((it) => it.remaining > 0)
-                    .map((it) => {
-                      const sel = selection[it.item_id] ?? { checked: false, qty: it.remaining, variantId: it.suggestedVariantId };
-                      const ceiling = sel.variantId
-                        ? Math.min(it.remaining, availableByVariant.get(sel.variantId) ?? it.remaining)
-                        : it.remaining;
-                      return (
-                        <div key={it.item_id} className="flex items-start gap-2 p-2 border border-[#E8E5E0] rounded-lg">
-                          <input
-                            type="checkbox"
-                            className="mt-1.5"
-                            checked={sel.checked}
-                            disabled={!sel.variantId}
-                            onChange={(e) => updateSelection(it.item_id, { checked: e.target.checked })}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{it.sku || it.name}</p>
-                            <p className="text-[11px] text-[#6B6B6B]">
-                              {it.size} · {t(`ค้างส่ง ${fmt(it.remaining)}/${fmt(it.qty)} ชิ้น`, `${it.remaining}/${it.qty} left`, `剩余 ${it.remaining}/${it.qty}`)}
-                            </p>
-                            {it.candidates.length === 0 ? (
-                              <p className="text-[11px] text-red-500 mt-1">{t("ไม่พบสินค้านี้ในสต็อก", "Not found in Stock", "库存中未找到")}</p>
-                            ) : it.candidates.length === 1 ? (
-                              <p className="text-[11px] text-[#6B6B6B] mt-1">
-                                {it.candidates[0].size_text || "-"} ({fmt(availableByVariant.get(it.candidates[0].variantId) ?? it.candidates[0].available)})
+                  <>
+                    <div className="flex justify-end">
+                      <Button type="button" size="sm" variant="outline" onClick={selectAllShippable} disabled={shippableItemIds.size === 0}>
+                        {t("เลือกทั้งหมดที่ส่งได้", "Select all shippable", "全选可发货项")}
+                      </Button>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+                      {remainingItems.map((it) => {
+                        const sel = selection[it.item_id] ?? { checked: false, qty: it.remaining, variantId: it.suggestedVariantId };
+                        const stockAvail = itemStock(sel.variantId);
+                        const outOfStock = !!sel.variantId && stockAvail <= 0;
+                        const shortStock = !!sel.variantId && stockAvail > 0 && stockAvail < it.remaining;
+                        const canCheck = !!sel.variantId && stockAvail > 0;
+                        const ceiling = Math.max(1, Math.min(it.remaining, stockAvail || it.remaining));
+                        return (
+                          <div key={it.item_id} className="flex items-start gap-2 p-2 border border-[#E8E5E0] rounded-lg">
+                            <input
+                              type="checkbox"
+                              className="mt-1.5"
+                              checked={sel.checked}
+                              disabled={!canCheck}
+                              onChange={(e) => updateSelection(it.item_id, { checked: e.target.checked })}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{it.sku || it.name}</p>
+                              <p className="text-[11px] text-[#6B6B6B]">
+                                {it.size} · {t(`ค้างส่ง ${fmt(it.remaining)}/${fmt(it.qty)} ชิ้น`, `${it.remaining}/${it.qty} left`, `剩余 ${it.remaining}/${it.qty}`)}
                               </p>
-                            ) : (
-                              <Select
-                                value={sel.variantId ? String(sel.variantId) : "__none"}
-                                onValueChange={(v) => updateSelection(it.item_id, { variantId: v === "__none" ? null : Number(v) })}
-                              >
-                                <SelectTrigger size="sm" className="h-7 text-xs w-full mt-1">
-                                  <SelectValue>
-                                    {(v: string) => {
-                                      const c = it.candidates.find((c) => String(c.variantId) === v);
-                                      return c ? `${c.size_text || "-"} (${fmt(availableByVariant.get(c.variantId) ?? c.available)})` : t("เลือกขนาด", "Pick size", "选择尺寸");
-                                    }}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__none">{t("เลือกขนาด", "Pick size", "选择尺寸")}</SelectItem>
-                                  {it.candidates.map((c) => (
-                                    <SelectItem key={c.variantId} value={String(c.variantId)}>
-                                      {c.size_text || "-"} ({fmt(availableByVariant.get(c.variantId) ?? c.available)})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
+                              {it.candidates.length === 0 && !resolvedLabels[it.item_id] ? (
+                                <>
+                                  <p className="text-[11px] text-red-500 mt-1">{t("ไม่พบสินค้านี้ในสต็อก", "Not found in Stock", "库存中未找到")}</p>
+                                  <UnmatchedSkuPicker
+                                    products={products}
+                                    onPick={(variantId, label, available) => resolveManually(it.item_id, it.sku, variantId, label, available)}
+                                  />
+                                </>
+                              ) : resolvedLabels[it.item_id] ? (
+                                <p className="text-[11px] text-[#6B6B6B] mt-1">
+                                  {resolvedLabels[it.item_id].label} ({fmt(itemStock(sel.variantId))})
+                                </p>
+                              ) : it.candidates.length === 1 ? (
+                                <p className="text-[11px] text-[#6B6B6B] mt-1">
+                                  {it.candidates[0].size_text || "-"} ({fmt(itemStock(it.candidates[0].variantId))})
+                                </p>
+                              ) : (
+                                <Select
+                                  value={sel.variantId ? String(sel.variantId) : "__none"}
+                                  onValueChange={(v) => updateSelection(it.item_id, { variantId: v === "__none" ? null : Number(v) })}
+                                >
+                                  <SelectTrigger size="sm" className="h-7 text-xs w-full mt-1">
+                                    <SelectValue>
+                                      {(v: string) => {
+                                        const c = it.candidates.find((c) => String(c.variantId) === v);
+                                        return c ? `${c.size_text || "-"} (${fmt(itemStock(c.variantId))})` : t("เลือกขนาด", "Pick size", "选择尺寸");
+                                      }}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none">{t("เลือกขนาด", "Pick size", "选择尺寸")}</SelectItem>
+                                    {it.candidates.map((c) => (
+                                      <SelectItem key={c.variantId} value={String(c.variantId)}>
+                                        {c.size_text || "-"} ({fmt(itemStock(c.variantId))})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {outOfStock && (
+                                <p className="text-[11px] text-red-500 font-medium mt-1">{t("สต็อกหมด", "Out of stock", "缺货")}</p>
+                              )}
+                              {shortStock && (
+                                <p className="text-[11px] text-amber-600 font-medium mt-1">
+                                  {t(`ส่งได้ ${fmt(stockAvail)} จาก ${fmt(it.remaining)}`, `Can ship ${stockAvail} of ${it.remaining}`, `可发 ${stockAvail}/${it.remaining}`)}
+                                </p>
+                              )}
+                            </div>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={ceiling}
+                              disabled={!sel.checked}
+                              className="h-7 text-xs w-16"
+                              value={sel.qty}
+                              onChange={(e) => updateSelection(it.item_id, { qty: Number(e.target.value) || 0 })}
+                            />
                           </div>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={ceiling}
-                            disabled={!sel.checked}
-                            className="h-7 text-xs w-16"
-                            value={sel.qty}
-                            onChange={(e) => updateSelection(it.item_id, { qty: Number(e.target.value) || 0 })}
-                          />
-                        </div>
-                      );
-                    })
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
-          </Button>
-          {effectiveQuoteId && (
-            <Button size="sm" onClick={handleConfirm} disabled={submitting || loadingDetail}>
-              {submitting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
-              {t("ยืนยันตัดสต็อก", "Confirm & deduct Stock", "确认并扣减库存")}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-[#6B6B6B]">
+            {step === "items" && summaryCount > 0 &&
+              t(
+                `เลือก ${summaryCount} รายการ · ${fmt(summaryQty)} ชิ้น · ฿${fmtMoney(summaryValue)}`,
+                `${summaryCount} items · ${summaryQty} pcs · ฿${fmtMoney(summaryValue)}`,
+                `已选 ${summaryCount} 项 · ${summaryQty} 件 · ฿${fmtMoney(summaryValue)}`
+              )}
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
             </Button>
-          )}
+            {step === "items" && !loadingDetail && detail && remainingItems.length > 0 && (
+              shippableItemIds.size === 0 ? (
+                <p className="text-xs text-red-500 self-center font-medium">
+                  {t("ใบนี้ยังส่งไม่ได้ — สินค้าหมดสต็อก", "Can't ship this yet — out of stock", "暂无法发货 — 库存不足")}
+                </p>
+              ) : (
+                <Button size="sm" onClick={handleConfirm} disabled={submitting || summaryCount === 0}>
+                  {submitting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+                  {t(`เพิ่ม ${summaryCount} รายการลงตาราง`, `Add ${summaryCount} item(s) to table`, `添加 ${summaryCount} 项到表格`)}
+                </Button>
+              )
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -841,8 +1114,9 @@ export default function DailyExportsPage() {
   const [products, setProducts] = useState<GroupedProduct[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [fulfillOpen, setFulfillOpen] = useState(false);
-  const [fulfillQuoteId, setFulfillQuoteId] = useState<number | null>(null);
-  const [fulfillOriginRowId, setFulfillOriginRowId] = useState<number | null>(null);
+  // Bumped every time the dialog is opened so it always remounts fresh
+  // (step reset to search, no leftover selection from the last quote).
+  const [fulfillKey, setFulfillKey] = useState(0);
   // Stock is fetched once; this ledger tracks every unit deducted/returned
   // by actions taken in this session since then, so the picker's remaining
   // counts stay correct without re-fetching the whole catalog on every pick.
@@ -1098,8 +1372,7 @@ export default function DailyExportsPage() {
         <Button
           variant="outline"
           onClick={() => {
-            setFulfillQuoteId(null);
-            setFulfillOriginRowId(null);
+            setFulfillKey((k) => k + 1);
             setFulfillOpen(true);
           }}
         >
@@ -1111,13 +1384,14 @@ export default function DailyExportsPage() {
       <StockGridPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} products={liveProducts} onPick={addRow} />
 
       <QuoteFulfillDialog
+        key={fulfillKey}
         open={fulfillOpen}
         onOpenChange={setFulfillOpen}
-        initialQuoteId={fulfillQuoteId}
         exportDate={date}
         salesperson={currentUser}
         availableByVariant={liveAvailableByVariant}
-        onCreated={(createdRows, deltas, quoteCustomerName) => {
+        products={liveProducts}
+        onCreated={(createdRows, deltas) => {
           // A pulled item may have merged into a row this session already
           // created (pulling the same line twice) rather than being brand
           // new — update it in place then instead of appending a duplicate.
@@ -1133,7 +1407,6 @@ export default function DailyExportsPage() {
             for (const d of deltas) next[d.variantId] = (next[d.variantId] || 0) + d.qty;
             return next;
           });
-          if (fulfillOriginRowId) saveRow(fulfillOriginRowId, { customer_name: quoteCustomerName });
         }}
       />
 
@@ -1247,12 +1520,14 @@ export default function DailyExportsPage() {
                     <TableCell>
                       <CustomerPicker
                         value={r.customer_name}
-                        onSave={(name) => saveRow(r.id, { customer_name: name })}
-                        onPickQuote={(quoteId) => {
-                          setFulfillQuoteId(quoteId);
-                          setFulfillOriginRowId(r.id);
-                          setFulfillOpen(true);
-                        }}
+                        sku={r.sku}
+                        qty={r.qty}
+                        boundToQuote={!!r.quotation_item_id}
+                        onSave={(name) => saveRow(r.id, { customer_name: name, quotation_id: null, quotation_item_id: null })}
+                        onBind={(payload) => saveRow(r.id, payload)}
+                        onClear={() =>
+                          saveRow(r.id, { customer_name: "", quotation_id: null, quotation_item_id: null, unit_price: 0, discount_pct: 0 })
+                        }
                       />
                     </TableCell>
                     <TableCell>

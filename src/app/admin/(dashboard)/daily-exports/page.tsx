@@ -89,6 +89,7 @@ const EXPORT_HEADERS = [
   "规格\n(mm) (ขนาด)",
   "单价\nUnit Price (ราคาต่อหน่วย)",
   "数量\nQuantity (ปริมาณ)",
+  "套数\nSets deducted (จำนวนชุดที่ตัด)",
   "折扣%\nDiscount % (ส่วนลด)",
   "总金额\nTotal (จำนวนเงินทั้งหมด)",
   "渠道\nChannel (ช่องทาง)",
@@ -118,12 +119,14 @@ interface VariantOption {
   variantId: number;
   size_text: string;
   available: number;
+  unitFactor: number;
 }
 interface GroupedProduct {
   productId: number;
   code: string;
   category: string;
   image_url: string | null;
+  sharedStock: boolean;
   variants: VariantOption[];
 }
 interface PickedVariant {
@@ -1156,6 +1159,14 @@ export default function DailyExportsPage() {
     for (const p of liveProducts) for (const v of p.variants) m.set(v.variantId, v.available);
     return m;
   }, [liveProducts]);
+  // For the Excel export's "sets deducted" column — only meaningful for
+  // shared-stock models (YN-01-4, QC-A2401, YN-05); everything else leaves
+  // it blank since a normal product has no "set" concept.
+  const sharedStockMetaByVariant = useMemo(() => {
+    const m = new Map<number, { unitFactor: number }>();
+    for (const p of products) if (p.sharedStock) for (const v of p.variants) m.set(v.variantId, { unitFactor: v.unitFactor });
+    return m;
+  }, [products]);
 
   async function load() {
     setLoading(true);
@@ -1189,10 +1200,15 @@ export default function DailyExportsPage() {
       const data = await res.json();
       if (cancelled || !res.ok) return;
       const grouped: GroupedProduct[] = [];
-      for (const p of data.products as { id: number; code: string; category: string; image_url: string | null; stock_variants: { id: number; size_text: string; available: number; archived: boolean }[] }[]) {
-        const variants = p.stock_variants.filter((v) => !v.archived).map((v) => ({ variantId: v.id, size_text: v.size_text, available: v.available }));
+      for (const p of data.products as {
+        id: number; code: string; category: string; image_url: string | null; shared_stock: boolean;
+        stock_variants: { id: number; size_text: string; available: number; archived: boolean; unit_factor: number }[];
+      }[]) {
+        const variants = p.stock_variants
+          .filter((v) => !v.archived)
+          .map((v) => ({ variantId: v.id, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1 }));
         if (!variants.length) continue;
-        grouped.push({ productId: p.id, code: p.code, category: p.category, image_url: p.image_url, variants });
+        grouped.push({ productId: p.id, code: p.code, category: p.category, image_url: p.image_url, sharedStock: !!p.shared_stock, variants });
       }
       setProducts(grouped);
     })();
@@ -1301,9 +1317,9 @@ export default function DailyExportsPage() {
       const ws = wb.addWorksheet("Daily Export");
       ws.columns = [
         { width: 6 }, { width: 16 }, { width: PICTURE_COL_WIDTH }, { width: 16 }, { width: 12 },
-        { width: 8 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 16 },
+        { width: 8 }, { width: 10 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 16 },
       ];
-      ws.mergeCells("A1:M1");
+      ws.mergeCells("A1:N1");
       const title = ws.getCell("A1");
       title.value = "单日出库表格\nDaily Export (แบบฟอร์มการส่งออกสินค้ารายวัน) " + date;
       title.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
@@ -1314,8 +1330,10 @@ export default function DailyExportsPage() {
 
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
+        const sharedMeta = sharedStockMetaByVariant.get(r.stock_variant_id);
+        const setsDeducted = sharedMeta ? (r.qty * sharedMeta.unitFactor) / 2 : "";
         const row = ws.addRow([
-          i + 1, r.sku, "", r.size_text, r.unit_price, r.qty, r.discount_pct, rowTotal(r),
+          i + 1, r.sku, "", r.size_text, r.unit_price, r.qty, setsDeducted, r.discount_pct, rowTotal(r),
           r.channel ? t(CHANNEL_META[r.channel].th, CHANNEL_META[r.channel].en, CHANNEL_META[r.channel].zh) : "",
           r.remark, r.customer_name, r.salesperson || "", r.po_no,
         ]);

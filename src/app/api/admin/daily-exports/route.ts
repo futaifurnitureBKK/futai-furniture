@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { adjustVariantField } from "@/lib/shared-stock";
 import type { SavedQuoteItem } from "@/types";
 
 export async function GET(req: NextRequest) {
@@ -69,13 +70,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // One atomic SQL statement (see adjust_stock_variant_available) so two
-  // staff picking the last unit at the same instant can't both get through.
-  const { error: deductErr } = await db.rpc("adjust_stock_variant_available", {
-    p_variant_id: stock_variant_id,
-    p_delta: -qty,
-  });
-  if (deductErr) {
+  // Atomic (see adjust_stock_variant_available / adjust_shared_stock_modules)
+  // so two staff picking the last unit at the same instant can't both get
+  // through — and, for a shared-stock product, deducts the whole module
+  // pool so every sibling size's cached count updates together.
+  const deduct = await adjustVariantField(db, stock_variant_id, "available", -qty);
+  if (!deduct.ok) {
     return NextResponse.json({ error: `สต็อก ${sku || ""} ${size_text || ""} เหลือไม่พอ`.trim() }, { status: 409 });
   }
 
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
     if (error) {
-      await db.rpc("adjust_stock_variant_available", { p_variant_id: stock_variant_id, p_delta: qty });
+      await adjustVariantField(db, stock_variant_id, "available", qty);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({ row: data });
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
     .single();
   if (error) {
     // Roll back the deduction so a failed insert never leaves stock short.
-    await db.rpc("adjust_stock_variant_available", { p_variant_id: stock_variant_id, p_delta: qty });
+    await adjustVariantField(db, stock_variant_id, "available", qty);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
   return NextResponse.json({ row: data });

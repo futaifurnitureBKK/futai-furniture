@@ -11,9 +11,15 @@ export const PRODUCT_FIELDS = [
   "archived",
   "in_showroom",
   "made_to_order",
+  "shared_stock",
   "image_urls",
   "sort_order",
 ] as const;
+// shared_available_modules / shared_reserved_modules / shared_defective_modules
+// are deliberately NOT here — they must only ever change through the
+// adjust_shared_stock_modules() SQL function, never a raw PATCH, so the
+// synced per-variant available/reserved/defective cache can't drift out of
+// sync with the real pool.
 
 export const VARIANT_FIELDS = [
   "code",
@@ -28,6 +34,7 @@ export const VARIANT_FIELDS = [
   "available",
   "reserved",
   "defective",
+  "unit_factor",
   "reorder_point",
   "location",
   "eta",

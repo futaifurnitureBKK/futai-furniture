@@ -57,6 +57,7 @@ interface DbVariant {
   tracked: boolean;
   archived: boolean;
   image_urls: string[];
+  unit_factor: number;
 }
 interface DbProduct {
   id: number;
@@ -73,6 +74,13 @@ interface DbProduct {
   in_showroom: boolean;
   sort_order: number;
   stock_variants: DbVariant[];
+  // "สต็อกร่วม" — only ever true for a handful of models whose sizes all
+  // draw from one shared module pool instead of each having its own count.
+  // See src/lib/shared-stock.ts.
+  shared_stock: boolean;
+  shared_available_modules: number;
+  shared_reserved_modules: number;
+  shared_defective_modules: number;
 }
 interface Movement {
   id: number;
@@ -281,6 +289,7 @@ export default function StockPage() {
   // Quick "+N came in" instead of having to retype the new total by hand —
   // every container/batch arrival just adds to what's already there.
   function receiveStock(p: DbProduct, v: DbVariant) {
+    if (p.shared_stock) return receiveSharedStock(p);
     const input = prompt(
       t(`รับเข้าเพิ่มกี่ชิ้น? (ตอนนี้พร้อมขาย ${v.available})`, `How many came in? (currently ${v.available} available)`, `入库多少件？（当前可售 ${v.available}）`)
     );
@@ -293,6 +302,7 @@ export default function StockPage() {
   // Moves stock from "พร้อมขาย" to "จอง" as one step, so a reservation never
   // has to be hand-calculated across two separate number fields.
   function reserveStock(p: DbProduct, v: DbVariant) {
+    if (p.shared_stock) return reserveSharedStock(p);
     const input = prompt(
       t(`ลูกค้าจองกี่ชิ้น? (พร้อมขายตอนนี้ ${v.available})`, `How many did the customer reserve? (currently ${v.available} available)`, `客户预订多少件？（当前可售 ${v.available}）`)
     );
@@ -311,6 +321,96 @@ export default function StockPage() {
     )
       return;
     editVariant(p.id, v.id, { available: v.available - qty, reserved: v.reserved + qty });
+  }
+
+  // ── Shared-stock (YN-01-4, QC-A2401, YN-05): one pool across every size,
+  // entered in sets (.5 allowed) at the product level instead of pieces at
+  // the variant level — see src/lib/shared-stock.ts. ──
+  function sharedSetsAvailable(p: DbProduct) {
+    return p.shared_available_modules / 2;
+  }
+  function sharedSetsReserved(p: DbProduct) {
+    return p.shared_reserved_modules / 2;
+  }
+  function sharedSetsDefective(p: DbProduct) {
+    return p.shared_defective_modules / 2;
+  }
+
+  async function callSharedAdjust(p: DbProduct, field: "available" | "reserved" | "defective", sets: number) {
+    const res = await fetch(`/api/admin/stock/${p.id}/shared-adjust`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, sets }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+      return false;
+    }
+    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...data.product } : x)));
+    return true;
+  }
+
+  function receiveSharedStock(p: DbProduct) {
+    const current = sharedSetsAvailable(p);
+    const input = prompt(
+      t(
+        `รับเข้าเพิ่มกี่ชุด? (ตอนนี้พร้อมขาย ${current} ชุด) — ใส่ .5 ได้`,
+        `How many sets came in? (currently ${current} available) — .5 allowed`,
+        `入库多少套？（当前可售 ${current} 套）— 可输入 .5`
+      )
+    );
+    if (!input) return;
+    const sets = Number(input);
+    if (!sets || sets <= 0) return;
+    callSharedAdjust(p, "available", sets);
+  }
+
+  async function reserveSharedStock(p: DbProduct) {
+    const current = sharedSetsAvailable(p);
+    const input = prompt(
+      t(`ลูกค้าจองกี่ชุด? (พร้อมขายตอนนี้ ${current} ชุด)`, `How many sets did the customer reserve? (currently ${current} available)`, `客户预订多少套？（当前可售 ${current} 套）`)
+    );
+    if (!input) return;
+    const sets = Number(input);
+    if (!sets || sets <= 0) return;
+    if (
+      sets > current &&
+      !confirm(
+        t(
+          `มีพร้อมขายแค่ ${current} ชุด จะจอง ${sets} ชุดเลยไหม (พร้อมขายจะติดลบ)?`,
+          `Only ${current} sets available — reserve ${sets} anyway (available will go negative)?`,
+          `仅剩 ${current} 套可售 —— 仍要预订 ${sets} 套吗？`
+        )
+      )
+    )
+      return;
+    const ok = await callSharedAdjust(p, "available", -sets);
+    if (ok) await callSharedAdjust(p, "reserved", sets);
+  }
+
+  function adjustSharedAvailable(p: DbProduct) {
+    const current = sharedSetsAvailable(p);
+    const input = prompt(
+      t(`ปรับยอดพร้อมขายเป็นกี่ชุด? (ตอนนี้ ${current} ชุด)`, `Set available to how many sets? (currently ${current})`, `将可售调整为多少套？（当前 ${current} 套）`)
+    );
+    if (input == null || input === "") return;
+    const target = Number(input);
+    if (!Number.isFinite(target)) return;
+    const delta = target - current;
+    if (delta === 0) return;
+    callSharedAdjust(p, "available", delta);
+  }
+
+  function adjustSharedDefective(p: DbProduct) {
+    const current = sharedSetsDefective(p);
+    const input = prompt(
+      t(`มีตำหนิกี่ชุด? (ปัจจุบัน ${current} ชุด) ใส่ติดลบเพื่อลด`, `How many defective sets? (currently ${current}) negative to reduce`, `次品多少套？（当前 ${current} 套）输入负数以减少`)
+    );
+    if (input == null || input === "") return;
+    const delta = Number(input);
+    if (!delta) return;
+    callSharedAdjust(p, "defective", delta);
   }
 
   // Attaches a photo to this one size/variant — once a variant has its own
@@ -569,6 +669,26 @@ export default function StockPage() {
     if (!res.ok) {
       setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_showroom: !next } : x)));
       toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    }
+  }
+
+  // "สต็อกร่วม" — turning this on starts pooling this model's sizes into one
+  // shared module count (see shared_available_modules etc.); turning it off
+  // leaves whatever modules it had, just stops syncing them into available.
+  async function toggleSharedStock(p: DbProduct) {
+    const next = !p.shared_stock;
+    if (!confirm(t(`${next ? "เปิด" : "ปิด"}สต็อกร่วมสำหรับ "${p.code}" ใช่ไหม?`, `${next ? "Turn on" : "Turn off"} shared stock for "${p.code}"?`, `要${next ? "开启" : "关闭"} "${p.code}" 的共享库存吗？`))) return;
+    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, shared_stock: next } : x)));
+    const res = await fetch(`/api/admin/stock/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shared_stock: next }),
+    });
+    if (!res.ok) {
+      setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, shared_stock: !next } : x)));
+      toast.error(t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+    } else {
+      setReloadTick((n) => n + 1);
     }
   }
 
@@ -1033,17 +1153,56 @@ export default function StockPage() {
                                   <TableCell rowSpan={span} className="align-top">
                                     <p className="text-sm font-mono font-medium">{p.code}</p>
                                     <p className="text-[10px] text-[#9CA3AF]">{catLabel(p.category)}</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleShowroom(p)}
-                                      title={t("กดเพื่อตั้ง/ยกเลิกว่าอยู่ในโชว์รูมตอนนี้", "Click to toggle whether this is currently in the showroom", "点击切换是否当前陈列在展厅")}
-                                      className={`mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
-                                        p.in_showroom ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "bg-[#F0EDE6] text-[#9CA3AF] hover:bg-[#E8E5E0]"
-                                      }`}
-                                    >
-                                      <Store size={10} />
-                                      {t("โชว์รูม", "Showroom", "展厅")}
-                                    </button>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleShowroom(p)}
+                                        title={t("กดเพื่อตั้ง/ยกเลิกว่าอยู่ในโชว์รูมตอนนี้", "Click to toggle whether this is currently in the showroom", "点击切换是否当前陈列在展厅")}
+                                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                                          p.in_showroom ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "bg-[#F0EDE6] text-[#9CA3AF] hover:bg-[#E8E5E0]"
+                                        }`}
+                                      >
+                                        <Store size={10} />
+                                        {t("โชว์รูม", "Showroom", "展厅")}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSharedStock(p)}
+                                        title={t("สต็อกร่วม — ทุกขนาดของรุ่นนี้ใช้สต็อกร่วมกัน", "Shared stock — every size of this model shares one pool", "共享库存 — 该型号所有规格共用一个库存池")}
+                                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                                          p.shared_stock ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-[#F0EDE6] text-[#9CA3AF] hover:bg-[#E8E5E0]"
+                                        }`}
+                                      >
+                                        <Database size={10} />
+                                        {t("สต็อกร่วม", "Shared stock", "共享库存")}
+                                      </button>
+                                    </div>
+                                    {p.shared_stock && (
+                                      <div className="mt-1 text-[10px] text-blue-700 bg-blue-50 rounded px-1.5 py-1 space-y-0.5">
+                                        <p className="font-semibold">
+                                          {t(`พร้อมขาย ${fmt(sharedSetsAvailable(p))} ชุด`, `${fmt(sharedSetsAvailable(p))} sets available`, `可售 ${fmt(sharedSetsAvailable(p))} 套`)}
+                                        </p>
+                                        <p>
+                                          {t(`จอง ${fmt(sharedSetsReserved(p))} · ตำหนิ ${fmt(sharedSetsDefective(p))} ชุด`, `reserved ${fmt(sharedSetsReserved(p))} · defective ${fmt(sharedSetsDefective(p))}`, `已订 ${fmt(sharedSetsReserved(p))} · 次品 ${fmt(sharedSetsDefective(p))}`)}
+                                        </p>
+                                        {!archivedView && (
+                                          <div className="flex flex-wrap gap-1 pt-0.5">
+                                            <button type="button" onClick={() => receiveSharedStock(p)} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                                              {t("+รับเข้า", "+Receive", "+入库")}
+                                            </button>
+                                            <button type="button" onClick={() => reserveSharedStock(p)} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">
+                                              {t("จอง", "Reserve", "预订")}
+                                            </button>
+                                            <button type="button" onClick={() => adjustSharedAvailable(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
+                                              {t("ปรับยอด", "Adjust", "调整")}
+                                            </button>
+                                            <button type="button" onClick={() => adjustSharedDefective(p)} className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100">
+                                              {t("ตำหนิ", "Defective", "次品")}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                     {p.from_stock && (
                                       <p className="text-[10px] text-amber-700">{t("มีเฉพาะในตารางสต็อกเดิม (ยังไม่มีในไฟล์รหัสสินค้า)", "only in the old stock sheet (not in the product-code file)", "仅在旧库存表中（编号文件中没有）")}</p>
                                     )}
@@ -1081,13 +1240,14 @@ export default function StockPage() {
                                       <Input
                                         type="number"
                                         step="any"
-                                        disabled={archivedView}
+                                        disabled={archivedView || p.shared_stock}
+                                        title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
                                         className="h-8 w-20 text-xs"
                                         value={v[f] || ""}
                                         placeholder="0"
                                         onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
                                       />
-                                      {f === "available" && !archivedView && (
+                                      {f === "available" && !archivedView && !p.shared_stock && (
                                         <div className="flex gap-1 mt-1">
                                           <button
                                             type="button"

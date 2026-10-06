@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { adjustVariantField } from "@/lib/shared-stock";
 
 export type StockField = "available" | "reserved";
 
@@ -27,7 +28,7 @@ export async function syncStockDeduction(
   const newField: StockField = fromReserved ? "reserved" : "available";
 
   if (previousVariantId != null && previousQty) {
-    await adjustField(db, previousVariantId, previousField, previousQty);
+    await adjustVariantField(db, previousVariantId, previousField, previousQty);
   }
 
   const code = newSku.trim();
@@ -53,14 +54,14 @@ export async function syncStockDeduction(
     return { variantId: null, deductedQty: 0, field: newField };
   }
 
-  await adjustField(db, variant.id, newField, -newQty);
+  // Daily Sales must always be able to record a sale whether or not Stock
+  // has enough — same as an unmatched sku, insufficient shared-stock modules
+  // just means no deduction happened, not that the sale itself is blocked.
+  const result = await adjustVariantField(db, variant.id, newField, -newQty);
+  if (!result.ok) {
+    return { variantId: null, deductedQty: 0, field: newField };
+  }
   return { variantId: variant.id, deductedQty: newQty, field: newField };
-}
-
-async function adjustField(db: SupabaseClient, variantId: number, field: StockField, delta: number) {
-  const { data } = await db.from("stock_variants").select(field).eq("id", variantId).single();
-  const current = (data as Record<StockField, number> | null)?.[field] ?? 0;
-  await db.from("stock_variants").update({ [field]: current + delta }).eq("id", variantId);
 }
 
 function dims(text: string): number[] {

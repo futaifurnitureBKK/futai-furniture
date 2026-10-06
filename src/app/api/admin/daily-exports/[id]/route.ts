@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { restoreThenApply, adjustVariantField } from "@/lib/shared-stock";
 import type { SavedQuoteItem } from "@/types";
 
 const EDITABLE_FIELDS = [
@@ -55,35 +56,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const newVariantId = "stock_variant_id" in body ? Number(body.stock_variant_id) : existing.stock_variant_id;
       const newQty = "qty" in body ? Number(body.qty) || 0 : existing.stock_deducted_qty;
 
-      if (newVariantId === existing.stock_variant_id) {
-        // Same variant — one atomic step covers both a qty increase (more
-        // deducted) and a decrease (some given back).
-        const { error: adjErr } = await db.rpc("adjust_stock_variant_available", {
-          p_variant_id: newVariantId,
-          p_delta: existing.stock_deducted_qty - newQty,
-        });
-        if (adjErr) {
-          return NextResponse.json({ error: "สต็อกเหลือไม่พอสำหรับจำนวนนี้" }, { status: 409 });
-        }
-      } else {
-        // Different variant — restore the old one in full, then deduct the
-        // new one; if the new one doesn't have enough, undo the restore so
-        // stock never ends up short.
-        await db.rpc("adjust_stock_variant_available", {
-          p_variant_id: existing.stock_variant_id,
-          p_delta: existing.stock_deducted_qty,
-        });
-        const { error: applyErr } = await db.rpc("adjust_stock_variant_available", {
-          p_variant_id: newVariantId,
-          p_delta: -newQty,
-        });
-        if (applyErr) {
-          await db.rpc("adjust_stock_variant_available", {
-            p_variant_id: existing.stock_variant_id,
-            p_delta: -existing.stock_deducted_qty,
-          });
-          return NextResponse.json({ error: "สต็อกเหลือไม่พอสำหรับสินค้านี้" }, { status: 409 });
-        }
+      const result = await restoreThenApply(db, {
+        oldVariantId: existing.stock_variant_id,
+        oldQty: existing.stock_deducted_qty,
+        newVariantId,
+        newQty,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: "สต็อกเหลือไม่พอสำหรับจำนวนนี้" }, { status: 409 });
       }
 
       update.stock_variant_id = newVariantId;
@@ -115,10 +95,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     .eq("id", id)
     .single();
   if (existing?.stock_deducted_qty) {
-    await db.rpc("adjust_stock_variant_available", {
-      p_variant_id: existing.stock_variant_id,
-      p_delta: existing.stock_deducted_qty,
-    });
+    await adjustVariantField(db, existing.stock_variant_id, "available", existing.stock_deducted_qty);
   }
 
   const { error } = await db.from("daily_export_rows").delete().eq("id", id);

@@ -79,6 +79,8 @@ function detectChannelFromText(text: string): LeadChannel | null {
   if (t.includes("facebook") || t.includes("facedook")) return "facebook";
   if (t.includes("tiktok")) return "tiktok";
   if (t.includes("line") || t.includes("ไลน์")) return "line";
+  if (t.includes("转介绍") || t.includes("referral") || t.includes("แนะนำ")) return "referral";
+  if (t.includes("自然客") || t.includes("walk-in") || t.includes("walkin") || t.includes("หน้าร้าน")) return "walkin";
   return null;
 }
 
@@ -96,6 +98,8 @@ function detectChannelFromSheetName(name: string): LeadChannel {
   if (n.includes("face")) return "facebook";
   if (n.includes("tiktok")) return "tiktok";
   if (n.includes("line")) return "line";
+  if (n.includes("转介绍") || n.includes("referral")) return "referral";
+  if (n.includes("自然客") || n.includes("walk-in") || n.includes("walkin")) return "walkin";
   return "other";
 }
 

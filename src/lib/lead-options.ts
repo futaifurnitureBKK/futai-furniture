@@ -5,6 +5,8 @@ export const CHANNELS: { value: LeadChannel; th: string; en: string; zh: string;
   { value: "shopee",   th: "Shopee",   en: "Shopee",   zh: "Shopee",   color: "#EE4D2D" },
   { value: "tiktok",   th: "TikTok",   en: "TikTok",   zh: "TikTok",   color: "#111111" },
   { value: "line",     th: "LINE",     en: "LINE",     zh: "LINE",     color: "#06C755" },
+  { value: "referral", th: "แนะนำต่อ",  en: "Referral", zh: "转介绍",   color: "#8B5CF6" },
+  { value: "walkin",   th: "ลูกค้าหน้าร้าน", en: "Walk-in", zh: "自然客", color: "#14B8A6" },
   { value: "other",    th: "อื่นๆ",     en: "Other",    zh: "其他",     color: "#9CA3AF" },
 ];
 

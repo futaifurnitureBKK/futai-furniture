@@ -9,7 +9,7 @@ export type OrderStatus =
 export type QuoteStatus = "pending" | "quoted" | "converted" | "archived";
 export type DeliveryMethod = "pickup" | "delivery";
 
-export type LeadChannel = "facebook" | "shopee" | "tiktok" | "line" | "other";
+export type LeadChannel = "facebook" | "shopee" | "tiktok" | "line" | "referral" | "walkin" | "other";
 export type LeadSegment = "b2b" | "b2c";
 export type LeadStatus =
   | "new"

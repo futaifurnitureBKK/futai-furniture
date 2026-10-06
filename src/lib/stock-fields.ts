@@ -10,6 +10,7 @@ export const PRODUCT_FIELDS = [
   "boxes_per_item",
   "archived",
   "in_showroom",
+  "made_to_order",
   "image_urls",
   "sort_order",
 ] as const;

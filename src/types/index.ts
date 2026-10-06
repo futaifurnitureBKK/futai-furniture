@@ -79,6 +79,11 @@ export interface SavedQuoteItem {
   // Older quotes saved before this field existed won't have it yet; it
   // gets backfilled the first time such a quote is read or re-saved.
   item_id?: string;
+  // Set when picked from the Main Stock picker in quote-builder — points at
+  // the exact stock_variants row, so Daily Export's "pull from quotation"
+  // can deduct it directly instead of guessing a match from sku/size text.
+  // Absent for older quotes and for lines typed in by hand.
+  stock_variant_id?: number | null;
   name: string;
   sku: string;
   size: string;

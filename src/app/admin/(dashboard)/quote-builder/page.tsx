@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,10 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import rawStock from "@/data/stock-demo.json";
 import { useLanguage } from "@/store/language";
 import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuotePayment, PaymentMethod, PaymentType } from "@/types";
 import {
@@ -44,6 +47,7 @@ interface LineItem {
   image: string | null;
   seats: number;
   baseUnitPrice: number;
+  stock_variant_id: number | null;
 }
 
 const SEAT_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -166,6 +170,7 @@ function newLine(): LineItem {
     image: null,
     seats: 1,
     baseUnitPrice: 0,
+    stock_variant_id: null,
   };
 }
 
@@ -176,63 +181,206 @@ function todayStr() {
 function fmtMoney(n: number) {
   return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function fmt0(n: number) {
+  return n.toLocaleString("th-TH", { maximumFractionDigits: 1 });
+}
 
-function ProductPicker({ onPick }: { onPick: (entry: PriceCatalogEntry) => void }) {
-  const { t } = useLanguage();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+interface StockCat {
+  key: string;
+  th: string;
+  en: string;
+  zh: string;
+}
+const STOCK_CATEGORIES = rawStock.categories as StockCat[];
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 1) return [];
-    return PRICE_CATALOG.filter(
-      (e) => e.sku.toLowerCase().includes(q) || e.category.toLowerCase().includes(q)
-    ).slice(0, 8);
-  }, [query]);
+interface QBVariantOption {
+  variantId: number;
+  size_text: string;
+  price: number | null;
+  available: number;
+  reserved: number;
+}
+interface QBGroupedProduct {
+  productId: number;
+  code: string;
+  category: string;
+  image_url: string | null;
+  inShowroom: boolean;
+  madeToOrder: boolean;
+  variants: QBVariantOption[];
+}
+interface PickedStockVariant {
+  variantId: number;
+  code: string;
+  category: string;
+  size_text: string;
+  price: number | null;
+  image_url: string | null;
+}
+
+// Same "one card per model, size buttons underneath" picker as Daily
+// Export's Stock picker, with one difference on purpose: nothing here is
+// ever disabled. A quotation can always offer a size that's out of stock
+// or permanently made-to-order — it just labels those cases instead of
+// blocking the pick, since quoting is what happens *before* stock exists.
+function StockProductPickerDialog({
+  open, onOpenChange, products, onPick,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  products: QBGroupedProduct[];
+  onPick: (v: PickedStockVariant) => void;
+}) {
+  const { t, lang } = useLanguage();
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState<string>("all");
+  const [visibleCount, setVisibleCount] = useState(60);
+
+  function updateQ(v: string) {
+    setQ(v);
+    setVisibleCount(60);
+  }
+  function updateCat(v: string) {
+    setCat(v);
+    setVisibleCount(60);
+  }
+
+  const catLabel = (key: string) => {
+    const c = STOCK_CATEGORIES.find((c) => c.key === key);
+    return c ? t(c.th, c.en, c.zh) : key;
+  };
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return products.filter((p) => {
+      if (cat !== "all" && p.category !== cat) return false;
+      if (!query) return true;
+      return (
+        p.code.toLowerCase().includes(query) ||
+        catLabel(p.category).toLowerCase().includes(query) ||
+        p.variants.some((v) => v.size_text.toLowerCase().includes(query))
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, q, cat, lang]);
+
+  const matches = filtered.slice(0, visibleCount);
+  const categoriesInUse = useMemo(() => {
+    const keys = new Set(products.map((p) => p.category));
+    return STOCK_CATEGORIES.filter((c) => keys.has(c.key));
+  }, [products]);
 
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-        <Input
-          className="h-8 pl-7 text-xs"
-          placeholder={t("ค้นหา SKU หรือชื่อสินค้า...", "Search SKU or product name...", "搜索SKU或产品名称...")}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-        />
-      </div>
-      {open && matches.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
-          {matches.map((m, i) => (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl sm:max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{t("เลือกสินค้าจากสต็อก", "Pick from Stock", "从库存选择")}</DialogTitle>
+        </DialogHeader>
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <Input
+            autoFocus
+            className="pl-8"
+            placeholder={t("ค้นหารหัสรุ่น / หมวดหมู่...", "Search model code / category...", "搜索型号/类别...")}
+            value={q}
+            onChange={(e) => updateQ(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5 -mt-1">
+          <button
+            type="button"
+            onClick={() => updateCat("all")}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${cat === "all" ? "bg-[#C8102E] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"}`}
+          >
+            {t("ทั้งหมด", "All", "全部")}
+          </button>
+          {categoriesInUse.map((c) => (
             <button
-              key={`${m.sku}-${i}`}
+              key={c.key}
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onPick(m);
-                setQuery("");
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
+              onClick={() => updateCat(c.key)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${cat === c.key ? "bg-[#C8102E] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"}`}
             >
-              <div className="relative w-12 h-9 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
-                {m.image && <Image src={m.image} alt="" fill sizes="48px" className="object-contain" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-mono font-semibold text-[#1A1A1A]">{m.sku}</p>
-                <p className="text-[11px] text-[#6B6B6B] truncate">{m.category} · {m.size}</p>
-                <p className="text-[11px] text-[#C8102E] font-medium">{m.priceLabel}</p>
-              </div>
+              {t(c.th, c.en, c.zh)}
             </button>
           ))}
         </div>
-      )}
-    </div>
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pb-2">
+            {matches.map((p) => (
+              <div key={p.productId} className="bg-white border border-[#E8E5E0] rounded-lg overflow-hidden">
+                <div className="flex gap-2 p-2">
+                  <div className="relative w-16 h-16 shrink-0 rounded bg-[#F5F3EF] overflow-hidden">
+                    {p.image_url ? (
+                      <Image src={p.image_url} alt="" fill sizes="64px" className="object-contain p-1" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[#C8C5BE]">
+                        <ImageOff size={16} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{p.code}</p>
+                    <p className="text-[10px] text-[#9CA3AF] truncate">{catLabel(p.category)}</p>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {p.inShowroom && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                          {t("โชว์รูม", "Showroom", "展厅")}
+                        </span>
+                      )}
+                      {p.madeToOrder && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">
+                          {t("สั่งทำ", "Made to order", "定制")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1 px-2 pb-2">
+                  {p.variants.map((v) => {
+                    const stockLabel = p.madeToOrder
+                      ? t("สั่งทำ", "Made to order", "定制")
+                      : v.available > 0
+                        ? t(`พร้อมขาย ${fmt0(v.available)} (จอง ${fmt0(v.reserved)})`, `${v.available} ready (${v.reserved} reserved)`, `现货 ${v.available}（已订 ${v.reserved}）`)
+                        : t("สั่งผลิต", "To produce", "待生产");
+                    const warn = p.madeToOrder || v.available <= 0;
+                    return (
+                      <button
+                        key={v.variantId}
+                        type="button"
+                        onClick={() =>
+                          onPick({ variantId: v.variantId, code: p.code, category: p.category, size_text: v.size_text, price: v.price, image_url: p.image_url })
+                        }
+                        className="text-left text-[10px] px-1.5 py-1 rounded border border-[#E8E5E0] bg-[#FAF7F2] hover:border-[#C8102E] hover:bg-white transition-colors"
+                      >
+                        <span className="font-mono font-medium text-[#1A1A1A]">{v.size_text || "-"}</span>
+                        {v.price != null && <span className="text-[#6B6B6B]"> · ฿{fmtMoney(v.price)}</span>}
+                        <span className={`block ${warn ? "text-orange-600" : "text-[#6B6B6B]"}`}>{stockLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {matches.length === 0 && (
+              <div className="col-span-full text-center py-10 text-sm text-[#9CA3AF]">{t("ไม่พบสินค้า", "No products found", "未找到商品")}</div>
+            )}
+          </div>
+          {filtered.length > visibleCount && (
+            <div className="text-center pb-2">
+              <Button size="sm" variant="outline" onClick={() => setVisibleCount((n) => n + 60)}>
+                {t(`แสดงเพิ่ม (เหลืออีก ${filtered.length - visibleCount})`, `Show more (${filtered.length - visibleCount} left)`, `显示更多（还有 ${filtered.length - visibleCount}）`)}
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -654,6 +802,38 @@ function QuoteBuilderInner() {
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
   const [items, setItems] = useState<LineItem[]>([newLine()]);
+  const [stockProducts, setStockProducts] = useState<QBGroupedProduct[]>([]);
+  const [stockPickerOpen, setStockPickerOpen] = useState(false);
+  const [stockPickerTarget, setStockPickerTarget] = useState<string | null>(null);
+
+  // Fetched once — every line item's "pick from Stock" button reuses this
+  // same list rather than each row fetching its own copy.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/admin/stock?archived=false");
+      const data = await res.json();
+      if (cancelled || !res.ok) return;
+      const grouped: QBGroupedProduct[] = [];
+      for (const p of data.products as {
+        id: number; code: string; category: string; image_url: string | null; in_showroom: boolean; made_to_order: boolean;
+        stock_variants: { id: number; size_text: string; price: number | null; available: number; reserved: number; archived: boolean }[];
+      }[]) {
+        const variants = p.stock_variants
+          .filter((v) => !v.archived)
+          .map((v) => ({ variantId: v.id, size_text: v.size_text, price: v.price, available: v.available, reserved: v.reserved }));
+        if (!variants.length) continue;
+        grouped.push({
+          productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
+          inShowroom: p.in_showroom, madeToOrder: p.made_to_order, variants,
+        });
+      }
+      setStockProducts(grouped);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [savedId, setSavedId] = useState<number | null>(null);
   const [savedList, setSavedList] = useState<SavedListRow[]>([]);
@@ -749,6 +929,7 @@ function QuoteBuilderInner() {
       items: items.map(
         (it): SavedQuoteItem => ({
           item_id: it.id,
+          stock_variant_id: it.stock_variant_id,
           name: it.name,
           sku: it.sku,
           size: it.size,
@@ -815,6 +996,7 @@ function QuoteBuilderInner() {
             seats: it.seats ?? 1,
             baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
             remarkImage: it.remarkImage ?? null,
+            stock_variant_id: it.stock_variant_id ?? null,
           }))
         : [newLine()]
     );
@@ -968,15 +1150,21 @@ function QuoteBuilderInner() {
     setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   }
 
-  function pickProduct(id: string, entry: PriceCatalogEntry) {
+  // Main Stock has no per-product display name (never did — the old price
+  // catalog used its category label as the "name" too), so the category's
+  // own th/en/zh labels become the item name, combined the same way every
+  // other multi-language field on this document is.
+  function pickStockProduct(id: string, v: PickedStockVariant) {
+    const catEntry = STOCK_CATEGORIES.find((c) => c.key === v.category);
     updateItem(id, {
-      name: entry.category,
-      sku: entry.sku,
-      size: entry.size,
-      unitPrice: entry.price ?? 0,
+      name: catEntry ? L(catEntry) : v.category,
+      sku: v.code,
+      size: v.size_text,
+      unitPrice: v.price ?? 0,
       seats: 1,
-      baseUnitPrice: entry.price ?? 0,
-      image: entry.image,
+      baseUnitPrice: v.price ?? 0,
+      image: v.image_url,
+      stock_variant_id: v.variantId,
     });
   }
 
@@ -1616,8 +1804,27 @@ function QuoteBuilderInner() {
 
                 <div className="flex gap-2">
                   <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
-                  <div className="flex-1 min-w-0">
-                    <ProductPicker onPick={(entry) => pickProduct(it.id, entry)} />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs w-full justify-start"
+                      onClick={() => {
+                        setStockPickerTarget(it.id);
+                        setStockPickerOpen(true);
+                      }}
+                    >
+                      <Search size={13} className="mr-1.5 shrink-0" />
+                      <span className="truncate">{t("เลือกสินค้าจากสต็อก...", "Pick from Stock...", "从库存选择...")}</span>
+                    </Button>
+                    {it.sku && (
+                      <p className={`text-[11px] ${it.stock_variant_id ? "text-emerald-600" : "text-amber-600"}`}>
+                        {it.stock_variant_id
+                          ? t("✓ ผูกกับสต็อก", "✓ Linked to Stock", "✓ 已关联库存")
+                          : t("ไม่ผูกสต็อก", "Not linked to Stock", "未关联库存")}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1632,13 +1839,13 @@ function QuoteBuilderInner() {
                     className="h-8 text-xs font-mono"
                     placeholder={t("รหัสรุ่น / SKU", "Model / SKU", "型号/SKU")}
                     value={it.sku}
-                    onChange={(e) => updateItem(it.id, { sku: e.target.value })}
+                    onChange={(e) => updateItem(it.id, { sku: e.target.value, stock_variant_id: null })}
                   />
                   <Input
                     className="h-8 text-xs"
                     placeholder={t("ขนาด (mm)", "Size (mm)", "规格 (mm)")}
                     value={it.size}
-                    onChange={(e) => updateItem(it.id, { size: e.target.value })}
+                    onChange={(e) => updateItem(it.id, { size: e.target.value, stock_variant_id: null })}
                   />
                 </div>
 
@@ -1710,6 +1917,16 @@ function QuoteBuilderInner() {
               <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
             </Button>
           </div>
+
+          <StockProductPickerDialog
+            open={stockPickerOpen}
+            onOpenChange={setStockPickerOpen}
+            products={stockProducts}
+            onPick={(v) => {
+              if (stockPickerTarget) pickStockProduct(stockPickerTarget, v);
+              setStockPickerOpen(false);
+            }}
+          />
 
           {!isDeliveryNote && (
             <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">

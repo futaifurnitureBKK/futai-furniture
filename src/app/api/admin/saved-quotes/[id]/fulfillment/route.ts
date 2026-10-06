@@ -44,9 +44,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Quote lines are free-text (sku/size typed by hand, not tied to Stock),
   // so Daily Export — which never deducts from a typed SKU — can only
   // *suggest* a matching stock_variants row here; staff still confirm or
-  // correct it before anything is actually deducted. A sku staff have
-  // already resolved by hand before (quotation_sku_mappings) wins over a
-  // fresh code/size guess.
+  // correct it before anything is actually deducted. Lines picked through
+  // quote-builder's Stock picker carry stock_variant_id directly and skip
+  // all of this guessing entirely; it's only needed for older quotes and
+  // hand-typed lines. Next preference is a sku staff have already resolved
+  // by hand before (quotation_sku_mappings), then a fresh code/size guess.
   const skus = [...new Set(items.map((it) => it.sku?.trim()).filter(Boolean))] as string[];
   const { data: candidates } = skus.length
     ? await db.from("stock_variants").select("id, code, size_text, available, image_urls").in("code", skus)
@@ -55,11 +57,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { data: mappings } = skus.length
     ? await db.from("quotation_sku_mappings").select("quote_sku, stock_variant_id").in("quote_sku", skus)
     : { data: [] as { quote_sku: string; stock_variant_id: number }[] };
-  const mappedVariantIds = (mappings || []).map((m) => m.stock_variant_id).filter((id) => !(candidates || []).some((c) => c.id === id));
-  const { data: mappedVariants } = mappedVariantIds.length
-    ? await db.from("stock_variants").select("id, code, size_text, available, image_urls").in("id", mappedVariantIds)
+
+  const directVariantIds = [...new Set(items.map((it) => it.stock_variant_id).filter((id): id is number => id != null))];
+
+  const seenVariantIds = new Set((candidates || []).map((c) => c.id));
+  const extraVariantIds = [
+    ...new Set([...(mappings || []).map((m) => m.stock_variant_id), ...directVariantIds]),
+  ].filter((id) => !seenVariantIds.has(id));
+  const { data: extraVariants } = extraVariantIds.length
+    ? await db.from("stock_variants").select("id, code, size_text, available, image_urls").in("id", extraVariantIds)
     : { data: [] as { id: number; code: string; size_text: string; available: number; image_urls: string[] | null }[] };
-  const allVariants = [...(candidates || []), ...(mappedVariants || [])];
+  const allVariants = [...(candidates || []), ...(extraVariants || [])];
   const mappingBySku = new Map((mappings || []).map((m) => [m.quote_sku, m.stock_variant_id]));
 
   function suggestVariant(sku: string, size: string) {
@@ -88,9 +96,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
     items: items.map((it) => {
       const sku = it.sku?.trim() || "";
-      const suggestion = sku ? suggestVariant(sku, it.size) : null;
+      const directMatch = it.stock_variant_id ? allVariants.find((c) => c.id === it.stock_variant_id) : null;
+      const suggestion = directMatch ?? (sku ? suggestVariant(sku, it.size) : null);
       const candidatesForSku = allVariants
-        .filter((c) => c.code === sku)
+        .filter((c) => c.code === sku || c.id === it.stock_variant_id)
         .map((c) => ({ variantId: c.id, size_text: c.size_text, available: c.available, image_url: c.image_urls?.[0] ?? null }));
       return {
         ...it,

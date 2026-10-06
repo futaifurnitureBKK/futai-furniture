@@ -13,9 +13,9 @@ export const DOC_LABELS: Record<SavedQuoteDocType, TriText & { prefix: string }>
 };
 
 export const STATUS_META: Record<SavedQuoteStatus, { th: string; en: string; zh: string; color: string }> = {
-  in_progress:        { th: "กำลังดำเนินการ",     en: "In Progress",       zh: "进行中",     color: "bg-blue-100 text-blue-700" },
+  in_progress:        { th: "ได้เสนอราคาแล้ว/รอการยืนยัน", en: "Quoted / Awaiting Confirmation", zh: "已报价/待确认", color: "bg-blue-100 text-blue-700" },
   confirmed:          { th: "คอนเฟิร์ม/รอชำระ",   en: "Confirmed / Awaiting Payment", zh: "已确认/待付款", color: "bg-yellow-100 text-yellow-700" },
-  awaiting_shipment:  { th: "รอจัดส่ง",           en: "Awaiting Shipment", zh: "待发货",     color: "bg-purple-100 text-purple-700" },
+  awaiting_shipment:  { th: "กำลังเตรียมจัดส่ง/กำลังจัดส่งอยู่", en: "Preparing / Shipping", zh: "待发货/发货中", color: "bg-purple-100 text-purple-700" },
   completed:          { th: "จัดส่งเสร็จแล้ว",     en: "Shipped / Completed", zh: "已发货/完成", color: "bg-green-100 text-green-700" },
 };
 export const STATUS_ORDER: SavedQuoteStatus[] = ["in_progress", "confirmed", "awaiting_shipment", "completed"];

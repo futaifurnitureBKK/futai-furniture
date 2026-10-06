@@ -196,6 +196,7 @@ const STOCK_CATEGORIES = rawStock.categories as StockCat[];
 
 interface QBVariantOption {
   variantId: number;
+  code: string;
   size_text: string;
   price: number | null;
   available: number;
@@ -263,7 +264,7 @@ function StockProductPickerDialog({
       return (
         p.code.toLowerCase().includes(query) ||
         catLabel(p.category).toLowerCase().includes(query) ||
-        p.variants.some((v) => v.size_text.toLowerCase().includes(query))
+        p.variants.some((v) => v.size_text.toLowerCase().includes(query) || v.code.toLowerCase().includes(query))
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -354,12 +355,13 @@ function StockProductPickerDialog({
                         key={v.variantId}
                         type="button"
                         onClick={() =>
-                          onPick({ variantId: v.variantId, code: p.code, category: p.category, size_text: v.size_text, price: v.price, image_url: v.imageUrls[0] || p.image_url })
+                          onPick({ variantId: v.variantId, code: v.code || p.code, category: p.category, size_text: v.size_text, price: v.price, image_url: v.imageUrls[0] || p.image_url })
                         }
                         className="text-left text-[10px] px-1.5 py-1 rounded border border-[#E8E5E0] bg-[#FAF7F2] hover:border-[#C8102E] hover:bg-white transition-colors"
                       >
                         <span className="font-mono font-medium text-[#1A1A1A]">{v.size_text || "-"}</span>
                         {v.price != null && <span className="text-[#6B6B6B]"> · ฿{fmtMoney(v.price)}</span>}
+                        {v.code && v.code !== p.code && <span className="block font-mono text-[#9CA3AF]">{v.code}</span>}
                         <span className={`block ${warn ? "text-orange-600" : "text-[#6B6B6B]"}`}>{stockLabel}</span>
                       </button>
                     );
@@ -829,11 +831,11 @@ function QuoteBuilderInner() {
       for (const p of data.products as {
         id: number; code: string; category: string; image_url: string | null; in_showroom: boolean; made_to_order: boolean;
         shared_stock: boolean; shared_available_modules: number;
-        stock_variants: { id: number; size_text: string; price: number | null; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
+        stock_variants: { id: number; code: string; size_text: string; price: number | null; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
       }[]) {
         const variants = p.stock_variants
           .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, size_text: v.size_text, price: v.price, available: v.available, reserved: v.reserved, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
+          .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, price: v.price, available: v.available, reserved: v.reserved, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
         if (!variants.length) continue;
         grouped.push({
           productId: p.id, code: p.code, category: p.category, image_url: p.image_url,

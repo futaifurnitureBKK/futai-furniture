@@ -118,6 +118,7 @@ const CATEGORIES = rawStock.categories as Cat[];
 
 interface VariantOption {
   variantId: number;
+  code: string;
   size_text: string;
   available: number;
   unitFactor: number;
@@ -184,7 +185,7 @@ function StockGridPickerDialog({
       return (
         p.code.toLowerCase().includes(query) ||
         catLabel(p.category).toLowerCase().includes(query) ||
-        p.variants.some((v) => v.size_text.toLowerCase().includes(query))
+        p.variants.some((v) => v.size_text.toLowerCase().includes(query) || v.code.toLowerCase().includes(query))
       );
     });
   }, [products, q, cat, onlyInStock, lang]);
@@ -268,7 +269,7 @@ function StockGridPickerDialog({
                       onClick={() =>
                         onPick({
                           variantId: v.variantId,
-                          code: p.code,
+                          code: v.code || p.code,
                           size_text: v.size_text,
                           image_url: v.imageUrls[0] || p.image_url,
                           available: v.available,
@@ -281,6 +282,7 @@ function StockGridPickerDialog({
                           : "border-[#F0EDE6] bg-[#F5F3EF] text-[#C8C5BE] line-through cursor-not-allowed"
                       }`}
                     >
+                      {v.code && v.code !== p.code && <span className="block">{v.code}</span>}
                       {v.size_text || "-"} ({fmt(v.available)})
                     </button>
                   ))}
@@ -1243,11 +1245,11 @@ export default function DailyExportsPage() {
       const grouped: GroupedProduct[] = [];
       for (const p of data.products as {
         id: number; code: string; category: string; image_url: string | null; shared_stock: boolean; shared_available_modules: number;
-        stock_variants: { id: number; size_text: string; available: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
+        stock_variants: { id: number; code: string; size_text: string; available: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
       }[]) {
         const variants = p.stock_variants
           .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
+          .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
         if (!variants.length) continue;
         grouped.push({
           productId: p.id, code: p.code, category: p.category, image_url: p.image_url,

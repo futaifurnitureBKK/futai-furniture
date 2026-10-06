@@ -20,6 +20,7 @@ import {
 import rawStock from "@/data/stock-demo.json";
 import { useLanguage } from "@/store/language";
 import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuotePayment, PaymentMethod, PaymentType } from "@/types";
+import { getAvailable, type DraftLine } from "@/lib/shared-stock";
 import {
   STATUS_META, STATUS_ORDER, CHANNEL_META, CHANNEL_ORDER,
   SALESPEOPLE, PAYMENT_METHOD_META, PAYMENT_METHOD_ORDER, PAYMENT_TYPE_META, PAYMENT_TYPE_ORDER,
@@ -199,6 +200,8 @@ interface QBVariantOption {
   price: number | null;
   available: number;
   reserved: number;
+  unitFactor: number;
+  imageUrls: string[];
 }
 interface QBGroupedProduct {
   productId: number;
@@ -207,6 +210,8 @@ interface QBGroupedProduct {
   image_url: string | null;
   inShowroom: boolean;
   madeToOrder: boolean;
+  sharedStock: boolean;
+  sharedAvailableModules: number;
   variants: QBVariantOption[];
 }
 interface PickedStockVariant {
@@ -349,7 +354,7 @@ function StockProductPickerDialog({
                         key={v.variantId}
                         type="button"
                         onClick={() =>
-                          onPick({ variantId: v.variantId, code: p.code, category: p.category, size_text: v.size_text, price: v.price, image_url: p.image_url })
+                          onPick({ variantId: v.variantId, code: p.code, category: p.category, size_text: v.size_text, price: v.price, image_url: v.imageUrls[0] || p.image_url })
                         }
                         className="text-left text-[10px] px-1.5 py-1 rounded border border-[#E8E5E0] bg-[#FAF7F2] hover:border-[#C8102E] hover:bg-white transition-colors"
                       >
@@ -817,15 +822,17 @@ function QuoteBuilderInner() {
       const grouped: QBGroupedProduct[] = [];
       for (const p of data.products as {
         id: number; code: string; category: string; image_url: string | null; in_showroom: boolean; made_to_order: boolean;
-        stock_variants: { id: number; size_text: string; price: number | null; available: number; reserved: number; archived: boolean }[];
+        shared_stock: boolean; shared_available_modules: number;
+        stock_variants: { id: number; size_text: string; price: number | null; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
       }[]) {
         const variants = p.stock_variants
           .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, size_text: v.size_text, price: v.price, available: v.available, reserved: v.reserved }));
+          .map((v) => ({ variantId: v.id, size_text: v.size_text, price: v.price, available: v.available, reserved: v.reserved, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
         if (!variants.length) continue;
         grouped.push({
           productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
-          inShowroom: p.in_showroom, madeToOrder: p.made_to_order, variants,
+          inShowroom: p.in_showroom, madeToOrder: p.made_to_order,
+          sharedStock: !!p.shared_stock, sharedAvailableModules: p.shared_available_modules || 0, variants,
         });
       }
       setStockProducts(grouped);
@@ -834,6 +841,36 @@ function QuoteBuilderInner() {
       cancelled = true;
     };
   }, []);
+
+  const stockVariantMeta = useMemo(() => {
+    const m = new Map<number, { productId: number; unitFactor: number; sharedStock: boolean }>();
+    for (const p of stockProducts) for (const v of p.variants) m.set(v.variantId, { productId: p.productId, unitFactor: v.unitFactor, sharedStock: p.sharedStock });
+    return m;
+  }, [stockProducts]);
+
+  // For a shared-stock model, every other line already in this quote that
+  // uses the same model eats into what this row's picker can still show —
+  // excludes the row the picker is currently open for, so re-picking a
+  // different size for that same row isn't counted against itself.
+  const liveStockProducts = useMemo(() => {
+    const draftRows: DraftLine[] = items
+      .filter((it) => it.id !== stockPickerTarget && it.stock_variant_id != null)
+      .map((it) => {
+        const meta = stockVariantMeta.get(it.stock_variant_id as number);
+        return meta ? { productId: meta.productId, unitFactor: meta.unitFactor, qty: it.qty } : null;
+      })
+      .filter((x): x is DraftLine => x != null);
+    return stockProducts.map((p) => ({
+      ...p,
+      variants: p.variants.map((v) => ({
+        ...v,
+        available: getAvailable(
+          { sharedStock: p.sharedStock, rawAvailable: v.available, productId: p.productId, sharedAvailableModules: p.sharedAvailableModules, unitFactor: v.unitFactor },
+          draftRows
+        ),
+      })),
+    }));
+  }, [stockProducts, items, stockPickerTarget, stockVariantMeta]);
 
   const [savedId, setSavedId] = useState<number | null>(null);
   const [savedList, setSavedList] = useState<SavedListRow[]>([]);
@@ -1921,7 +1958,7 @@ function QuoteBuilderInner() {
           <StockProductPickerDialog
             open={stockPickerOpen}
             onOpenChange={setStockPickerOpen}
-            products={stockProducts}
+            products={liveStockProducts}
             onPick={(v) => {
               if (stockPickerTarget) pickStockProduct(stockPickerTarget, v);
               setStockPickerOpen(false);

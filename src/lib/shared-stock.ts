@@ -39,6 +39,45 @@ export function computeVariantAvailable(modules: number, unitFactor: number): nu
   return Math.floor(modules / unitFactor);
 }
 
+// One line of a draft (not-yet-confirmed, or already-saved-this-session)
+// selection — enough to know how many modules of a shared-stock product's
+// pool it accounts for.
+export interface DraftLine {
+  productId: number;
+  unitFactor: number;
+  qty: number;
+}
+
+// The single source of truth for "how many of this exact size can still be
+// picked right now," used by every surface that shows a shared-stock
+// product's per-size count (Daily Export's picker and table, the pull-from-
+// quotation dialog, Quote Builder, the Stock page). For a shared-stock
+// product it subtracts every draft line that belongs to the SAME model
+// (across all its sizes) from the product's current module pool before
+// flooring by this size's own factor, so every sibling size agrees with
+// what's actually left; a normal product is untouched (just its own cached
+// count). Pass `excludeIndex` to add a row's own consumption back when
+// computing the max *that row itself* can be raised to.
+export function getAvailable(
+  variant: {
+    sharedStock: boolean;
+    rawAvailable: number;
+    productId: number;
+    sharedAvailableModules: number;
+    unitFactor: number;
+  },
+  draftRows: DraftLine[] = [],
+  excludeIndex?: number
+): number {
+  if (!variant.sharedStock) return variant.rawAvailable;
+  let consumed = 0;
+  draftRows.forEach((r, i) => {
+    if (i === excludeIndex || r.productId !== variant.productId) return;
+    consumed += r.qty * r.unitFactor;
+  });
+  return computeVariantAvailable(variant.sharedAvailableModules - consumed, variant.unitFactor);
+}
+
 // ── DB-aware — the single entry point every deduct/restore call in the
 // app should go through, so shared-stock products are handled correctly
 // everywhere without every call site needing to know about them ──────────

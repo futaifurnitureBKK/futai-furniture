@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { setsToModules, modulesToSets, computeNewModules, computeVariantAvailable } from "./shared-stock";
+import { setsToModules, modulesToSets, computeNewModules, computeVariantAvailable, getAvailable } from "./shared-stock";
 
 describe("setsToModules / modulesToSets", () => {
   it("converts whole and half sets to modules", () => {
@@ -55,5 +55,56 @@ describe("shared stock scenarios (QC-A2401 starting at 8.5 sets = 17 modules)", 
     const result = computeNewModules(START_MODULES, -18);
     expect(result.ok).toBe(false);
     expect(result.newModules).toBe(START_MODULES); // pool unchanged on rejection
+  });
+});
+
+describe("getAvailable (draft rows already in the table reduce every sibling size)", () => {
+  const PRODUCT_ID = 1;
+  const base = { sharedStock: true, rawAvailable: 0, productId: PRODUCT_ID, sharedAvailableModules: 17 };
+  const sizes = { f1: { ...base, unitFactor: 1 }, f2: { ...base, unitFactor: 2 }, f3: { ...base, unitFactor: 3 } };
+
+  it("17 modules + a 1200mm x3 draft row -> 14/7/4", () => {
+    const draft = [{ productId: PRODUCT_ID, unitFactor: 1, qty: 3 }];
+    expect(getAvailable(sizes.f1, draft)).toBe(14);
+    expect(getAvailable(sizes.f2, draft)).toBe(7);
+    expect(getAvailable(sizes.f3, draft)).toBe(4);
+  });
+
+  it("adding a 2400mm x1 draft row on top -> 12/6/4", () => {
+    const draft = [
+      { productId: PRODUCT_ID, unitFactor: 1, qty: 3 },
+      { productId: PRODUCT_ID, unitFactor: 2, qty: 1 },
+    ];
+    expect(getAvailable(sizes.f1, draft)).toBe(12);
+    expect(getAvailable(sizes.f2, draft)).toBe(6);
+    expect(getAvailable(sizes.f3, draft)).toBe(4);
+  });
+
+  it("removing the 1200mm row -> 15/7/5", () => {
+    const draft = [{ productId: PRODUCT_ID, unitFactor: 2, qty: 1 }];
+    expect(getAvailable(sizes.f1, draft)).toBe(15);
+    expect(getAvailable(sizes.f2, draft)).toBe(7);
+    expect(getAvailable(sizes.f3, draft)).toBe(5);
+  });
+
+  it("a draft row of a different product never affects this one", () => {
+    const draft = [{ productId: 999, unitFactor: 1, qty: 100 }];
+    expect(getAvailable(sizes.f1, draft)).toBe(17);
+  });
+
+  it("non-shared-stock variants ignore draft rows entirely", () => {
+    const normal = { sharedStock: false, rawAvailable: 42, productId: PRODUCT_ID, sharedAvailableModules: 0, unitFactor: 1 };
+    const draft = [{ productId: PRODUCT_ID, unitFactor: 1, qty: 3 }];
+    expect(getAvailable(normal, draft)).toBe(42);
+  });
+
+  it("excludeIndex adds that row's own consumption back (for computing its own max)", () => {
+    const draft = [
+      { productId: PRODUCT_ID, unitFactor: 1, qty: 3 }, // index 0 — this row itself
+      { productId: PRODUCT_ID, unitFactor: 2, qty: 1 }, // index 1
+    ];
+    // Editing row 0 (the 1200mm x3 row): its own max should ignore its own
+    // qty, so only the 2400mm x1 row's 2 modules are subtracted from 17.
+    expect(getAvailable(sizes.f1, draft, 0)).toBe(15);
   });
 });

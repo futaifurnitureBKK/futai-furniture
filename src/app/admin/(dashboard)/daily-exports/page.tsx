@@ -23,6 +23,7 @@ import {
 } from "@/lib/daily-sheets-excel";
 import rawStock from "@/data/stock-demo.json";
 import type { DailyExportRow, DailyExportChannel } from "@/types";
+import { getAvailable } from "@/lib/shared-stock";
 
 interface MatchingQuoteItem {
   item_id: string;
@@ -120,6 +121,7 @@ interface VariantOption {
   size_text: string;
   available: number;
   unitFactor: number;
+  imageUrls: string[];
 }
 interface GroupedProduct {
   productId: number;
@@ -127,6 +129,7 @@ interface GroupedProduct {
   category: string;
   image_url: string | null;
   sharedStock: boolean;
+  sharedAvailableModules: number;
   variants: VariantOption[];
 }
 interface PickedVariant {
@@ -262,7 +265,15 @@ function StockGridPickerDialog({
                       key={v.variantId}
                       type="button"
                       disabled={v.available <= 0}
-                      onClick={() => onPick({ variantId: v.variantId, code: p.code, size_text: v.size_text, image_url: p.image_url, available: v.available })}
+                      onClick={() =>
+                        onPick({
+                          variantId: v.variantId,
+                          code: p.code,
+                          size_text: v.size_text,
+                          image_url: v.imageUrls[0] || p.image_url,
+                          available: v.available,
+                        })
+                      }
                       title={v.available <= 0 ? t("หมด", "Out of stock", "缺货") : undefined}
                       className={`text-[10px] px-1.5 py-1 rounded border font-mono transition-colors ${
                         v.available > 0
@@ -868,6 +879,7 @@ function QuoteFulfillDialog({
           salesperson,
           quotation_id: detail.quote.id,
           quotation_item_id: itemId,
+          channel: "b2b" as DailyExportChannel,
         }),
       });
       const data = await res.json();
@@ -1141,18 +1153,47 @@ export default function DailyExportsPage() {
   // Bumped every time the dialog is opened so it always remounts fresh
   // (step reset to search, no leftover selection from the last quote).
   const [fulfillKey, setFulfillKey] = useState(0);
-  // Stock is fetched once; this ledger tracks every unit deducted/returned
+  // Stock is fetched once; these ledgers track every unit deducted/returned
   // by actions taken in this session since then, so the picker's remaining
   // counts stay correct without re-fetching the whole catalog on every pick.
+  // Normal products are tracked per variant (pieces); shared-stock products
+  // are tracked per PRODUCT in modules, since a deduction on any one size
+  // has to show up on every sibling size too.
   const [sessionDelta, setSessionDelta] = useState<Record<number, number>>({});
+  const [sessionModuleDelta, setSessionModuleDelta] = useState<Record<number, number>>({});
+
+  const variantMeta = useMemo(() => {
+    const m = new Map<number, { productId: number; unitFactor: number; sharedStock: boolean }>();
+    for (const p of products) for (const v of p.variants) m.set(v.variantId, { productId: p.productId, unitFactor: v.unitFactor, sharedStock: p.sharedStock });
+    return m;
+  }, [products]);
+
+  // Routes a piece-quantity change on one variant to the right ledger —
+  // every call site that used to call setSessionDelta directly goes through
+  // this instead, so shared-stock products are handled correctly everywhere
+  // without each call site needing to know about them.
+  function bumpSessionDelta(variantId: number, pieceDelta: number) {
+    const meta = variantMeta.get(variantId);
+    if (meta?.sharedStock) {
+      setSessionModuleDelta((prev) => ({ ...prev, [meta.productId]: (prev[meta.productId] || 0) + pieceDelta * meta.unitFactor }));
+    } else {
+      setSessionDelta((prev) => ({ ...prev, [variantId]: (prev[variantId] || 0) + pieceDelta }));
+    }
+  }
 
   const liveProducts = useMemo(
     () =>
       products.map((p) => ({
         ...p,
-        variants: p.variants.map((v) => ({ ...v, available: v.available - (sessionDelta[v.variantId] || 0) })),
+        variants: p.variants.map((v) => ({
+          ...v,
+          available: getAvailable(
+            { sharedStock: p.sharedStock, rawAvailable: v.available - (sessionDelta[v.variantId] || 0), productId: p.productId, sharedAvailableModules: p.sharedAvailableModules, unitFactor: v.unitFactor },
+            [{ productId: p.productId, unitFactor: 1, qty: sessionModuleDelta[p.productId] || 0 }]
+          ),
+        })),
       })),
-    [products, sessionDelta]
+    [products, sessionDelta, sessionModuleDelta]
   );
   const liveAvailableByVariant = useMemo(() => {
     const m = new Map<number, number>();
@@ -1201,14 +1242,17 @@ export default function DailyExportsPage() {
       if (cancelled || !res.ok) return;
       const grouped: GroupedProduct[] = [];
       for (const p of data.products as {
-        id: number; code: string; category: string; image_url: string | null; shared_stock: boolean;
-        stock_variants: { id: number; size_text: string; available: number; archived: boolean; unit_factor: number }[];
+        id: number; code: string; category: string; image_url: string | null; shared_stock: boolean; shared_available_modules: number;
+        stock_variants: { id: number; size_text: string; available: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
       }[]) {
         const variants = p.stock_variants
           .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1 }));
+          .map((v) => ({ variantId: v.id, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
         if (!variants.length) continue;
-        grouped.push({ productId: p.id, code: p.code, category: p.category, image_url: p.image_url, sharedStock: !!p.shared_stock, variants });
+        grouped.push({
+          productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
+          sharedStock: !!p.shared_stock, sharedAvailableModules: p.shared_available_modules || 0, variants,
+        });
       }
       setProducts(grouped);
     })();
@@ -1252,7 +1296,7 @@ export default function DailyExportsPage() {
       // Picking a size that's already a row for today tops that row up
       // instead of creating a duplicate — the server returns that same row.
       setRows((prev) => (prev.some((r) => r.id === data.row.id) ? prev.map((r) => (r.id === data.row.id ? data.row : r)) : [...prev, data.row]));
-      setSessionDelta((prev) => ({ ...prev, [v.variantId]: (prev[v.variantId] || 0) + 1 }));
+      bumpSessionDelta(v.variantId, 1);
       toast.success(t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`));
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));
@@ -1277,8 +1321,7 @@ export default function DailyExportsPage() {
       // Only move the stock ledger once the server has confirmed the
       // change actually went through.
       if (change.qty !== undefined && prevRow) {
-        const delta = change.qty - prevRow.qty;
-        setSessionDelta((prev) => ({ ...prev, [prevRow.stock_variant_id]: (prev[prevRow.stock_variant_id] || 0) + delta }));
+        bumpSessionDelta(prevRow.stock_variant_id, change.qty - prevRow.qty);
       }
     } else {
       toast.error(data?.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
@@ -1295,7 +1338,7 @@ export default function DailyExportsPage() {
       setRows(prev);
       toast.error(t("ลบไม่สำเร็จ", "Delete failed", "删除失败"));
     } else {
-      if (row) setSessionDelta((prevD) => ({ ...prevD, [row.stock_variant_id]: (prevD[row.stock_variant_id] || 0) - row.qty }));
+      if (row) bumpSessionDelta(row.stock_variant_id, -row.qty);
       toast.success(t("ลบแล้ว — คืนจำนวนกลับเข้าสต็อกแล้ว", "Deleted — returned to Stock", "已删除 — 已退回库存"));
     }
   }
@@ -1306,10 +1349,37 @@ export default function DailyExportsPage() {
 
   const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
   const totalValue = rows.reduce((sum, r) => sum + rowTotal(r), 0);
+  // Per shared-stock model present in today's rows: total pieces and the
+  // set-equivalent (modules / 2) they add up to, e.g. "YN-01-4: 3 ตัว (1.5 ชุด)".
+  const sharedStockSummary = useMemo(() => {
+    const byProduct = new Map<number, { code: string; qty: number; modules: number }>();
+    for (const r of rows) {
+      const meta = sharedStockMetaByVariant.get(r.stock_variant_id);
+      if (!meta) continue;
+      const product = products.find((p) => p.variants.some((v) => v.variantId === r.stock_variant_id));
+      if (!product) continue;
+      const entry = byProduct.get(product.productId) || { code: product.code, qty: 0, modules: 0 };
+      entry.qty += r.qty;
+      entry.modules += r.qty * meta.unitFactor;
+      byProduct.set(product.productId, entry);
+    }
+    return [...byProduct.values()];
+  }, [rows, products, sharedStockMetaByVariant]);
 
   // Styled the same way as the Daily Sales / Daily Shipping export — title
   // bar, bordered + centered cells, embedded 1:1 product photos.
   async function exportExcel() {
+    const zeroRows = rows.some((r) => r.unit_price === 0 || r.qty === 0);
+    if (zeroRows) {
+      const ok = confirm(
+        t(
+          "มีรายการที่ราคา/หน่วย หรือจำนวน = 0 — ยืนยัน Export หรือไม่?",
+          "Some rows have unit price or qty = 0 — export anyway?",
+          "部分行单价或数量为0 — 仍要导出吗？"
+        )
+      );
+      if (!ok) return;
+    }
     setExporting(true);
     try {
       const ExcelJS = (await import("exceljs")).default;
@@ -1390,6 +1460,11 @@ export default function DailyExportsPage() {
           <div>
             <p className="text-[11px] text-[#9CA3AF]">{t("จำนวนชิ้นที่ตัดรวม", "Total qty deducted", "总扣减数量")}</p>
             <p className="text-base font-bold text-[#1A1A1A]">{fmt(totalQty)}</p>
+            {sharedStockSummary.map((s) => (
+              <p key={s.code} className="text-[10px] text-[#9CA3AF]">
+                {s.code}: {fmt(s.qty)} {t("ตัว", "pcs", "件")} ({fmt(s.modules / 2)} {t("ชุด", "sets", "套")})
+              </p>
+            ))}
           </div>
         </div>
         <div className="bg-white rounded-xl border border-[#E8E5E0] p-3.5 flex items-center gap-3">
@@ -1441,11 +1516,7 @@ export default function DailyExportsPage() {
             }
             return next;
           });
-          setSessionDelta((prev) => {
-            const next = { ...prev };
-            for (const d of deltas) next[d.variantId] = (next[d.variantId] || 0) + d.qty;
-            return next;
-          });
+          for (const d of deltas) bumpSessionDelta(d.variantId, d.qty);
         }}
       />
 

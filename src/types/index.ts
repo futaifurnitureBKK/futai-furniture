@@ -54,7 +54,7 @@ export interface Lead {
 
 export type SavedQuoteDocType = "quotation" | "invoice" | "delivery_note";
 export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
-export type SavedQuoteStatus = "in_progress" | "confirmed" | "awaiting_shipment" | "completed";
+export type SavedQuoteStatus = "in_progress" | "confirmed" | "awaiting_shipment" | "completed" | "needs_followup";
 export type SavedQuoteChannel = "facebook" | "shopee" | "tiktok" | "other";
 export type PaymentMethod = "cash" | "transfer" | "credit_card" | "cheque" | "alipay" | "wechat" | "other";
 export type PaymentType = "deposit" | "additional" | "full" | "other";

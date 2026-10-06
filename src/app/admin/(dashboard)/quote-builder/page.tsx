@@ -683,6 +683,12 @@ function PaymentsSection({ quoteId }: { quoteId: number | null }) {
                 </SelectContent>
               </Select>
             </div>
+            <Input
+              className="h-8 text-xs"
+              placeholder={t("หมายเหตุ (ให้ฝ่ายบัญชีอ่าน)", "Note (for accounting)", "备注（给财务看）")}
+              value={form.note}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+            />
             <Button type="button" size="sm" className="w-full" disabled={saving} onClick={addPayment}>
               <Plus size={13} className="mr-1" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
             </Button>

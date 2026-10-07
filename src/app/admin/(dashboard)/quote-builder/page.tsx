@@ -803,6 +803,11 @@ function QuoteBuilderInner() {
   // different salesperson's number can be swapped in on the letterhead.
   const [companyTel, setCompanyTel] = useState(COMPANY.tel);
   const [docNo, setDocNo] = useState(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+  // True once the doc number has been hand-edited (or loaded from an
+  // existing saved document) — lets saveQuote() warn only when someone is
+  // about to save a brand-new document still carrying the generic default
+  // number, which they almost always meant to swap for their own.
+  const [docNoTouched, setDocNoTouched] = useState(false);
   const [channel, setChannel] = useState<SavedQuoteChannel>("other");
   const [date, setDate] = useState(todayStr());
   const [customerName, setCustomerName] = useState("");
@@ -936,6 +941,7 @@ function QuoteBuilderInner() {
     setDocType("quotation");
     setLangMode("th-en-zh");
     setDocNo(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+    setDocNoTouched(false);
     setChannel("other");
     setDate(todayStr());
     setCustomerName("");
@@ -955,6 +961,16 @@ function QuoteBuilderInner() {
   }
 
   async function saveQuote() {
+    if (!savedId && !docNoTouched) {
+      const ok = confirm(
+        t(
+          "ยังไม่ได้เปลี่ยนเลขที่เอกสารเป็นของตัวเอง — บันทึกเลยไหม?",
+          "You haven't changed the document number to your own yet — save anyway?",
+          "您还没有把单号改成自己的 — 仍要保存吗？"
+        )
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     const payload = {
       doc_type: docType,
@@ -1020,6 +1036,7 @@ function QuoteBuilderInner() {
     setDocType(q.doc_type);
     setLangMode(q.lang_mode);
     setDocNo(q.doc_no);
+    setDocNoTouched(true);
     setChannel(q.channel ?? "other");
     setDate(q.doc_date);
     setCustomerName(q.customer_name);
@@ -1762,7 +1779,14 @@ function QuoteBuilderInner() {
               </div>
               <div>
                 <Label>{t("เลขที่เอกสาร", "Document No.", "单号")}</Label>
-                <Input className="mt-1 font-mono" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+                <Input
+                  className="mt-1 font-mono"
+                  value={docNo}
+                  onChange={(e) => {
+                    setDocNo(e.target.value);
+                    setDocNoTouched(true);
+                  }}
+                />
               </div>
             </div>
 

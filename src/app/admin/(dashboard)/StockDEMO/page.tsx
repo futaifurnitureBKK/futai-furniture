@@ -355,9 +355,9 @@ export default function StockPage() {
     const current = sharedSetsAvailable(p);
     const input = prompt(
       t(
-        `รับเข้าเพิ่มกี่ชุด? (ตอนนี้พร้อมขาย ${current} ชุด) — ใส่ .5 ได้`,
-        `How many sets came in? (currently ${current} available) — .5 allowed`,
-        `入库多少套？（当前可售 ${current} 套）— 可输入 .5`
+        `รับเข้าเพิ่มกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ตอนนี้พร้อมขาย ${current} ตัว) — ใส่ .5 ได้`,
+        `How many came in (in 2400mm/4-seat equivalent pieces)? (currently ${current} available) — .5 allowed`,
+        `入库多少件（按2400mm/4座换算）？（当前可售 ${current} 件）— 可输入 .5`
       )
     );
     if (!input) return;
@@ -369,7 +369,11 @@ export default function StockPage() {
   async function reserveSharedStock(p: DbProduct) {
     const current = sharedSetsAvailable(p);
     const input = prompt(
-      t(`ลูกค้าจองกี่ชุด? (พร้อมขายตอนนี้ ${current} ชุด)`, `How many sets did the customer reserve? (currently ${current} available)`, `客户预订多少套？（当前可售 ${current} 套）`)
+      t(
+        `ลูกค้าจองกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (พร้อมขายตอนนี้ ${current} ตัว)`,
+        `How many did the customer reserve (in 2400mm/4-seat equivalent pieces)? (currently ${current} available)`,
+        `客户预订多少件（按2400mm/4座换算）？（当前可售 ${current} 件）`
+      )
     );
     if (!input) return;
     const sets = Number(input);
@@ -378,9 +382,9 @@ export default function StockPage() {
       sets > current &&
       !confirm(
         t(
-          `มีพร้อมขายแค่ ${current} ชุด จะจอง ${sets} ชุดเลยไหม (พร้อมขายจะติดลบ)?`,
-          `Only ${current} sets available — reserve ${sets} anyway (available will go negative)?`,
-          `仅剩 ${current} 套可售 —— 仍要预订 ${sets} 套吗？`
+          `มีพร้อมขายแค่ ${current} ตัว จะจอง ${sets} ตัวเลยไหม (พร้อมขายจะติดลบ)?`,
+          `Only ${current} available — reserve ${sets} anyway (available will go negative)?`,
+          `仅剩 ${current} 件可售 —— 仍要预订 ${sets} 件吗？`
         )
       )
     )
@@ -392,7 +396,11 @@ export default function StockPage() {
   function adjustSharedAvailable(p: DbProduct) {
     const current = sharedSetsAvailable(p);
     const input = prompt(
-      t(`ปรับยอดพร้อมขายเป็นกี่ชุด? (ตอนนี้ ${current} ชุด)`, `Set available to how many sets? (currently ${current})`, `将可售调整为多少套？（当前 ${current} 套）`)
+      t(
+        `ปรับยอดพร้อมขายเป็นกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ตอนนี้ ${current} ตัว)`,
+        `Set available to how many (in 2400mm/4-seat equivalent pieces)? (currently ${current})`,
+        `将可售调整为多少件（按2400mm/4座换算）？（当前 ${current} 件）`
+      )
     );
     if (input == null || input === "") return;
     const target = Number(input);
@@ -405,7 +413,11 @@ export default function StockPage() {
   function adjustSharedDefective(p: DbProduct) {
     const current = sharedSetsDefective(p);
     const input = prompt(
-      t(`มีตำหนิกี่ชุด? (ปัจจุบัน ${current} ชุด) ใส่ติดลบเพื่อลด`, `How many defective sets? (currently ${current}) negative to reduce`, `次品多少套？（当前 ${current} 套）输入负数以减少`)
+      t(
+        `มีตำหนิกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ปัจจุบัน ${current} ตัว) ใส่ติดลบเพื่อลด`,
+        `How many defective (in 2400mm/4-seat equivalent pieces)? (currently ${current}) negative to reduce`,
+        `次品多少件（按2400mm/4座换算）？（当前 ${current} 件）输入负数以减少`
+      )
     );
     if (input == null || input === "") return;
     const delta = Number(input);
@@ -1180,10 +1192,18 @@ export default function StockPage() {
                                     {p.shared_stock && (
                                       <div className="mt-1 text-[10px] text-blue-700 bg-blue-50 rounded px-1.5 py-1 space-y-0.5">
                                         <p className="font-semibold">
-                                          {t(`พร้อมขาย ${fmt(sharedSetsAvailable(p))} ชุด`, `${fmt(sharedSetsAvailable(p))} sets available`, `可售 ${fmt(sharedSetsAvailable(p))} 套`)}
+                                          {t(
+                                            `พร้อมขาย ${fmt(sharedSetsAvailable(p))} ตัว (2400mm · 4 ที่นั่ง)`,
+                                            `${fmt(sharedSetsAvailable(p))} pcs available (2400mm / 4-seat equivalent)`,
+                                            `可售 ${fmt(sharedSetsAvailable(p))} 件（按2400mm/4座换算）`
+                                          )}
                                         </p>
                                         <p>
-                                          {t(`จอง ${fmt(sharedSetsReserved(p))} · ตำหนิ ${fmt(sharedSetsDefective(p))} ชุด`, `reserved ${fmt(sharedSetsReserved(p))} · defective ${fmt(sharedSetsDefective(p))}`, `已订 ${fmt(sharedSetsReserved(p))} · 次品 ${fmt(sharedSetsDefective(p))}`)}
+                                          {t(
+                                            `จอง ${fmt(sharedSetsReserved(p))} · ตำหนิ ${fmt(sharedSetsDefective(p))} ตัว`,
+                                            `reserved ${fmt(sharedSetsReserved(p))} · defective ${fmt(sharedSetsDefective(p))}`,
+                                            `已订 ${fmt(sharedSetsReserved(p))} · 次品 ${fmt(sharedSetsDefective(p))}`
+                                          )}
                                         </p>
                                         {!archivedView && (
                                           <div className="flex flex-wrap gap-1 pt-0.5">

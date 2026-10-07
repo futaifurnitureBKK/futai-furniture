@@ -90,7 +90,7 @@ const EXPORT_HEADERS = [
   "规格\n(mm) (ขนาด)",
   "单价\nUnit Price (ราคาต่อหน่วย)",
   "数量\nQuantity (ปริมาณ)",
-  "套数\nSets deducted (จำนวนชุดที่ตัด)",
+  "件数(2400mm换算)\nQty deducted (2400mm equiv.) (จำนวนที่ตัด เทียบเท่า 2400mm)",
   "折扣%\nDiscount % (ส่วนลด)",
   "总金额\nTotal (จำนวนเงินทั้งหมด)",
   "渠道\nChannel (ช่องทาง)",
@@ -1464,7 +1464,7 @@ export default function DailyExportsPage() {
             <p className="text-base font-bold text-[#1A1A1A]">{fmt(totalQty)}</p>
             {sharedStockSummary.map((s) => (
               <p key={s.code} className="text-[10px] text-[#9CA3AF]">
-                {s.code}: {fmt(s.qty)} {t("ตัว", "pcs", "件")} ({fmt(s.modules / 2)} {t("ชุด", "sets", "套")})
+                {s.code}: {fmt(s.qty)} {t("ชิ้น", "pcs", "件")} = {fmt(s.modules / 2)} {t("ตัว (2400mm)", "pcs (2400mm equiv.)", "件（2400mm换算）")}
               </p>
             ))}
           </div>

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!result.ok) {
     const insufficientStock = result.error !== "sets_must_be_half_increment";
     return NextResponse.json(
-      { error: insufficientStock ? "สต็อกเหลือไม่พอ" : "จำนวนต้องเป็นหน่วย 0.5 ชุด" },
+      { error: insufficientStock ? "สต็อกเหลือไม่พอ" : "จำนวนต้องเป็นหน่วย 0.5 ตัว" },
       { status: insufficientStock ? 409 : 400 }
     );
   }

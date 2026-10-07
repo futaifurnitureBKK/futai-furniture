@@ -1175,6 +1175,14 @@ function QuoteBuilderInner() {
     }
   }
 
+  // Brings this item's row into view inside the preview panel's own
+  // scroll area when its fields gain focus on the left, so the preview
+  // follows along with whichever item is being edited instead of staying
+  // wherever it last was.
+  function scrollPreviewToItem(itemId: string) {
+    document.getElementById(`preview-row-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
     setDocNo((prev) => {
@@ -1875,7 +1883,11 @@ function QuoteBuilderInner() {
             <p className="text-sm font-semibold text-[#1A1A1A]">{t("รายการสินค้า", "Line Items", "产品清单")}</p>
 
             {items.map((it, idx) => (
-              <div key={it.id} className="border border-[#E8E5E0] rounded-lg p-3 space-y-2">
+              <div
+                key={it.id}
+                className="border border-[#E8E5E0] rounded-lg p-3 space-y-2"
+                onFocus={() => scrollPreviewToItem(it.id)}
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#9CA3AF]">#{idx + 1}</span>
                   <button type="button" onClick={() => removeItem(it.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600">
@@ -2141,7 +2153,7 @@ function QuoteBuilderInner() {
               </thead>
               <tbody>
                 {items.map((it, idx) => (
-                  <tr key={it.id} className="text-center">
+                  <tr key={it.id} id={`preview-row-${it.id}`} className="text-center">
                     <td className="border border-[#1A1A1A] p-1">{idx + 1}</td>
                     <td className="border border-[#1A1A1A] p-1 text-left">{it.name || "-"}</td>
                     <td className="border border-[#1A1A1A] p-1 font-mono">{it.sku || "-"}</td>

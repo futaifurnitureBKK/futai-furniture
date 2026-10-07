@@ -1183,6 +1183,28 @@ function QuoteBuilderInner() {
     document.getElementById(`preview-row-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  // Keeps the preview's own scroll position proportional to the page's,
+  // so scrolling the form (with the mouse, not just by focusing a field)
+  // moves the preview along with it too. "main" is the dashboard layout's
+  // own scroll container (the sidebar is fixed; only <main> scrolls), so
+  // that's what's listened to rather than window.
+  const previewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const mainEl = document.querySelector("main");
+    const previewEl = previewRef.current;
+    if (!mainEl || !previewEl) return;
+    function syncPreviewScroll() {
+      if (!mainEl || !previewEl) return;
+      const mainScrollable = mainEl.scrollHeight - mainEl.clientHeight;
+      const previewScrollable = previewEl.scrollHeight - previewEl.clientHeight;
+      if (mainScrollable <= 0 || previewScrollable <= 0) return;
+      const fraction = Math.min(1, Math.max(0, mainEl.scrollTop / mainScrollable));
+      previewEl.scrollTop = fraction * previewScrollable;
+    }
+    mainEl.addEventListener("scroll", syncPreviewScroll, { passive: true });
+    return () => mainEl.removeEventListener("scroll", syncPreviewScroll);
+  }, []);
+
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
     setDocNo((prev) => {
@@ -2055,12 +2077,20 @@ function QuoteBuilderInner() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        {/* A plain block, not sticky/internally-scrolled — it scrolls in
-            the normal document flow at the same rate as the left column,
-            so it's always roughly alongside whatever's being edited
-            without ever needing its own separate scroll interaction. */}
-        <div className="preview-sticky-wrapper overflow-x-auto">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
+        {/* Outer grid item stretches to the left column's full height (the
+            containing block sticky needs so it can stay pinned the whole
+            way down, not just for its own shorter content's height). The
+            inner box is the one that's actually sticky + internally
+            scrollable; its own scroll position is kept in sync with the
+            page's scroll by the effect above, so it both stays visible
+            AND shows whatever part of the document corresponds to how
+            far down the form you've scrolled — not stuck on page 1. */}
+        <div>
+          <div
+            ref={previewRef}
+            className="preview-sticky-wrapper sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto"
+          >
+            <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
             <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}
             <table className="w-full border-collapse mb-0">
@@ -2290,6 +2320,7 @@ function QuoteBuilderInner() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

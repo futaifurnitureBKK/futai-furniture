@@ -24,6 +24,7 @@ import { getAvailable, type DraftLine } from "@/lib/shared-stock";
 import {
   STATUS_META, STATUS_ORDER, CHANNEL_META, CHANNEL_ORDER,
   SALESPEOPLE, PAYMENT_METHOD_META, PAYMENT_METHOD_ORDER, PAYMENT_TYPE_META, PAYMENT_TYPE_ORDER,
+  computeGrandTotal,
 } from "@/lib/saved-quote-options";
 import type ExcelJS from "exceljs";
 
@@ -59,7 +60,10 @@ function computeSeatPrice(baseUnitPrice: number, seats: number): number {
   return baseUnitPrice + (seats - 1) * Math.floor(baseUnitPrice / 2);
 }
 
-type SavedListRow = Pick<SavedQuote, "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "archived" | "channel">;
+type SavedListRow = Pick<
+  SavedQuote,
+  "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "archived" | "channel" | "items" | "discount_pct" | "vat_pct"
+>;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
   quotation:     { th: "ใบเสนอราคา", en: "QUOTATION",      zh: "报价单", prefix: "QT" },
@@ -1596,6 +1600,7 @@ function QuoteBuilderInner() {
                 <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
                 <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
                 <TableHead className="text-xs">{t("วันที่", "Date", "日期")}</TableHead>
+                <TableHead className="text-xs text-right">{t("จำนวนเงิน", "Amount", "金额")}</TableHead>
                 <TableHead className="text-xs">{t("ช่องทาง", "Channel", "渠道")}</TableHead>
                 <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
                 <TableHead className="text-xs" />
@@ -1604,13 +1609,13 @@ function QuoteBuilderInner() {
             <TableBody>
               {loadingList ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={8} className="text-center py-8 text-[#6B6B6B]">
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
               ) : filteredSavedList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={8} className="text-center py-8 text-[#6B6B6B]">
                     {savedList.length === 0
                       ? showArchived
                         ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
@@ -1627,6 +1632,9 @@ function QuoteBuilderInner() {
                     </TableCell>
                     <TableCell className="text-sm">{q.customer_name || "-"}</TableCell>
                     <TableCell className="text-xs text-[#6B6B6B]">{q.doc_date}</TableCell>
+                    <TableCell className="text-sm font-medium text-right whitespace-nowrap">
+                      ฿{fmtMoney(computeGrandTotal(q.items, q.discount_pct, q.vat_pct))}
+                    </TableCell>
                     <TableCell>
                       <Select value={q.channel} onValueChange={(v) => updateSavedChannel(q.id, v as SavedQuoteChannel)}>
                         <SelectTrigger

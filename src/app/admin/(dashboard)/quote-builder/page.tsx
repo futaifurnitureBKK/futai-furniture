@@ -1183,29 +1183,6 @@ function QuoteBuilderInner() {
     document.getElementById(`preview-row-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  // Keeps the preview's own scroll position proportional to the page's —
-  // scroll the form (with the mouse, not just by focusing a field) and the
-  // preview scrolls along with it, not just when a field happens to be
-  // focused. "main" is the dashboard layout's own scroll container (the
-  // page itself has no scrollbar — the sidebar is fixed and only <main>
-  // scrolls), so that's what's listened to rather than window.
-  const previewRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const mainEl = document.querySelector("main");
-    const previewEl = previewRef.current;
-    if (!mainEl || !previewEl) return;
-    function syncPreviewScroll() {
-      if (!mainEl || !previewEl) return;
-      const mainScrollable = mainEl.scrollHeight - mainEl.clientHeight;
-      const previewScrollable = previewEl.scrollHeight - previewEl.clientHeight;
-      if (mainScrollable <= 0 || previewScrollable <= 0) return;
-      const fraction = mainEl.scrollTop / mainScrollable;
-      previewEl.scrollTop = fraction * previewScrollable;
-    }
-    mainEl.addEventListener("scroll", syncPreviewScroll, { passive: true });
-    return () => mainEl.removeEventListener("scroll", syncPreviewScroll);
-  }, []);
-
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
     setDocNo((prev) => {
@@ -2078,10 +2055,7 @@ function QuoteBuilderInner() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div
-          ref={previewRef}
-          className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto"
-        >
+        <div className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto">
           <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}

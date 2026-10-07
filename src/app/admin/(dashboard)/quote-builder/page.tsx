@@ -808,6 +808,10 @@ function QuoteBuilderInner() {
   // about to save a brand-new document still carrying the generic default
   // number, which they almost always meant to swap for their own.
   const [docNoTouched, setDocNoTouched] = useState(false);
+  // Reveals the doc-no warning below, but only once someone has actually
+  // tried to save — the first click just shows it (and doesn't save yet);
+  // clicking Save again goes ahead regardless, which is the "skip" path.
+  const [docNoWarningAcked, setDocNoWarningAcked] = useState(false);
   const [channel, setChannel] = useState<SavedQuoteChannel>("other");
   const [date, setDate] = useState(todayStr());
   const [customerName, setCustomerName] = useState("");
@@ -942,6 +946,7 @@ function QuoteBuilderInner() {
     setLangMode("th-en-zh");
     setDocNo(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
     setDocNoTouched(false);
+    setDocNoWarningAcked(false);
     setChannel("other");
     setDate(todayStr());
     setCustomerName("");
@@ -961,6 +966,10 @@ function QuoteBuilderInner() {
   }
 
   async function saveQuote() {
+    if (!savedId && !docNoTouched && !docNoWarningAcked) {
+      setDocNoWarningAcked(true);
+      return;
+    }
     setSaving(true);
     const payload = {
       doc_type: docType,
@@ -1777,7 +1786,7 @@ function QuoteBuilderInner() {
                     setDocNoTouched(true);
                   }}
                 />
-                {!savedId && !docNoTouched && (
+                {!savedId && !docNoTouched && docNoWarningAcked && (
                   <p className="mt-1 text-[11px] text-orange-600">
                     {t("⚠ อย่าลืมเปลี่ยนเป็นเลขที่ของตัวเอง", "⚠ Don't forget to change this to your own number", "⚠ 别忘了改成自己的单号")}
                   </p>

@@ -1175,36 +1175,6 @@ function QuoteBuilderInner() {
     }
   }
 
-  // Brings this item's row into view inside the preview panel's own
-  // scroll area when its fields gain focus on the left, so the preview
-  // follows along with whichever item is being edited instead of staying
-  // wherever it last was.
-  function scrollPreviewToItem(itemId: string) {
-    document.getElementById(`preview-row-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  // Keeps the preview's own scroll position proportional to the page's,
-  // so scrolling the form (with the mouse, not just by focusing a field)
-  // moves the preview along with it too. The dashboard layout's <main> has
-  // overflow-auto but its parent is only min-h-screen (not a fixed
-  // height), so <main> itself never actually overflows — the real scroll
-  // happens on the window/document, which is what's listened to here.
-  const previewRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previewEl = previewRef.current;
-    if (!previewEl) return;
-    function syncPreviewScroll() {
-      if (!previewEl) return;
-      const pageScrollable = document.documentElement.scrollHeight - window.innerHeight;
-      const previewScrollable = previewEl.scrollHeight - previewEl.clientHeight;
-      if (pageScrollable <= 0 || previewScrollable <= 0) return;
-      const fraction = Math.min(1, Math.max(0, window.scrollY / pageScrollable));
-      previewEl.scrollTop = fraction * previewScrollable;
-    }
-    window.addEventListener("scroll", syncPreviewScroll, { passive: true });
-    return () => window.removeEventListener("scroll", syncPreviewScroll);
-  }, []);
-
   function setDocTypeAndPrefix(newType: DocType) {
     setDocType(newType);
     setDocNo((prev) => {
@@ -1905,11 +1875,7 @@ function QuoteBuilderInner() {
             <p className="text-sm font-semibold text-[#1A1A1A]">{t("รายการสินค้า", "Line Items", "产品清单")}</p>
 
             {items.map((it, idx) => (
-              <div
-                key={it.id}
-                className="border border-[#E8E5E0] rounded-lg p-3 space-y-2"
-                onFocus={() => scrollPreviewToItem(it.id)}
-              >
+              <div key={it.id} className="border border-[#E8E5E0] rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#9CA3AF]">#{idx + 1}</span>
                   <button type="button" onClick={() => removeItem(it.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600">
@@ -2077,21 +2043,12 @@ function QuoteBuilderInner() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        {/* Outer grid item stretches to the left column's full height (the
-            containing block sticky needs so it can stay pinned the whole
-            way down, not just for its own shorter content's height). The
-            inner box is the one that's actually sticky + internally
-            scrollable; its own scroll position is kept in sync with the
-            page's scroll by the effect above, so it both stays visible
-            AND shows whatever part of the document corresponds to how
-            far down the form you've scrolled — not stuck on page 1. */}
-        <div>
-          <div
-            ref={previewRef}
-            className="preview-sticky-wrapper sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto"
-          >
-            <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
-            <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
+        {/* Plain block, full height, no internal scroll — shows the whole
+            document and scrolls in the normal page flow alongside the
+            left column, with no sticky/JS scroll-sync involved. */}
+        <div className="preview-sticky-wrapper overflow-x-auto">
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
+          <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}
             <table className="w-full border-collapse mb-0">
               <tbody>
@@ -2187,7 +2144,7 @@ function QuoteBuilderInner() {
               </thead>
               <tbody>
                 {items.map((it, idx) => (
-                  <tr key={it.id} id={`preview-row-${it.id}`} className="text-center">
+                  <tr key={it.id} className="text-center">
                     <td className="border border-[#1A1A1A] p-1">{idx + 1}</td>
                     <td className="border border-[#1A1A1A] p-1 text-left">{it.name || "-"}</td>
                     <td className="border border-[#1A1A1A] p-1 font-mono">{it.sku || "-"}</td>
@@ -2320,7 +2277,6 @@ function QuoteBuilderInner() {
             )}
           </div>
         </div>
-      </div>
       </div>
     </div>
   );

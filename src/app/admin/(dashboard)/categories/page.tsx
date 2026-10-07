@@ -46,8 +46,8 @@ export default function CategoriesPage() {
       setCategories((prev) =>
         prev.map((c) => (c.slug === category.slug ? { ...c, banner_url: uploadData.url } : c))
       );
-    } catch {
-      alert(t("อัปโหลดรูปไม่สำเร็จ", "Failed to upload image", "图片上传失败"));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("อัปโหลดรูปไม่สำเร็จ", "Failed to upload image", "图片上传失败"));
     } finally {
       setUploadingSlug(null);
     }

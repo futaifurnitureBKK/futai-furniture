@@ -431,8 +431,8 @@ export default function StockPage() {
     try {
       const url = await uploadImage(file);
       editVariant(p.id, v.id, { image_urls: [...v.image_urls, url] });
-    } catch {
-      toast.error(t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
     }
   }
 
@@ -528,8 +528,8 @@ export default function StockPage() {
     setUploading(true);
     try {
       setter(await uploadImage(file));
-    } catch {
-      toast.error(t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
     } finally {
       setUploading(false);
     }

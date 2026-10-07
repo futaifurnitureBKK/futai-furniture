@@ -482,8 +482,8 @@ function ImageUploadTile({ image, onChange }: { image: string | null; onChange: 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
       onChange(data.url);
-    } catch {
-      toast.error(t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
     } finally {
       setUploading(false);
     }

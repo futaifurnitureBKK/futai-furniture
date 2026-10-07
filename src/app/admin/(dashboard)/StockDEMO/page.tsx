@@ -1191,19 +1191,8 @@ export default function StockPage() {
                                     </div>
                                     {p.shared_stock && (
                                       <div className="mt-1 text-[10px] text-blue-700 bg-blue-50 rounded px-1.5 py-1 space-y-0.5">
-                                        <p className="font-semibold">
-                                          {t(
-                                            `พร้อมขาย ${fmt(sharedSetsAvailable(p))} ตัว (2400mm · 4 ที่นั่ง)`,
-                                            `${fmt(sharedSetsAvailable(p))} pcs available (2400mm / 4-seat equivalent)`,
-                                            `可售 ${fmt(sharedSetsAvailable(p))} 件（按2400mm/4座换算）`
-                                          )}
-                                        </p>
-                                        <p>
-                                          {t(
-                                            `จอง ${fmt(sharedSetsReserved(p))} · ตำหนิ ${fmt(sharedSetsDefective(p))} ตัว`,
-                                            `reserved ${fmt(sharedSetsReserved(p))} · defective ${fmt(sharedSetsDefective(p))}`,
-                                            `已订 ${fmt(sharedSetsReserved(p))} · 次品 ${fmt(sharedSetsDefective(p))}`
-                                          )}
+                                        <p className="text-[9px] text-blue-600/70">
+                                          {t("ตัวเลขดูได้ที่แถว 2400mm ด้านขวา", "See the 2400mm row for the number", "数量见右侧2400mm行")}
                                         </p>
                                         {!archivedView && (
                                           <div className="flex flex-wrap gap-1 pt-0.5">
@@ -1257,11 +1246,15 @@ export default function StockPage() {
                                   </TableCell>
                                   {(["available", "reserved", "defective"] as const).map((f) => {
                                     // For a shared-stock product, only the 2400mm/4-seat
-                                    // row's number matches the summary box above — every
-                                    // other size's own floor-divided count is correct but
-                                    // reads as a mismatch next to it, so it's left blank
-                                    // here (the picker still shows it per size when selling).
+                                    // row carries the real number now — shown as the exact
+                                    // set count (e.g. 4.5), not its own floor-divided piece
+                                    // count, so it matches what receive/reserve/adjust use.
+                                    // Every other size is left blank here (the picker still
+                                    // shows a real sellable count per size when selling).
+                                    const isReferenceRow = p.shared_stock && v.unit_factor === 2;
                                     const hideForSharedStock = p.shared_stock && v.unit_factor !== 2;
+                                    const sharedPreciseValue =
+                                      f === "available" ? sharedSetsAvailable(p) : f === "reserved" ? sharedSetsReserved(p) : sharedSetsDefective(p);
                                     return (
                                       <TableCell key={f}>
                                         <Input
@@ -1270,7 +1263,7 @@ export default function StockPage() {
                                           disabled={archivedView || p.shared_stock}
                                           title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
                                           className="h-8 w-20 text-xs"
-                                          value={hideForSharedStock ? "" : v[f] || ""}
+                                          value={hideForSharedStock ? "" : isReferenceRow ? sharedPreciseValue : v[f] || ""}
                                           placeholder={hideForSharedStock ? "–" : "0"}
                                           onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
                                         />
@@ -1561,7 +1554,10 @@ export default function StockPage() {
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>
                           {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => {
                             const isMovementField = f === "available" || f === "reserved" || f === "defective";
+                            const isReferenceRow = detail.shared_stock && isMovementField && v.unit_factor === 2;
                             const hideForSharedStock = detail.shared_stock && isMovementField && v.unit_factor !== 2;
+                            const sharedPreciseValue =
+                              f === "available" ? sharedSetsAvailable(detail) : f === "reserved" ? sharedSetsReserved(detail) : sharedSetsDefective(detail);
                             return (
                               <TableCell key={f}>
                                 <Input
@@ -1570,7 +1566,7 @@ export default function StockPage() {
                                   disabled={detail.shared_stock && isMovementField}
                                   title={detail.shared_stock && isMovementField ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
                                   className="h-8 w-20 text-xs"
-                                  value={hideForSharedStock ? "" : v[f] || ""}
+                                  value={hideForSharedStock ? "" : isReferenceRow ? sharedPreciseValue : v[f] || ""}
                                   placeholder={hideForSharedStock ? "–" : "0"}
                                   onChange={(e) => editVariant(detail.id, v.id, { [f]: num(e.target.value) })}
                                 />

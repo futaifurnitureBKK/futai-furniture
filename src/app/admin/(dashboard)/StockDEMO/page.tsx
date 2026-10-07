@@ -1255,40 +1255,48 @@ export default function StockPage() {
                                       {v.note && <span className="ml-1.5 font-normal text-[#9CA3AF]">· {v.note}</span>}
                                     </p>
                                   </TableCell>
-                                  {(["available", "reserved", "defective"] as const).map((f) => (
-                                    <TableCell key={f}>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        disabled={archivedView || p.shared_stock}
-                                        title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
-                                        className="h-8 w-20 text-xs"
-                                        value={v[f] || ""}
-                                        placeholder="0"
-                                        onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
-                                      />
-                                      {f === "available" && !archivedView && !p.shared_stock && (
-                                        <div className="flex gap-1 mt-1">
-                                          <button
-                                            type="button"
-                                            onClick={() => receiveStock(p, v)}
-                                            title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")}
-                                            className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                          >
-                                            {t("+รับเข้า", "+Receive", "+入库")}
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => reserveStock(p, v)}
-                                            title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")}
-                                            className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                          >
-                                            {t("จอง", "Reserve", "预订")}
-                                          </button>
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                  ))}
+                                  {(["available", "reserved", "defective"] as const).map((f) => {
+                                    // For a shared-stock product, only the 2400mm/4-seat
+                                    // row's number matches the summary box above — every
+                                    // other size's own floor-divided count is correct but
+                                    // reads as a mismatch next to it, so it's left blank
+                                    // here (the picker still shows it per size when selling).
+                                    const hideForSharedStock = p.shared_stock && v.unit_factor !== 2;
+                                    return (
+                                      <TableCell key={f}>
+                                        <Input
+                                          type="number"
+                                          step="any"
+                                          disabled={archivedView || p.shared_stock}
+                                          title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
+                                          className="h-8 w-20 text-xs"
+                                          value={hideForSharedStock ? "" : v[f] || ""}
+                                          placeholder={hideForSharedStock ? "–" : "0"}
+                                          onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
+                                        />
+                                        {f === "available" && !archivedView && !p.shared_stock && (
+                                          <div className="flex gap-1 mt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => receiveStock(p, v)}
+                                              title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")}
+                                              className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                            >
+                                              {t("+รับเข้า", "+Receive", "+入库")}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => reserveStock(p, v)}
+                                              title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")}
+                                              className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                            >
+                                              {t("จอง", "Reserve", "预订")}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </TableCell>
+                                    );
+                                  })}
                                   <TableCell>
                                     <Input
                                       className="h-8 w-28 text-xs"
@@ -1551,11 +1559,24 @@ export default function StockPage() {
                           </TableCell>
                           <TableCell><Input type="number" min={0} className="h-8 w-24 text-xs" value={v.price ?? ""} onChange={(e) => editVariant(detail.id, v.id, { price: e.target.value === "" ? null : num(e.target.value) })} /></TableCell>
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>
-                          {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => (
-                            <TableCell key={f}>
-                              <Input type="number" step="any" className="h-8 w-20 text-xs" value={v[f] || ""} placeholder="0" onChange={(e) => editVariant(detail.id, v.id, { [f]: num(e.target.value) })} />
-                            </TableCell>
-                          ))}
+                          {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => {
+                            const isMovementField = f === "available" || f === "reserved" || f === "defective";
+                            const hideForSharedStock = detail.shared_stock && isMovementField && v.unit_factor !== 2;
+                            return (
+                              <TableCell key={f}>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  disabled={detail.shared_stock && isMovementField}
+                                  title={detail.shared_stock && isMovementField ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
+                                  className="h-8 w-20 text-xs"
+                                  value={hideForSharedStock ? "" : v[f] || ""}
+                                  placeholder={hideForSharedStock ? "–" : "0"}
+                                  onChange={(e) => editVariant(detail.id, v.id, { [f]: num(e.target.value) })}
+                                />
+                              </TableCell>
+                            );
+                          })}
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.location} onChange={(e) => editVariant(detail.id, v.id, { location: e.target.value })} /></TableCell>
                           <TableCell><Input type="date" className="h-8 w-36 text-xs" value={v.eta ?? ""} onChange={(e) => editVariant(detail.id, v.id, { eta: e.target.value || null })} /></TableCell>
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.batch_no} onChange={(e) => editVariant(detail.id, v.id, { batch_no: e.target.value })} /></TableCell>

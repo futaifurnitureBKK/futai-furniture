@@ -2055,9 +2055,17 @@ function QuoteBuilderInner() {
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="preview-sticky-wrapper sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
-          <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
+        {/* Outer grid item is left to its default stretch, so its box
+            matches the left column's full (taller) height — that's what
+            position:sticky on the inner box is constrained within. Without
+            this wrapper, the old self-start/h-fit version shrank the grid
+            item down to the preview's own (shorter) content height, so
+            once scrolled past that short box, sticky had nothing left to
+            stick within and the preview just scrolled away blank. */}
+        <div>
+          <div className="preview-sticky-wrapper sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-auto">
+            <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
+            <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}
             <table className="w-full border-collapse mb-0">
               <tbody>
@@ -2286,6 +2294,7 @@ function QuoteBuilderInner() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

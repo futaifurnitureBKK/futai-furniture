@@ -1185,24 +1185,24 @@ function QuoteBuilderInner() {
 
   // Keeps the preview's own scroll position proportional to the page's,
   // so scrolling the form (with the mouse, not just by focusing a field)
-  // moves the preview along with it too. "main" is the dashboard layout's
-  // own scroll container (the sidebar is fixed; only <main> scrolls), so
-  // that's what's listened to rather than window.
+  // moves the preview along with it too. The dashboard layout's <main> has
+  // overflow-auto but its parent is only min-h-screen (not a fixed
+  // height), so <main> itself never actually overflows — the real scroll
+  // happens on the window/document, which is what's listened to here.
   const previewRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const mainEl = document.querySelector("main");
     const previewEl = previewRef.current;
-    if (!mainEl || !previewEl) return;
+    if (!previewEl) return;
     function syncPreviewScroll() {
-      if (!mainEl || !previewEl) return;
-      const mainScrollable = mainEl.scrollHeight - mainEl.clientHeight;
+      if (!previewEl) return;
+      const pageScrollable = document.documentElement.scrollHeight - window.innerHeight;
       const previewScrollable = previewEl.scrollHeight - previewEl.clientHeight;
-      if (mainScrollable <= 0 || previewScrollable <= 0) return;
-      const fraction = Math.min(1, Math.max(0, mainEl.scrollTop / mainScrollable));
+      if (pageScrollable <= 0 || previewScrollable <= 0) return;
+      const fraction = Math.min(1, Math.max(0, window.scrollY / pageScrollable));
       previewEl.scrollTop = fraction * previewScrollable;
     }
-    mainEl.addEventListener("scroll", syncPreviewScroll, { passive: true });
-    return () => mainEl.removeEventListener("scroll", syncPreviewScroll);
+    window.addEventListener("scroll", syncPreviewScroll, { passive: true });
+    return () => window.removeEventListener("scroll", syncPreviewScroll);
   }, []);
 
   function setDocTypeAndPrefix(newType: DocType) {

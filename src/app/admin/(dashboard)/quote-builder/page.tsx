@@ -961,16 +961,6 @@ function QuoteBuilderInner() {
   }
 
   async function saveQuote() {
-    if (!savedId && !docNoTouched) {
-      const ok = confirm(
-        t(
-          "ยังไม่ได้เปลี่ยนเลขที่เอกสารเป็นของตัวเอง — บันทึกเลยไหม?",
-          "You haven't changed the document number to your own yet — save anyway?",
-          "您还没有把单号改成自己的 — 仍要保存吗？"
-        )
-      );
-      if (!ok) return;
-    }
     setSaving(true);
     const payload = {
       doc_type: docType,
@@ -1787,6 +1777,11 @@ function QuoteBuilderInner() {
                     setDocNoTouched(true);
                   }}
                 />
+                {!savedId && !docNoTouched && (
+                  <p className="mt-1 text-[11px] text-orange-600">
+                    {t("⚠ อย่าลืมเปลี่ยนเป็นเลขที่ของตัวเอง", "⚠ Don't forget to change this to your own number", "⚠ 别忘了改成自己的单号")}
+                  </p>
+                )}
               </div>
             </div>
 

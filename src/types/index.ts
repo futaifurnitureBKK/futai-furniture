@@ -298,9 +298,12 @@ export interface DailyShippingRow {
   updated_at: string;
 }
 
+export type AdPlatform = "facebook" | "tiktok" | "ig" | "shopee" | "other";
+
 export interface AdSpend {
   date: string;
   owner: string;
+  platform: AdPlatform;
   amount: number;
   updated_at: string;
 }

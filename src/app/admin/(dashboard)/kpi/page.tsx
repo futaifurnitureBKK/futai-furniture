@@ -18,7 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/store/language";
 import type {
-  AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown,
+  AdPlatform, AdSpend, Lead, LeadChannel, LeadContactMethod, LeadSegment, LeadStatus, YesNoUnknown,
   SavedQuoteChannel, SavedQuoteItem, SavedQuoteStatus,
 } from "@/types";
 import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNKNOWN, statusMeta } from "@/lib/lead-options";
@@ -113,16 +113,30 @@ const BOARD_COLUMNS: {
 
 const NO_OWNER = "__none";
 
-// Keyed by `date` from the parent (key={date}) so switching the day being
-// edited remounts this with a fresh local value instead of needing an effect
-// to resync it — the usual React way to reset state when a prop changes.
+// "other" exists only to hold ad spend logged before the per-platform split
+// was added — old lump-sum rows get bucketed there on migration rather than
+// guessed into one specific platform. New entries are made directly under
+// one of the first four.
+const AD_PLATFORMS: { key: AdPlatform; label: string }[] = [
+  { key: "facebook", label: "Facebook" },
+  { key: "tiktok", label: "TikTok" },
+  { key: "ig", label: "IG" },
+  { key: "shopee", label: "Shopee" },
+  { key: "other", label: "อื่นๆ/ยังไม่แยก" },
+];
+
+// Keyed by `date`+`platform` from the parent so switching the day or
+// platform being edited remounts this with a fresh local value instead of
+// needing an effect to resync it — the usual React way to reset state when a
+// prop changes.
 function AdSpendInput({
-  date, owner, initialAmount, onSave,
+  date, owner, platform, initialAmount, onSave,
 }: {
   date: string;
   owner: string;
+  platform: AdPlatform;
   initialAmount: number;
-  onSave: (date: string, owner: string, amount: number) => Promise<void>;
+  onSave: (date: string, owner: string, platform: AdPlatform, amount: number) => Promise<void>;
 }) {
   const [value, setValue] = useState(String(initialAmount));
   const [saving, setSaving] = useState(false);
@@ -130,13 +144,13 @@ function AdSpendInput({
     <div className="flex justify-center">
       <Input
         type="number"
-        className="h-6 w-14 min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-6 w-16 min-w-0 rounded-md text-[10px] px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onClick={(e) => e.stopPropagation()}
         onBlur={async () => {
           setSaving(true);
-          await onSave(date, owner, Number(value) || 0);
+          await onSave(date, owner, platform, Number(value) || 0);
           setSaving(false);
         }}
         disabled={saving}
@@ -194,6 +208,7 @@ export default function KpiPage() {
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [customerSearch, setCustomerSearch] = useState("");
   const [adSpendRows, setAdSpendRows] = useState<AdSpend[]>([]);
+  const [adSpendDialogOwner, setAdSpendDialogOwner] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingRef = useRef<Lead | null>(null);
   useEffect(() => {
@@ -532,10 +547,16 @@ export default function KpiPage() {
     return names.map((name) => {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
-      const editDayAmount = adSpendRows.find((r) => r.owner === name && r.date === adSpendEditDate)?.amount ?? 0;
-      const rangeAdAmount = adSpendRows
-        .filter((r) => r.owner === name && r.date >= scopeFrom && r.date <= scopeTo)
-        .reduce((sum, r) => sum + r.amount, 0);
+      const platforms = AD_PLATFORMS.map((p) => ({
+        key: p.key,
+        label: p.label,
+        editDayAmount: adSpendRows.find((r) => r.owner === name && r.date === adSpendEditDate && r.platform === p.key)?.amount ?? 0,
+        rangeAdAmount: adSpendRows
+          .filter((r) => r.owner === name && r.platform === p.key && r.date >= scopeFrom && r.date <= scopeTo)
+          .reduce((sum, r) => sum + r.amount, 0),
+      }));
+      const editDayAmount = platforms.reduce((sum, p) => sum + p.editDayAmount, 0);
+      const rangeAdAmount = platforms.reduce((sum, p) => sum + p.rangeAdAmount, 0);
       return {
         name,
         count: rows.length,
@@ -543,6 +564,7 @@ export default function KpiPage() {
         rate: rows.length ? (converted.length / rows.length) * 100 : 0,
         editDayAmount,
         rangeAdAmount,
+        platforms,
       };
     });
   }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo]);
@@ -552,15 +574,15 @@ export default function KpiPage() {
     [ownerSummary, isSingleDay]
   );
 
-  async function saveAdSpend(date: string, owner: string, amount: number) {
+  async function saveAdSpend(date: string, owner: string, platform: AdPlatform, amount: number) {
     const res = await fetch("/api/admin/ad-spend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, owner, amount }),
+      body: JSON.stringify({ date, owner, platform, amount }),
     });
     const data = await res.json();
     if (res.ok) {
-      setAdSpendRows((prev) => [...prev.filter((r) => !(r.date === date && r.owner === owner)), data.row]);
+      setAdSpendRows((prev) => [...prev.filter((r) => !(r.date === date && r.owner === owner && r.platform === platform)), data.row]);
     }
   }
 
@@ -1012,13 +1034,18 @@ export default function KpiPage() {
                       <td className="py-1 text-center">{o.converted}</td>
                       <td className="py-1 text-center">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</td>
                       <td className="py-1 text-center">
-                        {isSingleDay ? (
-                          <AdSpendInput key={`${adSpendEditDate}-${o.name}`} date={adSpendEditDate} owner={o.name} initialAmount={o.editDayAmount} onSave={saveAdSpend} />
-                        ) : (
-                          <span className="inline-block text-[11px] font-medium text-[#1A1A1A]">
-                            {o.rangeAdAmount ? o.rangeAdAmount.toLocaleString("th-TH") : "-"}
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAdSpendDialogOwner(o.name);
+                          }}
+                          className="inline-block text-[11px] font-medium text-[#1A1A1A] underline decoration-dotted underline-offset-2 hover:text-[#C8102E]"
+                        >
+                          {(isSingleDay ? o.editDayAmount : o.rangeAdAmount)
+                            ? (isSingleDay ? o.editDayAmount : o.rangeAdAmount).toLocaleString("th-TH")
+                            : "-"}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1027,16 +1054,56 @@ export default function KpiPage() {
               <p className="text-[10px] text-[#9CA3AF] mt-1">
                 {isSingleDay
                   ? t(
-                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แก้ของวันที่ ${adSpendEditDate}`,
-                      `Click a name to filter the charts and board — the Ad Spend box edits ${adSpendEditDate}`,
-                      `点击姓名筛选图表和看板——广告费栏编辑 ${adSpendEditDate} 当天`
+                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — กดตัวเลขค่ายิง Ads เพื่อแก้แยกตาม platform ของวันที่ ${adSpendEditDate}`,
+                      `Click a name to filter the charts and board — click the Ad Spend number to edit it per platform for ${adSpendEditDate}`,
+                      `点击姓名筛选图表和看板——点击广告费数字可按平台编辑 ${adSpendEditDate} 当天的支出`
                     )
                   : t(
-                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แสดงผลรวมของช่วง ${scopeFrom} → ${scopeTo} (เลือกวันเดียวเพื่อแก้ไข)`,
-                      `Click a name to filter the charts and board — the Ad Spend column shows the total for ${scopeFrom} → ${scopeTo} (pick a single day to edit it)`,
-                      `点击姓名筛选图表和看板——广告费栏显示 ${scopeFrom} → ${scopeTo} 期间的总额（选择单日可编辑）`
+                      `กดชื่อเพื่อกรองกราฟและบอร์ดเฉพาะคนนั้น — ช่องค่ายิง Ads แสดงผลรวมของช่วง ${scopeFrom} → ${scopeTo} (กดตัวเลขเพื่อดูแยกตาม platform, เลือกวันเดียวเพื่อแก้ไข)`,
+                      `Click a name to filter the charts and board — the Ad Spend column shows the total for ${scopeFrom} → ${scopeTo} (click the number to see the per-platform split; pick a single day to edit it)`,
+                      `点击姓名筛选图表和看板——广告费栏显示 ${scopeFrom} → ${scopeTo} 期间的总额（点击数字可查看各平台明细，选择单日可编辑）`
                     )}
               </p>
+
+              <Dialog open={!!adSpendDialogOwner} onOpenChange={(open) => !open && setAdSpendDialogOwner(null)}>
+                <DialogContent className="max-w-xs">
+                  <DialogHeader>
+                    <DialogTitle className="text-sm">
+                      {t("ค่ายิง Ads ตาม Platform", "Ad spend by platform", "各平台广告费")}
+                      {" · "}
+                      {adSpendDialogOwner === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : adSpendDialogOwner}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <p className="text-[11px] text-[#9CA3AF] -mt-2">
+                    {isSingleDay ? adSpendEditDate : `${scopeFrom} → ${scopeTo}`}
+                  </p>
+                  <div className="space-y-2">
+                    {(() => {
+                      const owner = ownerSummary.find((o) => o.name === adSpendDialogOwner);
+                      if (!owner) return null;
+                      return owner.platforms.map((p) => (
+                        <div key={p.key} className="flex items-center justify-between gap-3">
+                          <span className="text-xs text-[#1A1A1A]">{p.label}</span>
+                          {isSingleDay ? (
+                            <AdSpendInput
+                              key={`${adSpendEditDate}-${owner.name}-${p.key}`}
+                              date={adSpendEditDate}
+                              owner={owner.name}
+                              platform={p.key}
+                              initialAmount={p.editDayAmount}
+                              onSave={saveAdSpend}
+                            />
+                          ) : (
+                            <span className="text-[11px] font-medium text-[#1A1A1A]">
+                              {p.rangeAdAmount ? p.rangeAdAmount.toLocaleString("th-TH") : "-"}
+                            </span>
+                          )}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
           </div>

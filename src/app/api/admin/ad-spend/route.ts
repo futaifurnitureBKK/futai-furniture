@@ -26,15 +26,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json();
-  if (!body.date || !body.owner) {
-    return NextResponse.json({ error: "date and owner are required" }, { status: 400 });
+  if (!body.date || !body.owner || !body.platform) {
+    return NextResponse.json({ error: "date, owner and platform are required" }, { status: 400 });
   }
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("ad_spend")
     .upsert(
-      { date: body.date, owner: body.owner, amount: body.amount ?? 0, updated_at: new Date().toISOString() },
-      { onConflict: "date,owner" }
+      { date: body.date, owner: body.owner, platform: body.platform, amount: body.amount ?? 0, updated_at: new Date().toISOString() },
+      { onConflict: "date,owner,platform" }
     )
     .select()
     .single();

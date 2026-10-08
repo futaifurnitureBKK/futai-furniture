@@ -94,6 +94,9 @@ export interface SavedQuoteItem {
   image: string | null;
   seats?: number;
   baseUnitPrice?: number;
+  // Only used on delivery notes (e.g. "ชุด", "ตัว", "กล่อง") — shown instead
+  // of unit price/seats, since a delivery note doesn't carry pricing.
+  unit?: string;
 }
 
 export interface SavedQuote {

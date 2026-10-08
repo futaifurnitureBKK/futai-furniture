@@ -50,6 +50,7 @@ interface LineItem {
   seats: number;
   baseUnitPrice: number;
   stock_variant_id: number | null;
+  unit: string;
 }
 
 const SEAT_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -111,6 +112,7 @@ const TXT = {
   colPhoto:       { th: "ภาพ",              en: "Photo",        zh: "图片" },
   colSize:        { th: "ขนาด (mm)",        en: "Size (mm)",    zh: "规格" },
   colQty:         { th: "ปริมาณ",           en: "Qty",          zh: "数量" },
+  colUnit:        { th: "หน่วย",            en: "Unit",         zh: "单位" },
   colUnitPrice:   { th: "ราคาต่อหน่วย",     en: "Unit Price",   zh: "单价" },
   colAmount:      { th: "จำนวนเงินทั้งหมด", en: "Amount",       zh: "总价" },
   colRemark:      { th: "หมายเหตุ",         en: "Remark",       zh: "备注" },
@@ -176,6 +178,7 @@ function newLine(): LineItem {
     seats: 1,
     baseUnitPrice: 0,
     stock_variant_id: null,
+    unit: "",
   };
 }
 
@@ -1019,6 +1022,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           image: it.image,
           seats: it.seats,
           baseUnitPrice: it.baseUnitPrice,
+          unit: it.unit,
         })
       ),
     };
@@ -1077,6 +1081,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
             remarkImage: it.remarkImage ?? null,
             stock_variant_id: it.stock_variant_id ?? null,
+            unit: it.unit ?? "",
           }))
         : [newLine()]
     );
@@ -1126,6 +1131,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
             remarkImage: it.remarkImage ?? null,
             stock_variant_id: it.stock_variant_id ?? null,
+            unit: it.unit ?? "",
           }))
         : [newLine()]
     );
@@ -1352,8 +1358,8 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     const wb = new ExcelJSLib.Workbook();
     const ws = wb.addWorksheet("Sheet1");
 
-    const numCols = isDeliveryNote ? 6 : 8;
-    const widths = isDeliveryNote ? [6, 26, 16, 16, 8, 24] : [6, 22, 14, 14, 7, 12, 12, 20];
+    const numCols = isDeliveryNote ? 7 : 8;
+    const widths = isDeliveryNote ? [6, 26, 16, 16, 8, 10, 24] : [6, 22, 14, 14, 7, 12, 12, 20];
     widths.forEach((w, i) => {
       ws.getColumn(i + 1).width = w;
     });
@@ -1449,6 +1455,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
 
     // Item table
     const headerLabels = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colSize), L(TXT.colQty)];
+    if (isDeliveryNote) headerLabels.push(L(TXT.colUnit));
     if (!isDeliveryNote) headerLabels.push(L(TXT.colUnitPrice), L(TXT.colAmount));
     headerLabels.push(L(TXT.colRemark));
     const headerRow = nextRow();
@@ -1461,6 +1468,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     items.forEach((it, idx) => {
       const row = nextRow();
       const values: (string | number)[] = [idx + 1, it.name || "-", it.sku || "-", it.size || "-", it.qty];
+      if (isDeliveryNote) values.push(it.unit || "-");
       if (!isDeliveryNote) values.push(it.unitPrice, it.qty * it.unitPrice);
       values.push(it.remark);
       values.forEach((v, i) => {
@@ -1605,17 +1613,6 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           >
             <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({ownSavedList.length})
           </Button>
-          {defaultDocType === "delivery_note" && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setListMode("pull");
-                setListOpen(true);
-              }}
-            >
-              <Search size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单导入")}
-            </Button>
-          )}
           <Button variant="outline" onClick={resetForm}>
             <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
           </Button>
@@ -1833,41 +1830,45 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               ))}
             </div>
 
-            <div>
-              <Label>{t("ช่องทางที่มาของออเดอร์", "Order Channel", "订单渠道")}</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
-                {CHANNEL_ORDER.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setChannel(c)}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      channel === c ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
-                    }`}
-                  >
-                    {t(CHANNEL_META[c].th, CHANNEL_META[c].en, CHANNEL_META[c].zh)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {!isDeliveryNote && (
+              <>
+                <div>
+                  <Label>{t("ช่องทางที่มาของออเดอร์", "Order Channel", "订单渠道")}</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                    {CHANNEL_ORDER.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setChannel(c)}
+                        className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          channel === c ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
+                        }`}
+                      >
+                        {t(CHANNEL_META[c].th, CHANNEL_META[c].en, CHANNEL_META[c].zh)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div>
-              <Label>{t("ภาษาในเอกสาร", "Document Language", "文件语言")}</Label>
-              <div className="grid grid-cols-3 gap-2 mt-1">
-                {LANG_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => setLangMode(o.value)}
-                    className={`py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
-                      langMode === o.value ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                <div>
+                  <Label>{t("ภาษาในเอกสาร", "Document Language", "文件语言")}</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    {LANG_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setLangMode(o.value)}
+                        className={`py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
+                          langMode === o.value ? "bg-[#1A1A1A] text-white" : "bg-[#E8E5E0] text-[#6B6B6B] hover:bg-[#d0cdc8]"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -1971,6 +1972,16 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           {/* Line items */}
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
             <p className="text-sm font-semibold text-[#1A1A1A]">{t("รายการสินค้า", "Line Items", "产品清单")}</p>
+            {isDeliveryNote && (
+              <datalist id="delivery-note-units">
+                <option value="ชุด" />
+                <option value="ตัว" />
+                <option value="กล่อง" />
+                <option value="แผ่น" />
+                <option value="คู่" />
+                <option value="ชิ้น" />
+              </datalist>
+            )}
 
             {items.map((it, idx) => (
               <div key={it.id} className="border border-[#E8E5E0] rounded-lg p-3 space-y-2">
@@ -2028,7 +2039,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   />
                 </div>
 
-                <div className={isDeliveryNote ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
+                <div className={isDeliveryNote ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
                   <Input
                     type="number"
                     className="h-8 text-xs"
@@ -2036,6 +2047,15 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     value={it.qty}
                     onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
                   />
+                  {isDeliveryNote && (
+                    <Input
+                      className="h-8 text-xs"
+                      list="delivery-note-units"
+                      placeholder={t("หน่วย เช่น ชุด/ตัว", "Unit e.g. set/pc", "单位 如 套/件")}
+                      value={it.unit}
+                      onChange={(e) => updateItem(it.id, { unit: e.target.value })}
+                    />
+                  )}
                   {!isDeliveryNote && (
                     <>
                       <Select
@@ -2092,9 +2112,23 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               </div>
             ))}
 
-            <Button variant="outline" className="w-full" onClick={() => setItems((prev) => [...prev, newLine()])}>
-              <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setItems((prev) => [...prev, newLine()])}>
+                <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
+              </Button>
+              {defaultDocType === "delivery_note" && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setListMode("pull");
+                    setListOpen(true);
+                  }}
+                >
+                  <Search size={13} className="mr-1" /> {t("เลือกจากใบเสนอราคา", "Pull from Quotation", "从报价单导入")}
+                </Button>
+              )}
+            </div>
           </div>
 
           <StockProductPickerDialog
@@ -2136,8 +2170,12 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             </div>
           )}
 
-          <PaymentsSection quoteId={savedId} />
-          <ShipmentHistorySection quoteId={savedId} />
+          {!isDeliveryNote && (
+            <>
+              <PaymentsSection quoteId={savedId} />
+              <ShipmentHistorySection quoteId={savedId} />
+            </>
+          )}
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
@@ -2226,18 +2264,19 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               <thead>
                 <tr style={{ backgroundColor: "#F8CAAC" }}>
                   <th className="border border-[#1A1A1A] p-1" style={{ width: "6%" }}>{L(TXT.colNo)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "24%" : "19%" }}>{L(TXT.colItem)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "15%" : "13%" }}>{L(TXT.colModel)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "13%" : "11%" }}>{L(TXT.colPhoto)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "20%" : "17%" }}>{L(TXT.colSize)}</th>
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "8%" : "7%" }}>{L(TXT.colQty)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "20%" : "19%" }}>{L(TXT.colItem)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "14%" : "13%" }}>{L(TXT.colModel)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "12%" : "11%" }}>{L(TXT.colPhoto)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "17%" : "17%" }}>{L(TXT.colSize)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "7%" : "7%" }}>{L(TXT.colQty)}</th>
+                  {isDeliveryNote && <th className="border border-[#1A1A1A] p-1" style={{ width: "8%" }}>{L(TXT.colUnit)}</th>}
                   {!isDeliveryNote && (
                     <>
                       <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colUnitPrice)} (THB.)</th>
                       <th className="border border-[#1A1A1A] p-1" style={{ width: "11%" }}>{L(TXT.colAmount)} (THB.)</th>
                     </>
                   )}
-                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "14%" : "11%" }}>{L(TXT.colRemark)}</th>
+                  <th className="border border-[#1A1A1A] p-1" style={{ width: isDeliveryNote ? "16%" : "11%" }}>{L(TXT.colRemark)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2257,6 +2296,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     </td>
                     <td className="border border-[#1A1A1A] p-1">{it.size || "-"}</td>
                     <td className="border border-[#1A1A1A] p-1">{it.qty}</td>
+                    {isDeliveryNote && <td className="border border-[#1A1A1A] p-1">{it.unit || "-"}</td>}
                     {!isDeliveryNote && (
                       <>
                         <td className="border border-[#1A1A1A] p-1 text-right">{fmtMoney(it.unitPrice)}</td>

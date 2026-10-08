@@ -401,6 +401,80 @@ function StockProductPickerDialog({
   );
 }
 
+// Single-field version of CompanyPicker — the text IS the customer name
+// (not a separate search-only box above a plain name input), so typing
+// always shows matching suggestions and picking one fills in the rest.
+function CustomerNamePicker({
+  value,
+  onChange,
+  savedList,
+  onPickFull,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  savedList: SavedListRow[];
+  onPickFull: (id: number) => void;
+  placeholder?: string;
+}) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+
+  const matches = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    if (q.length < 1) return [];
+    const seen = new Set<string>();
+    const results: SavedListRow[] = [];
+    for (const row of savedList) {
+      if (!row.customer_name) continue;
+      const name = row.customer_name.toLowerCase();
+      if (!name.includes(q) || seen.has(name)) continue;
+      seen.add(name);
+      results.push(row);
+      if (results.length >= 8) break;
+    }
+    return results;
+  }, [value, savedList]);
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+        <Input
+          className="pl-8"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder || t("ค้นหาชื่อลูกค้าหรือรหัสลูกค้า...", "Search customer name or code...", "搜索客户名称或编号...")}
+        />
+      </div>
+      {open && matches.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto bg-white border border-[#E8E5E0] rounded-lg shadow-lg">
+          {matches.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onPickFull(m.id);
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-[#FAF7F2] border-b border-[#F0EDE7] last:border-0"
+            >
+              <p className="text-xs font-medium text-[#1A1A1A] truncate">{m.customer_name}</p>
+              <p className="text-[11px] text-[#6B6B6B]">{m.doc_no} · {m.doc_date}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompanyPicker({
   savedList,
   onPick,
@@ -1913,14 +1987,8 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   <div>
                     <Label>{t("ชื่อลูกค้า / บริษัท", "Customer / Company Name", "客户/公司名称")} *</Label>
                     <div className="mt-1">
-                      <CompanyPicker savedList={savedList} onPick={pickCompany} />
+                      <CustomerNamePicker value={customerName} onChange={setCustomerName} savedList={savedList} onPickFull={pickCompany} />
                     </div>
-                    <Input
-                      className="mt-1.5"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder={t("เช่น บริษัท ... จำกัด", "e.g. ... Co., Ltd.", "例如：... 有限公司")}
-                    />
                   </div>
                   <div>
                     <Label>{t("เบอร์โทรศัพท์", "Phone", "电话")}</Label>

@@ -54,16 +54,12 @@ function XiaohongshuIcon({ className }: { className?: string }) {
     </span>
   );
 }
-function DouyinIcon({ className }: { className?: string }) {
-  return <Image src="/logos/douyin.png" alt="" width={16} height={16} className={className} unoptimized />;
-}
-
 const PLATFORMS: { key: string; label: string; color: string; Icon: (p: { className?: string }) => React.ReactElement }[] = [
   { key: "fb", label: "Facebook", color: "#1877F2", Icon: FacebookIcon },
   { key: "ig", label: "Instagram", color: "#E4405F", Icon: InstagramIcon },
   { key: "tk", label: "TikTok", color: "#1A1A1A", Icon: (p) => <Music2 className={p.className} /> },
   { key: "xiaohongshu", label: "小红书", color: "#FE2C55", Icon: XiaohongshuIcon },
-  { key: "douyin", label: "抖音", color: "#1A1A1A", Icon: DouyinIcon },
+  { key: "douyin", label: "抖音", color: "#1A1A1A", Icon: (p) => <Music2 className={p.className} /> },
 ];
 
 const STATUS_META = {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { syncStockDeduction } from "@/lib/stock-auto-deduct";
+import { logActivity } from "@/lib/activity-log";
 
 const EDITABLE_FIELDS = [
   "sku",
@@ -62,6 +63,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "daily_shipping_row",
+    entityId: id,
+    summary: `แก้ไขรายการส่งของ ${data.ship_date} SKU ${data.sku || "-"} (${Object.keys(update).filter((k) => k !== "updated_at").join(", ") || "-"})`,
+    detail: update,
+  });
   return NextResponse.json({ row: data });
 }
 
@@ -74,7 +82,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { data: existing } = await db
     .from("daily_shipping_rows")
-    .select("stock_variant_id, stock_deducted_qty, stock_deducted_field")
+    .select("ship_date, sku, qty, customer_name, stock_variant_id, stock_deducted_qty, stock_deducted_field")
     .eq("id", id)
     .single();
   if (existing?.stock_variant_id && existing.stock_deducted_qty) {
@@ -93,5 +101,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "delete",
+    entityType: "daily_shipping_row",
+    entityId: id,
+    summary: `ลบรายการส่งของ ${existing?.ship_date ?? ""} SKU ${existing?.sku || "-"} x${existing?.qty ?? "-"} ลูกค้า ${existing?.customer_name || "-"}`,
+  });
   return NextResponse.json({ ok: true });
 }

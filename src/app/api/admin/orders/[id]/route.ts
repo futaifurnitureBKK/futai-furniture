@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -34,5 +35,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "order",
+    entityId: id,
+    summary: `แก้ไขออเดอร์ ${data.order_number ?? `#${id}`} สถานะเป็น ${data.status}`,
+  });
   return NextResponse.json({ order: data });
 }

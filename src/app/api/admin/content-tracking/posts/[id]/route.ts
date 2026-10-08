@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 // Replaces a cell's photo list and/or status — image_urls lets the client
 // remove one photo (sends back the array with that one filtered out);
@@ -38,5 +39,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "content_tracking_post",
+    entityId: id,
+    summary: `แก้ไขโพสต์ #${id} (${Object.keys(update).filter((k) => k !== "updated_at").join(", ") || "-"})`,
+  });
   return NextResponse.json({ post: data });
 }

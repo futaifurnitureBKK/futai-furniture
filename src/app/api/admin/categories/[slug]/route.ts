@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -20,5 +21,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "category",
+    entityId: slug,
+    summary: `แก้ไขหมวดหมู่ ${slug} (${Object.keys(update).join(", ") || "-"})`,
+  });
   return NextResponse.json({ category: data });
 }

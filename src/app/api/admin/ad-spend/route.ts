@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -41,5 +42,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "ad_spend",
+    entityId: `${body.date}-${body.owner}-${body.platform}`,
+    summary: `แก้ค่ายิง Ads ของ ${body.owner} (${body.platform}) วันที่ ${body.date} เป็น ฿${Number(body.amount ?? 0).toLocaleString("th-TH")}`,
+  });
   return NextResponse.json({ row: data });
 }

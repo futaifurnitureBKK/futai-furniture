@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { buildPlan, parseDims, type DbProductLite, type SyncRow } from "@/lib/stock-sync";
 import syncData from "@/data/stock-sync.json";
+import { logActivity } from "@/lib/activity-log";
 
 const rows = (syncData as unknown as { rows: SyncRow[] }).rows;
 const label = (syncData as unknown as { label: string }).label;
@@ -101,6 +102,11 @@ export async function POST(req: NextRequest) {
     if (vErr) return NextResponse.json({ error: vErr.message }, { status: 400 });
   }
 
+  await logActivity(req, {
+    action: "update",
+    entityType: "stock_sync",
+    summary: `ซิงก์สต็อกจากชีต "${label}" — แก้ ${plan.updates.length} รุ่น, เพิ่ม ${plan.newVariants.length} ไซส์ใหม่, เพิ่ม ${plan.newProducts.length} รุ่นใหม่`,
+  });
   return NextResponse.json({
     updated: plan.updates.length,
     newVariants: plan.newVariants.length,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { VARIANT_FIELDS, pick } from "@/lib/stock-fields";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -26,5 +27,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "stock_variant",
+    entityId: data.id,
+    summary: `เพิ่มรุ่นสินค้าใหม่ ${data.code ?? data.size_text ?? `#${data.id}`} ให้สินค้า #${id}`,
+  });
   return NextResponse.json({ variant: data });
 }

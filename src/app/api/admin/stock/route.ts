@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { PRODUCT_FIELDS, VARIANT_FIELDS, pick } from "@/lib/stock-fields";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -63,5 +64,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: full } = await db.from("stock_products").select("*, stock_variants(*)").eq("id", product.id).single();
+  await logActivity(req, {
+    action: "create",
+    entityType: "stock_product",
+    entityId: product.id,
+    summary: `เพิ่มสินค้าสต็อก ${product.code}`,
+  });
   return NextResponse.json({ product: full });
 }

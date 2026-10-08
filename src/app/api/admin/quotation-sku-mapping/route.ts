@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 // Staff resolving an unmatched quotation line by hand in the "pull from
 // quotation" dialog saves the match here, so the same quote sku
@@ -22,5 +23,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "quotation_sku_mapping",
+    entityId: quoteSku,
+    summary: `จับคู่ SKU ใบเสนอราคา "${quoteSku}" กับรุ่นสต็อก #${stockVariantId}`,
+  });
   return NextResponse.json({ ok: true });
 }

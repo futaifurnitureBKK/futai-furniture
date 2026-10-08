@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 const PLATFORMS = ["fb", "ig", "tk", "xiaohongshu", "douyin"];
 
@@ -53,6 +54,12 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logActivity(req, {
+      action: "update",
+      entityType: "content_tracking_post",
+      entityId: data.id,
+      summary: `เพิ่มรูปโพสต์ ${platform} วันที่ ${postDate} (employee #${employeeId})`,
+    });
     return NextResponse.json({ post: data });
   }
 
@@ -64,5 +71,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "content_tracking_post",
+    entityId: data.id,
+    summary: `เพิ่มโพสต์ใหม่ ${platform} วันที่ ${postDate} (employee #${employeeId})`,
+  });
   return NextResponse.json({ post: data });
 }

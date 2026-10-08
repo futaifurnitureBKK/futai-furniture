@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 const EDITABLE_FIELDS = [
   "lead_date",
@@ -54,6 +55,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "lead",
+    entityId: id,
+    summary: `แก้ไขลีด ${data.customer_name} (${Object.keys(update).filter((k) => k !== "updated_at").join(", ") || "-"})`,
+    detail: update,
+  });
   return NextResponse.json({ lead: data });
 }
 
@@ -64,9 +72,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
   const db = supabaseAdmin();
 
+  const { data: before } = await db.from("leads").select("customer_name, owner, deal_value").eq("id", id).single();
   const { error } = await db.from("leads").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "delete",
+    entityType: "lead",
+    entityId: id,
+    summary: `ลบลีด ${before?.customer_name ?? `#${id}`} ผู้ดูแล ${before?.owner || "-"}`,
+  });
   return NextResponse.json({ ok: true });
 }

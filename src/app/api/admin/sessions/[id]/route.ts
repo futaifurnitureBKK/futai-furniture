@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { verifyPassword } from "@/lib/password-hash";
+import { logActivity } from "@/lib/activity-log";
 
 // Force-logs-out one active session ("kick") — gated the same way as
 // /api/admin/logins, behind this page's own extra code.
@@ -21,9 +22,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
+  const { data: before } = await db.from("admin_sessions").select("name, ip").eq("id", id).single();
   const { error } = await db.from("admin_sessions").update({ revoked_at: new Date().toISOString() }).eq("id", id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "other",
+    entityType: "admin_session",
+    entityId: id,
+    summary: `บังคับออกจากระบบ ${before?.name || "-"} (IP ${before?.ip || "-"})`,
+  });
   return NextResponse.json({ ok: true });
 }

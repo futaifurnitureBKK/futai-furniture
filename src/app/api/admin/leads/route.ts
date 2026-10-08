@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -57,5 +58,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "lead",
+    entityId: data.id,
+    summary: `เพิ่มลีด ${data.customer_name} (${data.channel}) ผู้ดูแล ${data.owner || "-"}`,
+  });
   return NextResponse.json({ lead: data });
 }

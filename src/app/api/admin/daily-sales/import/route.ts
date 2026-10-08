@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { syncStockDeduction } from "@/lib/stock-auto-deduct";
+import { logActivity } from "@/lib/activity-log";
 import type { SavedQuote } from "@/types";
 
 // Pulls every line item of a saved quotation into the daily sales log for a
@@ -76,5 +77,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "daily_sales_row",
+    entityId: quote_id,
+    summary: `ดึงใบเสนอราคา ${quote.doc_no} เข้ายอดขายวันที่ ${sale_date} (${rows.length} รายการ)`,
+  });
   return NextResponse.json({ rows: data });
 }

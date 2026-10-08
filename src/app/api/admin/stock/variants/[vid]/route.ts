@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { TRACKED_MOVEMENT_FIELDS, VARIANT_FIELDS, pick } from "@/lib/stock-fields";
+import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vid: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -43,6 +44,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
     (f) => f in body && Number(body[f]) !== Number(before[f])
   ).map((f) => ({ variant_id: Number(vid), field: f, old_value: Number(before[f]), new_value: Number(body[f]) }));
   if (moves.length) await db.from("stock_movements").insert(moves);
+
+  const label = (before as unknown as { code?: string; size_text?: string }).code || (before as unknown as { size_text?: string }).size_text || `#${vid}`;
+  if (moves.length) {
+    await logActivity(req, {
+      action: "adjust",
+      entityType: "stock_variant",
+      entityId: vid,
+      summary: `ปรับสต็อก ${label}: ${moves.map((m) => `${m.field} ${m.old_value}→${m.new_value}`).join(", ")}`,
+      detail: moves,
+    });
+  } else {
+    await logActivity(req, {
+      action: "update",
+      entityType: "stock_variant",
+      entityId: vid,
+      summary: `แก้ไขรุ่นสินค้า ${label} (${Object.keys(update).filter((k) => k !== "updated_at" && k !== "tracked").join(", ") || "-"})`,
+      detail: update,
+    });
+  }
 
   return NextResponse.json({ variant: data });
 }

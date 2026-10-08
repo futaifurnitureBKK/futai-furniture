@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -49,5 +50,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "saved_quote_payment",
+    entityId: data.id,
+    summary: `บันทึกรับเงินเอกสาร #${id} ฿${Number(data.amount).toLocaleString("th-TH")} (${data.payment_type}, ${data.method})`,
+  });
   return NextResponse.json({ payment: data });
 }

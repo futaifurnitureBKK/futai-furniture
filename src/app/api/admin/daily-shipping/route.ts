@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -59,5 +60,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "daily_shipping_row",
+    entityId: data.id,
+    summary: `เพิ่มรายการส่งของ ${data.ship_date} SKU ${data.sku || "-"} x${data.qty} ลูกค้า ${data.customer_name || "-"}`,
+  });
   return NextResponse.json({ row: data });
 }

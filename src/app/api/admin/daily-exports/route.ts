@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { adjustVariantField } from "@/lib/shared-stock";
+import { logActivity } from "@/lib/activity-log";
 import type { SavedQuoteItem } from "@/types";
 
 export async function GET(req: NextRequest) {
@@ -103,6 +104,12 @@ export async function POST(req: NextRequest) {
       await adjustVariantField(db, stock_variant_id, "available", qty);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+    await logActivity(req, {
+      action: "create",
+      entityType: "daily_export_row",
+      entityId: data.id,
+      summary: `ตัดสต็อกส่งออก ${export_date} ${sku || ""} ${size_text || ""} x${qty} (รวมเป็น ${data.qty})`.trim(),
+    });
     return NextResponse.json({ row: data });
   }
 
@@ -141,5 +148,11 @@ export async function POST(req: NextRequest) {
     await adjustVariantField(db, stock_variant_id, "available", qty);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "daily_export_row",
+    entityId: data.id,
+    summary: `ตัดสต็อกส่งออก ${export_date} ${sku || ""} ${size_text || ""} x${qty} ลูกค้า ${data.customer_name || "-"}`.trim(),
+  });
   return NextResponse.json({ row: data });
 }

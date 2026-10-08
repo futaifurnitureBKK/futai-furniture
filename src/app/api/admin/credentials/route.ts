@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { hashPassword, verifyPassword } from "@/lib/password-hash";
+import { logActivity } from "@/lib/activity-log";
 
 const TARGETS = ["main", "security_code"] as const;
 type Target = (typeof TARGETS)[number];
@@ -48,5 +49,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "admin_credentials",
+    entityId: target,
+    summary: `เปลี่ยน${target === "main" ? "รหัสผ่านล็อกอินแอดมิน" : "รหัสเข้าหน้าความปลอดภัย"}`,
+  });
   return NextResponse.json({ ok: true });
 }

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import {
   Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
-  CheckCircle2, XCircle, Users, Clock,
+  CheckCircle2, XCircle, Users, Clock, History, Search, X,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -37,6 +37,25 @@ interface ActiveSession {
   created_at: string;
   expires_at: string;
 }
+interface ActivityEntry {
+  id: number;
+  created_at: string;
+  actor: string | null;
+  ip: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string;
+  detail: unknown;
+}
+
+const ACTION_META: Record<string, { th: string; color: string }> = {
+  create: { th: "เพิ่ม", color: "bg-emerald-100 text-emerald-700" },
+  update: { th: "แก้ไข", color: "bg-blue-100 text-blue-700" },
+  delete: { th: "ลบ", color: "bg-red-100 text-red-700" },
+  adjust: { th: "ปรับสต็อก", color: "bg-amber-100 text-amber-700" },
+  other: { th: "อื่นๆ", color: "bg-[#E8E5E0] text-[#6B6B6B]" },
+};
 
 const CODE_KEY = "futai-security-code";
 
@@ -125,6 +144,12 @@ export default function AdminSecurityPage() {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activitySearch, setActivitySearch] = useState("");
+  const [activityActor, setActivityActor] = useState("all");
+  const [activityAction, setActivityAction] = useState("all");
 
   async function load(code: string) {
     setLoading(true);
@@ -237,6 +262,23 @@ export default function AdminSecurityPage() {
     };
   }, [unlocked]);
 
+  // Fetched once (last 200 entries) and filtered client-side — same pattern
+  // as the login log above, and plenty for "who touched what recently".
+  useEffect(() => {
+    if (!unlocked || !unlockedCode) return;
+    let cancelled = false;
+    (async () => {
+      setActivityLoading(true);
+      const res = await fetch("/api/admin/activity-log", { headers: { "x-security-code": unlockedCode } });
+      const data = await res.json();
+      if (!cancelled && res.ok) setActivity(data.entries);
+      setActivityLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked, unlockedCode]);
+
   const rangeStart = useMemo(() => {
     const days = RANGES.find((r) => r.key === range)?.days;
     if (days != null) return daysAgoStr(days - 1);
@@ -270,6 +312,20 @@ export default function AdminSecurityPage() {
   }, [rangeLeads, leads]);
 
   const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+
+  const activityActors = useMemo(
+    () => [...new Set(activity.map((a) => a.actor).filter((a): a is string => !!a))].sort(),
+    [activity]
+  );
+  const filteredActivity = useMemo(() => {
+    const q = activitySearch.trim().toLowerCase();
+    return activity.filter((a) => {
+      if (activityActor !== "all" && a.actor !== activityActor) return false;
+      if (activityAction !== "all" && a.action !== activityAction) return false;
+      if (q && !a.summary.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [activity, activitySearch, activityActor, activityAction]);
 
   // KPI summary cards — logins/attempts only cover what's already fetched
   // (last 200 logins, currently-tracked attempt windows), which is plenty
@@ -655,6 +711,103 @@ export default function AdminSecurityPage() {
                 </p>
               </>
             )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-indigo-600" />
+                <p className="text-sm font-semibold text-[#1A1A1A]">
+                  {t("ประวัติการใช้งาน (กันทุจริต)", "Activity log (fraud prevention)", "操作记录（防止舞弊）")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                  <input
+                    type="text"
+                    value={activitySearch}
+                    onChange={(e) => setActivitySearch(e.target.value)}
+                    placeholder={t("ค้นหา...", "Search...", "搜索...")}
+                    className="h-8 w-40 rounded-lg border border-[#E8E5E0] bg-white pl-7 pr-7 text-xs text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+                  />
+                  {activitySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setActivitySearch("")}
+                      aria-label={t("ล้าง", "Clear", "清除")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#1A1A1A]"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={activityActor}
+                  onChange={(e) => setActivityActor(e.target.value)}
+                  className="h-8 rounded-lg border border-[#E8E5E0] bg-white px-2 text-xs text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30"
+                >
+                  <option value="all">{t("ทุกคน", "Everyone", "全部")}</option>
+                  {activityActors.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+                <select
+                  value={activityAction}
+                  onChange={(e) => setActivityAction(e.target.value)}
+                  className="h-8 rounded-lg border border-[#E8E5E0] bg-white px-2 text-xs text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30"
+                >
+                  <option value="all">{t("ทุกการกระทำ", "All actions", "所有操作")}</option>
+                  {Object.entries(ACTION_META).map(([key, meta]) => (
+                    <option key={key} value={key}>{meta.th}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {activityLoading ? (
+              <div className="py-10 text-center text-sm text-[#6B6B6B]">
+                <Loader2 size={18} className="mx-auto mb-2 animate-spin" />
+                {t("กำลังโหลด...", "Loading...", "加载中...")}
+              </div>
+            ) : filteredActivity.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-10">{t("ไม่พบข้อมูล", "No entries found", "未找到记录")}</p>
+            ) : (
+              <div className="max-h-[480px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#FAF7F2]">
+                      <TableHead className="text-xs">{t("เวลา", "Time", "时间")}</TableHead>
+                      <TableHead className="text-xs">{t("คนทำ", "Actor", "操作人")}</TableHead>
+                      <TableHead className="text-xs">{t("การกระทำ", "Action", "操作")}</TableHead>
+                      <TableHead className="text-xs">{t("รายละเอียด", "Detail", "详情")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredActivity.map((a) => (
+                      <TableRow key={a.id} className="hover:bg-[#FAF7F2]/50">
+                        <TableCell className="text-xs text-[#6B6B6B] whitespace-nowrap">{new Date(a.created_at).toLocaleString("th-TH")}</TableCell>
+                        <TableCell className="text-sm font-medium text-[#1A1A1A] whitespace-nowrap">
+                          {a.actor || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not set", "未设置")}</span>}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`text-[10px] font-medium px-2 py-1 rounded ${ACTION_META[a.action]?.color ?? ACTION_META.other.color}`}>
+                            {ACTION_META[a.action]?.th ?? a.action}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-[#1A1A1A]">{a.summary}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <p className="text-[10px] text-[#9CA3AF] px-5 py-2">
+              {t(
+                "แสดง 200 รายการล่าสุด — ครอบคลุมการเพิ่ม/แก้ไข/ลบทั่วทั้งเว็บแอดมิน",
+                "Showing the latest 200 entries — covers add/edit/delete across the whole admin site",
+                "显示最近200条记录——涵盖整个管理后台的增加/编辑/删除操作"
+              )}
+            </p>
           </div>
         </>
       )}

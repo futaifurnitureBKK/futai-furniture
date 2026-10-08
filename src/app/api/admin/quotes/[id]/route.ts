@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -30,6 +31,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "quote_request",
+    entityId: id,
+    summary: `แก้ไขคำขอใบเสนอราคา #${id} สถานะเป็น ${data.status}`,
+  });
   return NextResponse.json({ quote: data });
 }
 
@@ -40,9 +47,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
   const db = supabaseAdmin();
 
+  const { data: before } = await db.from("quotes").select("name").eq("id", id).single();
   const { error } = await db.from("quotes").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "delete",
+    entityType: "quote_request",
+    entityId: id,
+    summary: `ลบคำขอใบเสนอราคา #${id} ${before?.name ? `จาก ${before.name}` : ""}`.trim(),
+  });
   return NextResponse.json({ ok: true });
 }

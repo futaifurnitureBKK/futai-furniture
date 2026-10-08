@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { translateToEnZh } from "@/lib/translate";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -87,5 +88,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "product",
+    entityId: data.sku,
+    summary: `เพิ่มสินค้าหน้าเว็บ ${data.sku} ${data.name_th} ราคา ${data.price != null ? `฿${Number(data.price).toLocaleString("th-TH")}` : "-"}`,
+  });
   return NextResponse.json({ product: data, translationFailed });
 }

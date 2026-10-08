@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { adjustSharedStockBySets } from "@/lib/shared-stock";
+import { logActivity } from "@/lib/activity-log";
 
 const FIELDS = ["available", "reserved", "defective"] as const;
 
@@ -45,5 +46,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "adjust",
+    entityType: "stock_product",
+    entityId: id,
+    summary: `ปรับสต็อกร่วม ${updated.code} — ${field} ${sets > 0 ? "+" : ""}${sets} ตัว`,
+    detail: { field, sets },
+  });
   return NextResponse.json({ product: updated });
 }

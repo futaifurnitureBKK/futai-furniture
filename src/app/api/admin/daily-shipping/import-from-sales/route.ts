@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { syncStockDeduction } from "@/lib/stock-auto-deduct";
+import { logActivity } from "@/lib/activity-log";
 import type { DailySalesRow } from "@/types";
 
 // Pulls every row already logged in Daily Sales for a given date into the
@@ -80,5 +81,10 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "daily_shipping_row",
+    summary: `ดึงยอดขายวันที่ ${ship_date} เข้ารายการส่งของ (${rows.length} รายการ)`,
+  });
   return NextResponse.json({ rows: data });
 }

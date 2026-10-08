@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
 
 const EDITABLE_FIELDS = [
   "doc_type",
@@ -57,6 +58,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "saved_quote",
+    entityId: id,
+    summary: `แก้ไข${data.doc_type === "quotation" ? "ใบเสนอราคา" : data.doc_type === "delivery_note" ? "ใบส่งของ" : "เอกสาร"} ${data.doc_no} ลูกค้า ${data.customer_name || "-"} (${Object.keys(update).filter((k) => k !== "updated_at").join(", ") || "-"})`,
+  });
   return NextResponse.json({ quote: data });
 }
 
@@ -67,9 +74,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
   const db = supabaseAdmin();
 
+  const { data: before } = await db.from("saved_quotes").select("doc_type, doc_no, customer_name").eq("id", id).single();
   const { error } = await db.from("saved_quotes").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "delete",
+    entityType: "saved_quote",
+    entityId: id,
+    summary: `ลบ${before?.doc_type === "quotation" ? "ใบเสนอราคา" : before?.doc_type === "delivery_note" ? "ใบส่งของ" : "เอกสาร"} ${before?.doc_no ?? `#${id}`} ลูกค้า ${before?.customer_name || "-"}`,
+  });
   return NextResponse.json({ ok: true });
 }

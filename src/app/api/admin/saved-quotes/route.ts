@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { logActivity } from "@/lib/activity-log";
+import { DOC_LABELS } from "@/lib/saved-quote-options";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -61,5 +63,11 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "create",
+    entityType: "saved_quote",
+    entityId: data.id,
+    summary: `สร้าง${DOC_LABELS[data.doc_type as keyof typeof DOC_LABELS]?.th ?? data.doc_type} ${data.doc_no} ลูกค้า ${data.customer_name || "-"} (${(data.items ?? []).length} รายการ)`,
+  });
   return NextResponse.json({ quote: data });
 }

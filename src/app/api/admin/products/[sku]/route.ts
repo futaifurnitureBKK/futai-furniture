@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { translateToEnZh } from "@/lib/translate";
+import { logActivity } from "@/lib/activity-log";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sku: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -95,6 +96,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sk
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "update",
+    entityType: "product",
+    entityId: sku,
+    summary: `แก้ไขสินค้าหน้าเว็บ ${sku} (${Object.keys(update).filter((k) => !["name_en", "name_zh", "description_en", "description_zh", "category_id"].includes(k)).join(", ") || "-"})`,
+    detail: update,
+  });
   return NextResponse.json({ product: data, translationFailed });
 }
 
@@ -109,5 +117,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  await logActivity(req, {
+    action: "delete",
+    entityType: "product",
+    entityId: sku,
+    summary: `ลบสินค้าหน้าเว็บ ${sku}`,
+  });
   return NextResponse.json({ ok: true });
 }

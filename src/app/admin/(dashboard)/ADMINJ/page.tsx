@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import type { Lead } from "@/types";
 
 interface Login {
@@ -622,11 +623,12 @@ export default function AdminSecurityPage() {
                     {r.key}
                   </button>
                 ))}
-                <Input
-                  type="date"
-                  className="h-8 w-auto text-xs"
-                  value={selectedDate ?? ""}
-                  onChange={(e) => setSelectedDate(e.target.value || null)}
+                <DateRangePicker
+                  from={selectedDate}
+                  to={selectedDate}
+                  onChange={(f) => setSelectedDate(f)}
+                  onClear={() => setSelectedDate(null)}
+                  placeholder={t("เลือกวัน", "Pick a day", "选择日期")}
                 />
               </div>
             </div>

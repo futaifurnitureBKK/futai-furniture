@@ -2,15 +2,11 @@
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import {
   Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
-  CheckCircle2, XCircle, Users, Clock, History, Search, X, CalendarDays,
+  CheckCircle2, XCircle, Users, Clock, History, Search, X,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Popover } from "@base-ui/react/popover";
-import { DayPicker } from "react-day-picker";
-import { th as thLocale, zhCN, enUS } from "react-day-picker/locale";
-import "react-day-picker/style.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
+import { DateRangePicker } from "@/components/admin/date-range-picker";
 import type { Lead } from "@/types";
 
 interface Login {
@@ -78,78 +75,6 @@ function daysAgoStr(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString().slice(0, 10);
-}
-
-function parseDateStr(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-function formatDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-// A single-click calendar popover for picking one exact day — selecting a
-// date immediately applies and closes (no separate "apply" step), unlike
-// DateRangePicker which is built for picking a from/to range and needs one.
-function SingleDatePicker({
-  value, onChange, placeholder,
-}: {
-  value: string | null;
-  onChange: (date: string | null) => void;
-  placeholder?: string;
-}) {
-  const { t, lang } = useLanguage();
-  const calendarLocale = lang === "th" ? thLocale : lang === "zh" ? zhCN : enUS;
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#E8E5E0] bg-white px-2.5 text-xs text-[#1A1A1A] hover:border-[#C8102E]/40 transition-colors">
-        <CalendarDays size={13} className="text-[#6B6B6B]" />
-        {value ?? placeholder ?? t("เลือกวัน", "Pick a day", "选择日期")}
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner sideOffset={6} align="end">
-          <Popover.Popup className="z-50 rounded-xl bg-white p-3 shadow-lg ring-1 ring-[#E8E5E0] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-            <DayPicker
-              mode="single"
-              weekStartsOn={1}
-              locale={calendarLocale}
-              defaultMonth={value ? parseDateStr(value) : new Date()}
-              selected={value ? parseDateStr(value) : undefined}
-              onSelect={(d) => {
-                if (d) onChange(formatDateStr(d));
-                setOpen(false);
-              }}
-              className="text-xs"
-              classNames={{
-                today: "font-bold text-[#C8102E]",
-                selected: "bg-[#C8102E] text-white rounded-full",
-                day_button: "rounded-full hover:bg-[#FAF7F2]",
-              }}
-            />
-            {value && (
-              <div className="flex justify-end mt-1 pt-2 border-t border-[#F0EDE6]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(null);
-                    setOpen(false);
-                  }}
-                  className="text-xs text-[#9CA3AF] hover:text-[#1A1A1A] underline"
-                >
-                  {t("ล้าง", "Clear", "清除")}
-                </button>
-              </div>
-            )}
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
-  );
 }
 
 type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
@@ -220,6 +145,8 @@ export default function AdminSecurityPage() {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [range, setRange] = useState<RangeKey>("1M");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [customFrom, setCustomFrom] = useState<string | null>(null);
+  const [customTo, setCustomTo] = useState<string | null>(null);
 
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -362,12 +289,23 @@ export default function AdminSecurityPage() {
     return earliest;
   }, [range, leads]);
 
+  // "ALL" means every lead, so its upper bound follows the latest lead_date
+  // (in case one is future-dated) — every other preset stays capped at today.
+  const rangeEnd = useMemo(() => {
+    if (range !== "ALL") return todayStr();
+    return leads.reduce((max, l) => (l.lead_date > max ? l.lead_date : max), todayStr());
+  }, [range, leads]);
+
+  // A custom "จาก–ถึง" range (if both ends are picked) takes priority over a
+  // single picked date, which in turn takes priority over the preset range
+  // buttons — same three ways to land on a date scope as /admin/kpi.
+  const hasCustomRange = !!(customFrom && customTo);
+  const scopeFrom = hasCustomRange ? (customFrom as string) : selectedDate ?? rangeStart;
+  const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? rangeEnd;
+
   const rangeLeads = useMemo(
-    () =>
-      leads.filter((l) =>
-        selectedDate ? l.lead_date === selectedDate : l.lead_date >= rangeStart && l.lead_date <= todayStr()
-      ),
-    [leads, selectedDate, rangeStart]
+    () => leads.filter((l) => l.lead_date >= scopeFrom && l.lead_date <= scopeTo),
+    [leads, scopeFrom, scopeTo]
   );
 
   const ownerSalesSummary = useMemo(() => {
@@ -387,7 +325,7 @@ export default function AdminSecurityPage() {
     });
   }, [rangeLeads, leads]);
 
-  const scopeLabel = selectedDate ?? `${rangeStart} → ${todayStr()}`;
+  const scopeLabel = scopeFrom === scopeTo ? scopeFrom : `${scopeFrom} → ${scopeTo}`;
 
   const activityActors = useMemo(
     () => [...new Set(activity.map((a) => a.actor).filter((a): a is string => !!a))].sort(),
@@ -418,13 +356,11 @@ export default function AdminSecurityPage() {
   );
   const mostRecentSession = activeSessions[0] ?? null;
 
-  // Daily sales trend for the chart — only meaningful over a range, not a
-  // single picked date, so it sits out when selectedDate is set.
+  // Daily sales trend for the chart, over whatever date scope is active.
   const dailySalesTrend = useMemo(() => {
-    if (selectedDate) return [];
     const sums = new Map<string, number>();
-    const end = new Date(todayStr());
-    for (let d = new Date(rangeStart); d <= end; d.setDate(d.getDate() + 1)) {
+    const end = new Date(scopeTo);
+    for (let d = new Date(scopeFrom); d <= end; d.setDate(d.getDate() + 1)) {
       sums.set(d.toISOString().slice(0, 10), 0);
     }
     leads
@@ -433,7 +369,7 @@ export default function AdminSecurityPage() {
         if (sums.has(l.lead_date)) sums.set(l.lead_date, (sums.get(l.lead_date) || 0) + (l.deal_value ?? 0));
       });
     return Array.from(sums.entries()).map(([date, total]) => ({ date, total }));
-  }, [leads, rangeStart, selectedDate]);
+  }, [leads, scopeFrom, scopeTo]);
 
   if (checkingStoredCode) {
     return (
@@ -690,18 +626,29 @@ export default function AdminSecurityPage() {
                     onClick={() => {
                       setRange(r.key);
                       setSelectedDate(null);
+                      setCustomFrom(null);
+                      setCustomTo(null);
                     }}
                     className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                      range === r.key && !selectedDate ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                      !hasCustomRange && range === r.key ? "bg-[#1A1A1A] text-white" : "bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
                     }`}
                   >
                     {r.key}
                   </button>
                 ))}
-                <SingleDatePicker
-                  value={selectedDate}
-                  onChange={setSelectedDate}
-                  placeholder={t("เลือกวัน", "Pick a day", "选择日期")}
+                <DateRangePicker
+                  from={scopeFrom}
+                  to={scopeTo}
+                  onChange={(f, tt) => {
+                    setSelectedDate(null);
+                    setCustomFrom(f);
+                    setCustomTo(tt);
+                  }}
+                  onClear={() => {
+                    setSelectedDate(null);
+                    setCustomFrom(null);
+                    setCustomTo(null);
+                  }}
                 />
               </div>
             </div>

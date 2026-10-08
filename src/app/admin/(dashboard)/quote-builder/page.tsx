@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck, ImageOff } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck, ImageOff, RefreshCw, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import rawStock from "@/data/stock-demo.json";
 import { useLanguage } from "@/store/language";
 import type { SavedQuote, SavedQuoteItem, SavedQuoteDocType, SavedQuoteStatus, SavedQuoteChannel, SavedQuotePayment, PaymentMethod, PaymentType } from "@/types";
@@ -1593,47 +1596,88 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       `}</style>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 no-print">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("สร้างใบเสนอราคา / ใบแจ้งหนี้", "Quote / Invoice Builder", "生成报价单/发票")}</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">
-            {t(
-              "อ้างอิงราคาจากรายการสินค้า กรอกลูกค้า แล้วดาวน์โหลดได้ทันที",
-              "Pull prices from the product catalog, fill in customer details, and download instantly",
-              "从产品目录中获取价格，填写客户信息，即可立即下载"
-            )}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setListMode("saved");
-              setListOpen((v) => !v);
-            }}
-          >
-            <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({ownSavedList.length})
-          </Button>
-          <Button variant="outline" onClick={resetForm}>
-            <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
-          </Button>
-          <Button onClick={saveQuote} disabled={saving}>
-            <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
-          </Button>
-          <Button variant="outline" onClick={downloadExcel} disabled={generatingExcel}>
-            {generatingExcel ? (
-              <Loader2 size={14} className="mr-1.5 animate-spin" />
-            ) : (
-              <FileSpreadsheet size={14} className="mr-1.5" />
-            )}
-            {generatingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
-          </Button>
-          <Button variant="outline" onClick={printDeliveryNote}>
-            <Truck size={14} className="mr-1.5" /> {t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
-          </Button>
-          <Button onClick={() => window.print()}>
-            <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
-          </Button>
-        </div>
+        {defaultDocType === "delivery_note" ? (
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-[#C8102E] text-white flex items-center justify-center shrink-0">
+              <Truck size={20} />
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("สร้างใบส่งของ", "Create Delivery Note", "生成送货单")}</h1>
+              <p className="text-sm text-[#6B6B6B] mt-0.5">
+                {t("กรอกข้อมูลเพื่อสร้างใบส่งของ (Delivery Note)", "Fill in the details to create a delivery note", "填写信息以生成送货单")}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("สร้างใบเสนอราคา / ใบแจ้งหนี้", "Quote / Invoice Builder", "生成报价单/发票")}</h1>
+            <p className="text-sm text-[#6B6B6B] mt-0.5">
+              {t(
+                "อ้างอิงราคาจากรายการสินค้า กรอกลูกค้า แล้วดาวน์โหลดได้ทันที",
+                "Pull prices from the product catalog, fill in customer details, and download instantly",
+                "从产品目录中获取价格，填写客户信息，即可立即下载"
+              )}
+            </p>
+          </div>
+        )}
+        {defaultDocType === "delivery_note" ? (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button variant="outline" onClick={() => document.getElementById("print-area")?.scrollIntoView({ behavior: "smooth" })}>
+              <Eye size={14} className="mr-1.5" /> {t("ดูตัวอย่าง", "Preview", "预览")}
+            </Button>
+            <Button variant="outline" onClick={printDeliveryNote}>
+              <Printer size={14} className="mr-1.5" /> {t("พิมพ์", "Print", "打印")}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex items-center h-9 px-4 rounded-lg border border-input bg-background text-sm font-medium hover:bg-accent"
+                disabled={generatingExcel}
+              >
+                {generatingExcel ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Download size={14} className="mr-1.5" />}
+                {t("ดาวน์โหลด", "Download", "下载")}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.print()}>{t("PDF", "PDF", "PDF")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadExcel}>{t("Excel", "Excel", "Excel")}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={saveQuote} disabled={saving}>
+              <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึกใบส่งของ", "Save Delivery Note", "保存送货单")}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setListMode("saved");
+                setListOpen((v) => !v);
+              }}
+            >
+              <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({ownSavedList.length})
+            </Button>
+            <Button variant="outline" onClick={resetForm}>
+              <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
+            </Button>
+            <Button onClick={saveQuote} disabled={saving}>
+              <Save size={14} className="mr-1.5" /> {saving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึก", "Save", "保存")}
+            </Button>
+            <Button variant="outline" onClick={downloadExcel} disabled={generatingExcel}>
+              {generatingExcel ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <FileSpreadsheet size={14} className="mr-1.5" />
+              )}
+              {generatingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("ดาวน์โหลด Excel", "Download Excel", "下载Excel")}
+            </Button>
+            <Button variant="outline" onClick={printDeliveryNote}>
+              <Truck size={14} className="mr-1.5" /> {t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
+            </Button>
+            <Button onClick={() => window.print()}>
+              <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
+            </Button>
+          </div>
+        )}
       </div>
 
       {listOpen && (
@@ -1814,6 +1858,239 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Form ─────────────────────────────────────────────────── */}
         <div className="space-y-4 no-print">
+          {defaultDocType === "delivery_note" ? (
+            <>
+              <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                  <p className="text-sm font-semibold text-[#1A1A1A]">{t("ข้อมูลเอกสาร", "Document Info", "文件信息")}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("วันที่ส่งของ", "Delivery Date", "发货日期")} *</Label>
+                    <Input type="date" className="mt-1" value={date} onChange={(e) => setDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("เลขที่ใบส่งของ", "Delivery Note No.", "送货单号")} *</Label>
+                    <div className="mt-1 flex gap-1.5">
+                      <Input
+                        className="font-mono"
+                        value={docNo}
+                        onChange={(e) => {
+                          setDocNo(e.target.value);
+                          setDocNoTouched(true);
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label={t("สร้างเลขที่ใหม่", "Regenerate number", "重新生成单号")}
+                        onClick={() => {
+                          setDocNo(`${DOC_LABELS.delivery_note.prefix}${todayStr().replace(/-/g, "")}-01`);
+                          setDocNoTouched(false);
+                          setDocNoWarningAcked(false);
+                        }}
+                      >
+                        <RefreshCw size={14} />
+                      </Button>
+                    </div>
+                    {!docNoTouched && docNoWarningAcked && (
+                      <p className="mt-1 text-[11px] text-orange-600">
+                        {t("⚠ อย่าลืมเปลี่ยนเป็นเลขที่ของตัวเอง", "⚠ Don't forget to change this to your own number", "⚠ 别忘了改成自己的单号")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                  <p className="text-sm font-semibold text-[#1A1A1A]">{t("ข้อมูลลูกค้า", "Customer Info", "客户信息")}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("ชื่อลูกค้า / บริษัท", "Customer / Company Name", "客户/公司名称")} *</Label>
+                    <div className="mt-1">
+                      <CompanyPicker savedList={savedList} onPick={pickCompany} />
+                    </div>
+                    <Input
+                      className="mt-1.5"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder={t("เช่น บริษัท ... จำกัด", "e.g. ... Co., Ltd.", "例如：... 有限公司")}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("เบอร์โทรศัพท์", "Phone", "电话")}</Label>
+                    <Input className="mt-1" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="08x-xxx-xxxx" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>{t("ที่อยู่", "Address", "地址")}</Label>
+                    <Textarea className="mt-1" rows={2} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} placeholder={t("ที่อยู่ลูกค้า...", "Customer address...", "客户地址...")} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white text-xs font-bold flex items-center justify-center shrink-0">3</span>
+                    <p className="text-sm font-semibold text-[#1A1A1A]">{t("เพิ่มสินค้า", "Add Products", "添加产品")}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        const line = newLine();
+                        setItems((prev) => [...prev, line]);
+                        setStockPickerTarget(line.id);
+                        setStockPickerOpen(true);
+                      }}
+                    >
+                      <Plus size={13} className="mr-1" /> {t("เพิ่มสินค้า", "Add Product", "添加产品")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setListMode("pull");
+                        setListOpen(true);
+                      }}
+                    >
+                      <FileSpreadsheet size={13} className="mr-1" /> {t("เลือกจากใบเสนอราคา", "From Quotation", "从报价单选择")}
+                    </Button>
+                  </div>
+                </div>
+                <datalist id="delivery-note-units">
+                  <option value="ชุด" />
+                  <option value="ตัว" />
+                  <option value="กล่อง" />
+                  <option value="แผ่น" />
+                  <option value="คู่" />
+                  <option value="ชิ้น" />
+                </datalist>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[560px]">
+                    <thead>
+                      <tr className="text-[#9CA3AF] text-left">
+                        <th className="p-2 font-medium w-8">No.</th>
+                        <th className="p-2 font-medium">{t("สินค้า / รายละเอียด", "Product / Details", "产品/详情")}</th>
+                        <th className="p-2 font-medium w-28">{t("รุ่น / รหัส", "Model / SKU", "型号/编号")}</th>
+                        <th className="p-2 font-medium w-20">{t("จำนวน", "Qty", "数量")}</th>
+                        <th className="p-2 font-medium w-24">{t("หน่วย", "Unit", "单位")}</th>
+                        <th className="p-2 font-medium">{t("หมายเหตุ", "Remark", "备注")}</th>
+                        <th className="p-2 font-medium w-10">{t("จัดการ", "", "操作")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((it, idx) => (
+                        <tr key={it.id} className="border-t border-[#E8E5E0] align-top">
+                          <td className="p-2 pt-3 text-[#9CA3AF]">{idx + 1}</td>
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStockPickerTarget(it.id);
+                                  setStockPickerOpen(true);
+                                }}
+                                aria-label={t("เลือกสินค้าจากสต็อก", "Pick from Stock", "从库存选择")}
+                                className="relative w-10 h-10 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E]"
+                              >
+                                {it.image ? (
+                                  <Image src={it.image} alt="" fill sizes="40px" className="object-contain" />
+                                ) : (
+                                  <ImageOff size={14} className="m-auto text-[#C8C5BE] absolute inset-0" />
+                                )}
+                              </button>
+                              <Input
+                                className="h-8 text-xs"
+                                placeholder={t("ชื่อสินค้า", "Item name", "产品名称")}
+                                value={it.name}
+                                onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              className="h-8 text-xs font-mono"
+                              value={it.sku}
+                              onChange={(e) => updateItem(it.id, { sku: e.target.value, stock_variant_id: null })}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              className="h-8 text-xs"
+                              value={it.qty}
+                              onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              className="h-8 text-xs"
+                              list="delivery-note-units"
+                              value={it.unit}
+                              onChange={(e) => updateItem(it.id, { unit: e.target.value })}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              className="h-8 text-xs"
+                              value={it.remark}
+                              onChange={(e) => updateItem(it.id, { remark: e.target.value })}
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <button type="button" onClick={() => removeItem(it.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600">
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white text-xs font-bold flex items-center justify-center shrink-0">4</span>
+                  <p className="text-sm font-semibold text-[#1A1A1A]">{t("ข้อมูลเพิ่มเติม", "Additional Info", "附加信息")}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("ผู้ส่งของ / ผู้รับผิดชอบ", "Delivered By / Responsible", "送货人/负责人")}</Label>
+                    <Select value={salesperson || "__none"} onValueChange={(v) => setSalesperson(!v || v === "__none" ? "" : v)}>
+                      <SelectTrigger className="mt-1 w-full">
+                        <SelectValue>{(v: string) => (v === "__none" ? t("ยังไม่ระบุ", "Not set", "未设置") : v)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">{t("ยังไม่ระบุ", "Not set", "未设置")}</SelectItem>
+                        {SALESPEOPLE.map((name) => (
+                          <SelectItem key={name} value={name}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>{t("หมายเหตุ", "Note", "备注")}</Label>
+                    <Input
+                      className="mt-1"
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      placeholder={t("เพิ่มเติม (ถ้ามี)", "Additional (if any)", "补充说明（如有）")}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2">
               {(["quotation", "invoice", "delivery_note"] as DocType[]).map((docTypeOption) => (
@@ -2112,23 +2389,9 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               </div>
             ))}
 
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setItems((prev) => [...prev, newLine()])}>
-                <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
-              </Button>
-              {defaultDocType === "delivery_note" && (
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setListMode("pull");
-                    setListOpen(true);
-                  }}
-                >
-                  <Search size={13} className="mr-1" /> {t("เลือกจากใบเสนอราคา", "Pull from Quotation", "从报价单导入")}
-                </Button>
-              )}
-            </div>
+            <Button variant="outline" className="w-full" onClick={() => setItems((prev) => [...prev, newLine()])}>
+              <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}
+            </Button>
           </div>
 
           <StockProductPickerDialog
@@ -2174,6 +2437,8 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             <>
               <PaymentsSection quoteId={savedId} />
               <ShipmentHistorySection quoteId={savedId} />
+            </>
+          )}
             </>
           )}
         </div>

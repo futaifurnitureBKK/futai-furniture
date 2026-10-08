@@ -117,12 +117,12 @@ const NO_OWNER = "__none";
 // was added — old lump-sum rows get bucketed there on migration rather than
 // guessed into one specific platform. New entries are made directly under
 // one of the first four.
-const AD_PLATFORMS: { key: AdPlatform; label: string }[] = [
-  { key: "facebook", label: "Facebook" },
-  { key: "tiktok", label: "TikTok" },
-  { key: "ig", label: "IG" },
-  { key: "shopee", label: "Shopee" },
-  { key: "other", label: "อื่นๆ/ยังไม่แยก" },
+const AD_PLATFORMS: { key: AdPlatform; label: { th: string; en: string; zh: string } }[] = [
+  { key: "facebook", label: { th: "Facebook", en: "Facebook", zh: "Facebook" } },
+  { key: "tiktok", label: { th: "TikTok", en: "TikTok", zh: "TikTok" } },
+  { key: "ig", label: { th: "IG", en: "IG", zh: "IG" } },
+  { key: "shopee", label: { th: "Shopee", en: "Shopee", zh: "Shopee" } },
+  { key: "other", label: { th: "อื่นๆ/ยังไม่แยก", en: "Other/unsplit", zh: "其他/未分类" } },
 ];
 
 // Keyed by `date`+`platform` from the parent so switching the day or
@@ -1083,7 +1083,7 @@ export default function KpiPage() {
                       if (!owner) return null;
                       return owner.platforms.map((p) => (
                         <div key={p.key} className="flex items-center justify-between gap-3">
-                          <span className="text-xs text-[#1A1A1A]">{p.label}</span>
+                          <span className="text-xs text-[#1A1A1A]">{t(p.label.th, p.label.en, p.label.zh)}</span>
                           {isSingleDay ? (
                             <AdSpendInput
                               key={`${adSpendEditDate}-${owner.name}-${p.key}`}

@@ -794,10 +794,10 @@ function ShipmentHistorySection({ quoteId }: { quoteId: number | null }) {
   );
 }
 
-function QuoteBuilderInner() {
+export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDocType?: DocType } = {}) {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const [docType, setDocType] = useState<DocType>("quotation");
+  const [docType, setDocType] = useState<DocType>(defaultDocType);
   const [langMode, setLangMode] = useState<LangMode>("th-en-zh");
   // Editable per-document — defaults to the company's main number, but a
   // different salesperson's number can be swapped in on the letterhead.
@@ -942,9 +942,9 @@ function QuoteBuilderInner() {
 
   function resetForm() {
     setSavedId(null);
-    setDocType("quotation");
+    setDocType(defaultDocType);
     setLangMode("th-en-zh");
-    setDocNo(`${DOC_LABELS.quotation.prefix}${todayStr().replace(/-/g, "")}-01`);
+    setDocNo(`${DOC_LABELS[defaultDocType].prefix}${todayStr().replace(/-/g, "")}-01`);
     setDocNoTouched(false);
     setDocNoWarningAcked(false);
     setChannel("other");

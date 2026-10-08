@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Camera,
+  FileOutput,
 } from "lucide-react";
 import { useLanguage } from "@/store/language";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/admin/orders",            labelTh: "คำสั่งซื้อ",   labelEn: "Orders",       labelZh: "订单",       icon: ShoppingBag, hidden: true },
   { href: "/admin/quotes",            labelTh: "ใบเสนอราคา",  labelEn: "Quotes",       labelZh: "报价单",     icon: FileText },
   { href: "/admin/quote-builder",     labelTh: "สร้างใบเสนอราคา", labelEn: "Quote Builder", labelZh: "生成报价单", icon: Receipt },
+  { href: "/admin/delivery-note",     labelTh: "ใบส่งของ",      labelEn: "Delivery Note", labelZh: "送货单",     icon: FileOutput },
   { href: "/admin/daily-sales",       labelTh: "ยอดขายรายวัน",  labelEn: "Daily Sales",  labelZh: "每日销售",   icon: ClipboardList },
   { href: "/admin/daily-shipping",    labelTh: "จัดส่งสินค้ารายวัน", labelEn: "Daily Shipping", labelZh: "每日出货",   icon: PackageCheck, hidden: true },
   { href: "/admin/daily-exports",     labelTh: "การส่งออกรายวัน", labelEn: "Daily Export", labelZh: "每日出库",   icon: PackageMinus },

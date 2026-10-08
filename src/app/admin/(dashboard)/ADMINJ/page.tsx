@@ -2,11 +2,15 @@
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import {
   Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
-  CheckCircle2, XCircle, Users, Clock, History, Search, X,
+  CheckCircle2, XCircle, Users, Clock, History, Search, X, CalendarDays,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { Popover } from "@base-ui/react/popover";
+import { DayPicker } from "react-day-picker";
+import { th as thLocale, zhCN, enUS } from "react-day-picker/locale";
+import "react-day-picker/style.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +18,6 @@ import {
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
-import { DateRangePicker } from "@/components/admin/date-range-picker";
 import type { Lead } from "@/types";
 
 interface Login {
@@ -75,6 +78,78 @@ function daysAgoStr(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString().slice(0, 10);
+}
+
+function parseDateStr(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+function formatDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// A single-click calendar popover for picking one exact day — selecting a
+// date immediately applies and closes (no separate "apply" step), unlike
+// DateRangePicker which is built for picking a from/to range and needs one.
+function SingleDatePicker({
+  value, onChange, placeholder,
+}: {
+  value: string | null;
+  onChange: (date: string | null) => void;
+  placeholder?: string;
+}) {
+  const { t, lang } = useLanguage();
+  const calendarLocale = lang === "th" ? thLocale : lang === "zh" ? zhCN : enUS;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#E8E5E0] bg-white px-2.5 text-xs text-[#1A1A1A] hover:border-[#C8102E]/40 transition-colors">
+        <CalendarDays size={13} className="text-[#6B6B6B]" />
+        {value ?? placeholder ?? t("เลือกวัน", "Pick a day", "选择日期")}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner sideOffset={6} align="end">
+          <Popover.Popup className="z-50 rounded-xl bg-white p-3 shadow-lg ring-1 ring-[#E8E5E0] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+            <DayPicker
+              mode="single"
+              weekStartsOn={1}
+              locale={calendarLocale}
+              defaultMonth={value ? parseDateStr(value) : new Date()}
+              selected={value ? parseDateStr(value) : undefined}
+              onSelect={(d) => {
+                if (d) onChange(formatDateStr(d));
+                setOpen(false);
+              }}
+              className="text-xs"
+              classNames={{
+                today: "font-bold text-[#C8102E]",
+                selected: "bg-[#C8102E] text-white rounded-full",
+                day_button: "rounded-full hover:bg-[#FAF7F2]",
+              }}
+            />
+            {value && (
+              <div className="flex justify-end mt-1 pt-2 border-t border-[#F0EDE6]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                  className="text-xs text-[#9CA3AF] hover:text-[#1A1A1A] underline"
+                >
+                  {t("ล้าง", "Clear", "清除")}
+                </button>
+              </div>
+            )}
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
 }
 
 type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
@@ -623,11 +698,9 @@ export default function AdminSecurityPage() {
                     {r.key}
                   </button>
                 ))}
-                <DateRangePicker
-                  from={selectedDate}
-                  to={selectedDate}
-                  onChange={(f) => setSelectedDate(f)}
-                  onClear={() => setSelectedDate(null)}
+                <SingleDatePicker
+                  value={selectedDate}
+                  onChange={setSelectedDate}
                   placeholder={t("เลือกวัน", "Pick a day", "选择日期")}
                 />
               </div>

@@ -718,7 +718,7 @@ export default function AdminSecurityPage() {
               <div className="flex items-center gap-2">
                 <History size={16} className="text-indigo-600" />
                 <p className="text-sm font-semibold text-[#1A1A1A]">
-                  {t("ประวัติการใช้งาน (กันทุจริต)", "Activity log (fraud prevention)", "操作记录（防止舞弊）")}
+                  {t("ประวัติการใช้งาน", "Activity log", "操作记录")}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

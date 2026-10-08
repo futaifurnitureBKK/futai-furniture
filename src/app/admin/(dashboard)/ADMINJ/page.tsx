@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, FormEvent } from "react";
+import Link from "next/link";
 import {
   Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
   CheckCircle2, XCircle, Users, Clock, History, Search, X,
@@ -714,7 +715,17 @@ export default function AdminSecurityPage() {
                         {rangeLeads.length ? ((rangeLeads.filter((l) => l.status === "converted").length / rangeLeads.length) * 100).toFixed(0) : 0}%
                       </TableCell>
                       <TableCell className="text-sm text-right">
-                        ฿{rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                        {rangeLeads.some((l) => l.status === "converted") ? (
+                          <Link
+                            href={`/admin/ADMINJ/sales-detail?${new URLSearchParams({ owner: "all", from: scopeFrom, to: scopeTo }).toString()}`}
+                            target="_blank"
+                            className="underline decoration-dotted underline-offset-2 hover:text-[#C8102E]"
+                          >
+                            ฿{rangeLeads.filter((l) => l.status === "converted").reduce((sum, l) => sum + (l.deal_value ?? 0), 0).toLocaleString("th-TH")}
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                     </TableRow>
                     {ownerSalesSummary.map((o) => (
@@ -723,7 +734,19 @@ export default function AdminSecurityPage() {
                         <TableCell className="text-sm text-right">{o.count}</TableCell>
                         <TableCell className="text-sm text-right">{o.converted}</TableCell>
                         <TableCell className="text-sm text-right">{o.count ? `${o.rate.toFixed(0)}%` : "-"}</TableCell>
-                        <TableCell className="text-sm text-right">{o.revenue ? `฿${o.revenue.toLocaleString("th-TH")}` : "-"}</TableCell>
+                        <TableCell className="text-sm text-right">
+                          {o.revenue ? (
+                            <Link
+                              href={`/admin/ADMINJ/sales-detail?${new URLSearchParams({ owner: o.name, from: scopeFrom, to: scopeTo }).toString()}`}
+                              target="_blank"
+                              className="underline decoration-dotted underline-offset-2 hover:text-[#C8102E]"
+                            >
+                              ฿{o.revenue.toLocaleString("th-TH")}
+                            </Link>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

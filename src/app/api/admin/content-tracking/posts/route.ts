@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 
-const PLATFORMS = ["fb", "ig", "tk", "douyin", "xiaohongshu"];
+const PLATFORMS = ["fb", "ig", "tk", "xiaohongshu", "line"];
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {

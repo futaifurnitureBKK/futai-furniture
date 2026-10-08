@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json();
   const name = (body.name || "").trim();
+  const role = (body.role || "").trim();
   if (!name) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db
     .from("content_tracking_employees")
-    .insert({ name, sort_order: nextSortOrder })
+    .insert({ name, role, sort_order: nextSortOrder })
     .select()
     .single();
   if (error) {

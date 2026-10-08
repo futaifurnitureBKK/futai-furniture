@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
   const update: Record<string, unknown> = {};
   if (typeof body.name === "string") update.name = body.name.trim();
+  if (typeof body.role === "string") update.role = body.role.trim();
   if (typeof body.archived === "boolean") update.archived = body.archived;
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

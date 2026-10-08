@@ -523,7 +523,7 @@ export default function ShippingPage() {
           </div>
 
           {/* Other statuses — row underneath */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 items-start">
             {otherColumns.map((col) => {
               const meta = STATUS_META[col.key];
               return (

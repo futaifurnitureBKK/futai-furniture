@@ -896,6 +896,11 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   const [savedId, setSavedId] = useState<number | null>(null);
   const [savedList, setSavedList] = useState<SavedListRow[]>([]);
   const [listOpen, setListOpen] = useState(false);
+  // "saved" = the normal browse/open/archive list; "pull" = picking a
+  // quotation to copy into a brand-new document (used by the Delivery
+  // Note entry point's "ดึงจากใบเสนอราคา" — never opens the source for
+  // editing, so the original quotation is never touched).
+  const [listMode, setListMode] = useState<"saved" | "pull">("saved");
   const [showArchived, setShowArchived] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -904,15 +909,25 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   const [listDateFrom, setListDateFrom] = useState("");
   const [listDateTo, setListDateTo] = useState("");
 
+  // This entry point's own saved count — on the Delivery Note page, only
+  // counts delivery notes (not every saved_quotes row), matching what the
+  // "รายการที่บันทึกไว้" button and list actually show.
+  const ownSavedList = useMemo(
+    () => (defaultDocType === "delivery_note" ? savedList.filter((row) => row.doc_type === "delivery_note") : savedList),
+    [savedList, defaultDocType]
+  );
+
   const filteredSavedList = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     return savedList.filter((row) => {
+      if (listMode === "pull" && row.doc_type !== "quotation") return false;
+      if (listMode === "saved" && defaultDocType === "delivery_note" && row.doc_type !== "delivery_note") return false;
       if (q && !row.customer_name.toLowerCase().includes(q)) return false;
       if (listDateFrom && row.doc_date < listDateFrom) return false;
       if (listDateTo && row.doc_date > listDateTo) return false;
       return true;
     });
-  }, [savedList, listSearch, listDateFrom, listDateTo]);
+  }, [savedList, listSearch, listDateFrom, listDateTo, listMode, defaultDocType]);
 
   const L = (t: TriText) => joinLang(langMode, t);
 
@@ -1066,6 +1081,62 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
         : [newLine()]
     );
     setListOpen(false);
+  }
+
+  // Copies a quotation's details into a brand-new, independent document —
+  // savedId stays null, so the next Save creates a new row rather than
+  // touching the source quotation. Used for making a delivery note that
+  // only covers part of what was quoted (some items shipped later), so
+  // removing items here must never remove them from the original.
+  async function pullFromQuotation(id: number) {
+    const res = await fetch(`/api/admin/saved-quotes/${id}`);
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(t("โหลดไม่สำเร็จ", "Load failed", "加载失败"));
+      return;
+    }
+    const q = data.quote as SavedQuote;
+    setSavedId(null);
+    setDocType(defaultDocType);
+    setLangMode(q.lang_mode);
+    setDocNo(`${DOC_LABELS[defaultDocType].prefix}${todayStr().replace(/-/g, "")}-01`);
+    setDocNoTouched(false);
+    setDocNoWarningAcked(false);
+    setChannel(q.channel ?? "other");
+    setDate(todayStr());
+    setCustomerName(q.customer_name);
+    setCustomerAddress(q.customer_address);
+    setCustomerTaxId(q.customer_tax_id);
+    setShippingAddress(q.shipping_address);
+    setShippingDate(q.shipping_date || "");
+    setCustomerContact(q.contact_person);
+    setCustomerPhone(q.contact_phone);
+    setSalesperson(q.salesperson || "");
+    setOrderNotes(q.notes || "");
+    setTermsText(q.terms_text || defaultTermsText(q.lang_mode));
+    setDiscountPct(q.discount_pct ?? 0);
+    setVatPct(q.vat_pct);
+    setDepositPct(q.deposit_pct);
+    setItems(
+      q.items.length
+        ? q.items.map((it) => ({
+            ...it,
+            id: Math.random().toString(36).slice(2),
+            seats: it.seats ?? 1,
+            baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
+            remarkImage: it.remarkImage ?? null,
+            stock_variant_id: it.stock_variant_id ?? null,
+          }))
+        : [newLine()]
+    );
+    setListOpen(false);
+    toast.success(
+      t(
+        "ดึงข้อมูลจากใบเสนอราคาแล้ว — นี่คือเอกสารใหม่ ลบ/แก้รายการได้โดยไม่กระทบใบเสนอราคาต้นฉบับ",
+        "Pulled from the quotation — this is a new document; removing or editing items here won't affect the original",
+        "已从报价单导入 — 这是新文件，删除或编辑项目不会影响原报价单"
+      )
+    );
   }
 
   // Reuse a previously saved company's details instead of retyping them —
@@ -1525,9 +1596,26 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => setListOpen((v) => !v)}>
-            <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({savedList.length})
+          <Button
+            variant="outline"
+            onClick={() => {
+              setListMode("saved");
+              setListOpen((v) => !v);
+            }}
+          >
+            <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({ownSavedList.length})
           </Button>
+          {defaultDocType === "delivery_note" && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setListMode("pull");
+                setListOpen(true);
+              }}
+            >
+              <Search size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Pull from Quotation", "从报价单导入")}
+            </Button>
+          )}
           <Button variant="outline" onClick={resetForm}>
             <FilePlus2 size={14} className="mr-1.5" /> {t("สร้างใหม่", "New", "新建")}
           </Button>
@@ -1555,9 +1643,11 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
         <div className="bg-white rounded-xl shadow-sm p-5 no-print">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-[#1A1A1A]">
-              {showArchived
-                ? t("เอกสารที่เก็บเข้าคลัง", "Archived Documents", "已归档文件")
-                : t("รายการที่บันทึกไว้", "Saved Documents", "已保存文件")}
+              {listMode === "pull"
+                ? t("เลือกใบเสนอราคาที่จะดึงข้อมูลมา", "Pick a quotation to pull from", "选择要导入的报价单")
+                : showArchived
+                  ? t("เอกสารที่เก็บเข้าคลัง", "Archived Documents", "已归档文件")
+                  : t("รายการที่บันทึกไว้", "Saved Documents", "已保存文件")}
             </p>
             <Button size="sm" variant="outline" onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? (
@@ -1691,21 +1781,29 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="outline" onClick={() => loadQuote(q.id)}>
-                          {t("เปิด", "Open", "打开")}
-                        </Button>
-                        {showArchived ? (
-                          <Button size="icon-sm" variant="ghost" onClick={() => restoreQuote(q.id)} aria-label={t("กู้คืน", "Restore", "恢复")}>
-                            <ArchiveRestore size={13} className="text-[#6B6B6B]" />
+                        {listMode === "pull" ? (
+                          <Button size="sm" onClick={() => pullFromQuotation(q.id)}>
+                            {t("ใช้ใบนี้", "Use this", "使用此单")}
                           </Button>
                         ) : (
-                          <Button size="icon-sm" variant="ghost" onClick={() => archiveQuote(q.id)} aria-label={t("เก็บเข้าคลัง", "Archive", "归档")}>
-                            <Archive size={13} className="text-[#6B6B6B]" />
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => loadQuote(q.id)}>
+                              {t("เปิด", "Open", "打开")}
+                            </Button>
+                            {showArchived ? (
+                              <Button size="icon-sm" variant="ghost" onClick={() => restoreQuote(q.id)} aria-label={t("กู้คืน", "Restore", "恢复")}>
+                                <ArchiveRestore size={13} className="text-[#6B6B6B]" />
+                              </Button>
+                            ) : (
+                              <Button size="icon-sm" variant="ghost" onClick={() => archiveQuote(q.id)} aria-label={t("เก็บเข้าคลัง", "Archive", "归档")}>
+                                <Archive size={13} className="text-[#6B6B6B]" />
+                              </Button>
+                            )}
+                            <Button size="icon-sm" variant="ghost" onClick={() => deleteQuote(q.id, q.doc_no)} aria-label={t("ลบ", "Delete", "删除")}>
+                              <Trash2 size={13} className="text-red-500" />
+                            </Button>
+                          </>
                         )}
-                        <Button size="icon-sm" variant="ghost" onClick={() => deleteQuote(q.id, q.doc_no)} aria-label={t("ลบ", "Delete", "删除")}>
-                          <Trash2 size={13} className="text-red-500" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

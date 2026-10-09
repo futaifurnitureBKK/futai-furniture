@@ -1704,6 +1704,15 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
         )}
         {defaultDocType === "delivery_note" ? (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setListMode("saved");
+                setListOpen((v) => !v);
+              }}
+            >
+              <FolderOpen size={14} className="mr-1.5" /> {t("รายการที่บันทึกไว้", "Saved", "已保存")} ({ownSavedList.length})
+            </Button>
             <Button variant="outline" onClick={() => document.getElementById("print-area")?.scrollIntoView({ behavior: "smooth" })}>
               <Eye size={14} className="mr-1.5" /> {t("ดูตัวอย่าง", "Preview", "预览")}
             </Button>

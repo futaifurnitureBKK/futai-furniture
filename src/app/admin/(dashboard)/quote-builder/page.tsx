@@ -551,6 +551,7 @@ function CompanyPicker({
 function ImageUploadTile({ image, onChange }: { image: string | null; onChange: (url: string | null) => void }) {
   const { t } = useLanguage();
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   async function handleFile(file: File) {
     if (!file.type.startsWith("image/")) return;
@@ -570,7 +571,22 @@ function ImageUploadTile({ image, onChange }: { image: string | null; onChange: 
   }
 
   return (
-    <label className="relative w-16 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] cursor-pointer group flex items-center justify-center">
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleFile(file);
+      }}
+      className={`relative w-16 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border cursor-pointer group flex items-center justify-center transition-colors ${
+        dragOver ? "border-[#C8102E] border-2 bg-[#C8102E]/5" : "border-[#E8E5E0]"
+      }`}
+    >
       <input
         type="file"
         accept="image/*"

@@ -992,8 +992,15 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // This entry point's own saved count — on the Delivery Note page, only
   // counts delivery notes (not every saved_quotes row), matching what the
   // "รายการที่บันทึกไว้" button and list actually show.
+  // The delivery-note page only ever saves/shows delivery notes; the
+  // regular quote-builder page saves/shows quotations and invoices
+  // together (it toggles between those two doc types) but never a
+  // delivery note, which belongs to its own separate list.
   const ownSavedList = useMemo(
-    () => (defaultDocType === "delivery_note" ? savedList.filter((row) => row.doc_type === "delivery_note") : savedList),
+    () =>
+      savedList.filter((row) =>
+        defaultDocType === "delivery_note" ? row.doc_type === "delivery_note" : row.doc_type !== "delivery_note"
+      ),
     [savedList, defaultDocType]
   );
 
@@ -1002,6 +1009,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     return savedList.filter((row) => {
       if (listMode === "pull" && row.doc_type !== "quotation") return false;
       if (listMode === "saved" && defaultDocType === "delivery_note" && row.doc_type !== "delivery_note") return false;
+      if (listMode === "saved" && defaultDocType !== "delivery_note" && row.doc_type === "delivery_note") return false;
       if (q && !row.customer_name.toLowerCase().includes(q)) return false;
       if (listDateFrom && row.doc_date < listDateFrom) return false;
       if (listDateTo && row.doc_date > listDateTo) return false;

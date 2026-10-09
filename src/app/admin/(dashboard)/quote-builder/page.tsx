@@ -2060,21 +2060,19 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                           <td className="p-2 pt-3 text-[#9CA3AF]">{idx + 1}</td>
                           <td className="p-2">
                             <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setStockPickerTarget(it.id);
-                                  setStockPickerOpen(true);
-                                }}
-                                aria-label={t("เลือกสินค้าจากสต็อก", "Pick from Stock", "从库存选择")}
-                                className="relative w-10 h-10 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] hover:border-[#C8102E]"
-                              >
-                                {it.image ? (
-                                  <Image src={it.image} alt="" fill sizes="40px" className="object-contain" />
-                                ) : (
-                                  <ImageOff size={14} className="m-auto text-[#C8C5BE] absolute inset-0" />
-                                )}
-                              </button>
+                              <div className="flex flex-col items-center gap-1 shrink-0">
+                                <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setStockPickerTarget(it.id);
+                                    setStockPickerOpen(true);
+                                  }}
+                                  className="text-[10px] text-[#9CA3AF] hover:text-[#C8102E] inline-flex items-center gap-0.5 whitespace-nowrap"
+                                >
+                                  <Search size={10} /> {t("จากสต็อก", "From Stock", "从库存")}
+                                </button>
+                              </div>
                               <Input
                                 className="h-8 text-xs"
                                 placeholder={t("ชื่อสินค้า", "Item name", "产品名称")}

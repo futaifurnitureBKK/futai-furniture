@@ -79,13 +79,12 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "products",
-    labelTh: "สินค้าและลูกค้า", labelEn: "Products & Customers", labelZh: "产品与客户",
+    labelTh: "สินค้าและข้อมูลลูกค้า", labelEn: "Products & Customer Data", labelZh: "产品与客户数据",
     icon: Package,
     items: [
       { href: "/admin/products",        labelTh: "สินค้า",      labelEn: "Products",       labelZh: "产品",      icon: Package },
       { href: "/admin/categories",      labelTh: "รูปหมวดหมู่", labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },
       { href: "/admin/customers",       labelTh: "ลูกค้า",      labelEn: "Customers",      labelZh: "客户",      icon: Users },
-      { href: "/admin/StockDEMO",       labelTh: "สต็อก DEMO", labelEn: "Stock DEMO",     labelZh: "库存 DEMO", icon: Warehouse },
       { href: "/admin/products/images", labelTh: "รูปสินค้า",   labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus, hidden: true },
     ],
   },
@@ -106,6 +105,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Megaphone,
     items: [
       { href: "/admin/content-tracking", labelTh: "ติดตามโพสต์พนักงาน", labelEn: "Content Tracker", labelZh: "员工发帖跟踪", icon: Camera },
+      { href: "/admin/StockDEMO",        labelTh: "สต็อก DEMO",        labelEn: "Stock DEMO",     labelZh: "库存 DEMO",   icon: Warehouse },
     ],
   },
   {
@@ -219,23 +219,23 @@ function NavLinks({
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
-  const [expandedKeys, setExpandedKeys] = useState<string[]>(() => {
-    const active = groupContainingPath(pathname);
-    return active ? [active] : [];
-  });
+  // All sections start open by default — keeps every page one glance away
+  // instead of needing to hunt for which group it's hiding in.
+  const [expandedKeys, setExpandedKeys] = useState<string[]>(() => NAV_GROUPS.map((g) => g.key));
 
   // Re-seed from localStorage after mount (not during SSR, to avoid a
-  // hydration mismatch) — keeps whatever the person had open last time,
-  // always including the group the current page lives in.
+  // hydration mismatch) — keeps whatever the person had open/closed last
+  // time, always including the group the current page lives in.
   useEffect(() => {
     (async () => {
       try {
-        const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) || "[]") as string[];
+        const raw = localStorage.getItem(EXPANDED_KEY);
+        const stored = raw ? (JSON.parse(raw) as string[]) : NAV_GROUPS.map((g) => g.key);
         const active = groupContainingPath(pathname);
         const merged = [...new Set([...stored, ...(active ? [active] : [])])];
         setExpandedKeys(merged);
       } catch {
-        // ignore — just falls back to the active-group-only default
+        // ignore — just falls back to the all-expanded default
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

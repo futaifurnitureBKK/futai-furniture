@@ -2516,15 +2516,15 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
-                <Input type="number" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
+                <Input type="number" step="0.1" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
               </div>
               <div>
                 <Label>VAT %</Label>
-                <Input type="number" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
+                <Input type="number" step="0.1" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
               </div>
               <div>
                 <Label>{t("มัดจำ %", "Deposit %", "定金 %")}</Label>
-                <Input type="number" className="mt-1" value={depositPct} onChange={(e) => setDepositPct(Number(e.target.value) || 0)} />
+                <Input type="number" step="0.1" className="mt-1" value={depositPct} onChange={(e) => setDepositPct(Number(e.target.value) || 0)} />
               </div>
             </div>
           )}

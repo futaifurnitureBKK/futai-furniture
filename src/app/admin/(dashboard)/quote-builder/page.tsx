@@ -2065,6 +2065,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                         <th className="p-2 font-medium w-8">No.</th>
                         <th className="p-2 font-medium">{t("สินค้า / รายละเอียด", "Product / Details", "产品/详情")}</th>
                         <th className="p-2 font-medium w-28">{t("รุ่น / รหัส", "Model / SKU", "型号/编号")}</th>
+                        <th className="p-2 font-medium w-24">{t("ขนาด (mm)", "Size (mm)", "规格 (mm)")}</th>
                         <th className="p-2 font-medium w-20">{t("จำนวน", "Qty", "数量")}</th>
                         <th className="p-2 font-medium w-24">{t("หน่วย", "Unit", "单位")}</th>
                         <th className="p-2 font-medium">{t("หมายเหตุ", "Remark", "备注")}</th>
@@ -2103,6 +2104,14 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                               className="h-8 text-xs font-mono"
                               value={it.sku}
                               onChange={(e) => updateItem(it.id, { sku: e.target.value, stock_variant_id: null })}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder={t("ขนาด (mm)", "Size (mm)", "规格 (mm)")}
+                              value={it.size}
+                              onChange={(e) => updateItem(it.id, { size: e.target.value, stock_variant_id: null })}
                             />
                           </td>
                           <td className="p-2">

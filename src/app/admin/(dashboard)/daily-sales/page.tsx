@@ -4,7 +4,7 @@ import Image from "next/image";
 import {
   Plus, Trash2, FileDown, FolderOpen, Search, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown,
   LayoutGrid, Eye, SlidersHorizontal, ImageOff, Wallet, ListChecks, Boxes, Calculator,
-  ChevronUp, ChevronDown, RotateCcw, Camera,
+  ChevronUp, ChevronDown, RotateCcw, Camera, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -270,23 +270,34 @@ export default function DailySalesPage() {
   const [hiddenColumns, setHiddenColumns] = useState<Set<ConfigColumnKey>>(new Set());
 
   const { from, to } = useMemo(() => computeRange(date, rangeKey), [date, rangeKey]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function loadRows(signal?: { cancelled: boolean }) {
+    const res = await fetch(`/api/admin/daily-sales?from=${from}&to=${to}`);
+    const data = await res.json();
+    if (signal?.cancelled) return;
+    if (res.ok) setRows(data.rows);
+    setSelected(new Set());
+  }
 
   useEffect(() => {
-    let cancelled = false;
+    const signal = { cancelled: false };
     (async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/daily-sales?from=${from}&to=${to}`);
-      const data = await res.json();
-      if (!cancelled) {
-        if (res.ok) setRows(data.rows);
-        setSelected(new Set());
-        setLoading(false);
-      }
+      await loadRows(signal);
+      if (!signal.cancelled) setLoading(false);
     })();
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadRows();
+    setRefreshing(false);
+  }
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -794,6 +805,9 @@ export default function DailySalesPage() {
               </button>
             ))}
           </div>
+          <Button size="icon-sm" variant="outline" onClick={handleRefresh} disabled={loading || refreshing} aria-label={t("โหลดใหม่", "Refresh", "刷新")} title={t("โหลดใหม่", "Refresh", "刷新")}>
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
             <FolderOpen size={14} className="mr-1.5" /> {t("ดึงจากใบเสนอราคา", "Import from quotation", "从报价单导入")}
           </Button>

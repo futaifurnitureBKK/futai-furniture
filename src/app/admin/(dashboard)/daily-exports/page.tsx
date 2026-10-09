@@ -76,6 +76,26 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+type RangeKey = "1d" | "7d" | "30d" | "month";
+
+function computeRange(anchor: string, key: RangeKey): { from: string; to: string } {
+  const end = new Date(anchor);
+  if (key === "1d") return { from: anchor, to: anchor };
+  if (key === "7d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  if (key === "30d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  const first = new Date(end.getFullYear(), end.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+  return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+}
+
 function fmt(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 1 });
 }
@@ -1144,8 +1164,10 @@ function QuoteFulfillDialog({
 export default function DailyExportsPage() {
   const { t } = useLanguage();
   const [date, setDate] = useState(todayStr());
+  const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [rows, setRows] = useState<DailyExportRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -1211,19 +1233,21 @@ export default function DailyExportsPage() {
     return m;
   }, [products]);
 
+  const { from, to } = useMemo(() => computeRange(date, rangeKey), [date, rangeKey]);
+
   async function load() {
-    setLoading(true);
-    const res = await fetch(`/api/admin/daily-exports?date=${date}`);
+    const url = rangeKey === "1d" ? `/api/admin/daily-exports?date=${date}` : `/api/admin/daily-exports?from=${from}&to=${to}`;
+    const res = await fetch(url);
     const data = await res.json();
     if (res.ok) setRows(data.rows);
-    setLoading(false);
   }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/daily-exports?date=${date}`);
+      const url = rangeKey === "1d" ? `/api/admin/daily-exports?date=${date}` : `/api/admin/daily-exports?from=${from}&to=${to}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (!cancelled) {
         if (res.ok) setRows(data.rows);
@@ -1233,7 +1257,13 @@ export default function DailyExportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, rangeKey, from, to]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
 
   // Fetched once — the grid picker reuses this same list every time it opens.
   useEffect(() => {
@@ -1349,6 +1379,11 @@ export default function DailyExportsPage() {
     return r.qty * r.unit_price * (1 - r.discount_pct / 100);
   }
 
+  // Export (and the zero-price confirm check) always stays scoped to the
+  // single anchor date, even while viewing a wider range in the table below
+  // — one Excel file should only ever document one day's deductions.
+  const exportRows = useMemo(() => rows.filter((r) => r.export_date === date), [rows, date]);
+  const showDateColumn = rangeKey !== "1d";
   const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
   const totalValue = rows.reduce((sum, r) => sum + rowTotal(r), 0);
   // Per shared-stock model present in today's rows: total pieces and the
@@ -1371,7 +1406,7 @@ export default function DailyExportsPage() {
   // Styled the same way as the Daily Sales / Daily Shipping export — title
   // bar, bordered + centered cells, embedded 1:1 product photos.
   async function exportExcel() {
-    const zeroRows = rows.some((r) => r.unit_price === 0 || r.qty === 0);
+    const zeroRows = exportRows.some((r) => r.unit_price === 0 || r.qty === 0);
     if (zeroRows) {
       const ok = confirm(
         t(
@@ -1400,8 +1435,8 @@ export default function DailyExportsPage() {
 
       styleHeaderRow(ws.addRow(EXPORT_HEADERS));
 
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
+      for (let i = 0; i < exportRows.length; i++) {
+        const r = exportRows[i];
         const sharedMeta = sharedStockMetaByVariant.get(r.stock_variant_id);
         const setsDeducted = sharedMeta ? (r.qty * sharedMeta.unitFactor) / 2 : "";
         const row = ws.addRow([
@@ -1435,10 +1470,29 @@ export default function DailyExportsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input type="date" className="w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Button size="sm" variant="outline" onClick={load}>
-            <RefreshCw size={14} className="mr-1.5" /> {t("โหลดใหม่", "Refresh", "刷新")}
+          <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+            {([
+              ["1d", t("วันนี้", "Today", "今天")],
+              ["7d", t("7 วัน", "7 days", "7天")],
+              ["30d", t("30 วัน", "30 days", "30天")],
+              ["month", t("เดือนนี้", "This month", "本月")],
+            ] as [RangeKey, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setRangeKey(key)}
+                className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  rangeKey === key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button size="icon-sm" variant="outline" onClick={handleRefresh} disabled={loading || refreshing} aria-label={t("โหลดใหม่", "Refresh", "刷新")} title={t("โหลดใหม่", "Refresh", "刷新")}>
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
           </Button>
-          <Button size="sm" onClick={exportExcel} disabled={!rows.length || exporting}>
+          <Button size="sm" onClick={exportExcel} disabled={!exportRows.length || exporting} title={rangeKey !== "1d" ? t("ส่งออกเฉพาะวันที่เลือกในช่องวันที่", "Exports only the date selected above", "仅导出上方选择的日期") : undefined}>
             {exporting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
             {t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
@@ -1533,6 +1587,7 @@ export default function DailyExportsPage() {
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
                 <TableHead className="text-xs w-10">{t("ที่", "No.", "序号")}</TableHead>
+                {showDateColumn && <TableHead className="text-xs w-24">{t("วันที่", "Date", "日期")}</TableHead>}
                 <TableHead className="text-xs w-44">{t("สินค้า", "Item", "商品")}</TableHead>
                 <TableHead className="text-xs w-16">{t("จำนวน", "Qty", "数量")}</TableHead>
                 <TableHead className="text-xs w-24">{t("ราคา/หน่วย", "Unit price", "单价")}</TableHead>
@@ -1549,7 +1604,7 @@ export default function DailyExportsPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-12 text-sm text-[#9CA3AF]">
+                  <TableCell colSpan={showDateColumn ? 13 : 12} className="text-center py-12 text-sm text-[#9CA3AF]">
                     {t('ยังไม่มีรายการของวันนี้ — กด "เพิ่มรายการ" เพื่อเริ่มตัดสต็อก', 'No rows for this date yet — click "Add item" to start deducting Stock', '该日期暂无记录 — 点击"添加项目"以开始扣减库存')}
                   </TableCell>
                 </TableRow>
@@ -1557,6 +1612,7 @@ export default function DailyExportsPage() {
                 rows.map((r, i) => (
                   <TableRow key={r.id} className="align-top">
                     <TableCell className="text-sm text-[#6B6B6B] pt-3">{i + 1}</TableCell>
+                    {showDateColumn && <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap">{r.export_date}</TableCell>}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">

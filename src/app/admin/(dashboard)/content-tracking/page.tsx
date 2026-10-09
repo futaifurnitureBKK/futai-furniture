@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Pencil, ImageOff, Search,
-  Music2, Megaphone, X, CalendarDays,
+  Music2, Megaphone, X, CalendarDays, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,32 @@ function fmtDateDisplay(dateStr: string) {
   return d.toLocaleDateString("th-TH-u-ca-buddhist", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+type RangeKey = "1d" | "7d" | "30d" | "month";
+
+function computeRange(anchor: string, key: RangeKey): { from: string; to: string } {
+  const end = new Date(anchor);
+  if (key === "1d") return { from: anchor, to: anchor };
+  if (key === "7d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  if (key === "30d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    return { from: start.toISOString().slice(0, 10), to: anchor };
+  }
+  const first = new Date(end.getFullYear(), end.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+  return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+}
+
+function daysBetween(from: string, to: string): number {
+  const a = new Date(from + "T00:00:00");
+  const b = new Date(to + "T00:00:00");
+  return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+}
+
 async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
   form.append("file", file);
@@ -113,9 +139,12 @@ type StatusFilter = "all" | "posted" | "pending" | "none";
 export default function ContentTrackingPage() {
   const { t } = useLanguage();
   const [date, setDate] = useState(todayStr());
+  const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [rangePosts, setRangePosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [uploadingCell, setUploadingCell] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -128,33 +157,66 @@ export default function ContentTrackingPage() {
   const [editRole, setEditRole] = useState("");
   const [cellDialog, setCellDialog] = useState<{ employeeId: number; platform: string } | null>(null);
 
+  async function loadEmployees() {
+    const res = await fetch("/api/admin/content-tracking/employees");
+    const data = await res.json();
+    if (res.ok) setEmployees(data.employees);
+  }
+
+  async function loadDayPosts() {
+    const res = await fetch(`/api/admin/content-tracking/posts?date=${date}`);
+    const data = await res.json();
+    if (res.ok) setPosts(data.posts);
+  }
+
+  const { from: rangeFrom, to: rangeTo } = useMemo(() => computeRange(date, rangeKey), [date, rangeKey]);
+
+  async function loadRangePosts() {
+    if (rangeKey === "1d") {
+      setRangePosts([]);
+      return;
+    }
+    const res = await fetch(`/api/admin/content-tracking/posts?from=${rangeFrom}&to=${rangeTo}`);
+    const data = await res.json();
+    if (res.ok) setRangePosts(data.posts);
+  }
+
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/content-tracking/employees");
-      const data = await res.json();
-      if (!cancelled && res.ok) setEmployees(data.employees);
+      await loadEmployees();
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/content-tracking/posts?date=${date}`);
-      const data = await res.json();
-      if (!cancelled) {
-        if (res.ok) setPosts(data.posts);
-        setLoading(false);
-      }
+      await loadDayPosts();
+      if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      await loadRangePosts();
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey, rangeFrom, rangeTo]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await Promise.all([loadEmployees(), loadDayPosts(), loadRangePosts()]);
+    setRefreshing(false);
+  }
 
   const postByCell = useMemo(() => {
     const m = new Map<string, Post>();
@@ -185,6 +247,16 @@ export default function ContentTrackingPage() {
     return { posted, total, pct: total > 0 ? Math.round((posted / total) * 100) : 0 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employees, postByCell]);
+
+  // Same shape as `overall`, but counted across every day in the selected
+  // range instead of just the single day the grid below is showing —
+  // backs the summary card only; the grid itself always stays per-day.
+  const periodOverall = useMemo(() => {
+    if (rangeKey === "1d") return overall;
+    const posted = rangePosts.filter((p) => p.status === "posted" && p.image_urls.length > 0).length;
+    const total = employees.length * PLATFORMS.length * daysBetween(rangeFrom, rangeTo);
+    return { posted, total, pct: total > 0 ? Math.round((posted / total) * 100) : 0 };
+  }, [rangeKey, rangePosts, employees, rangeFrom, rangeTo, overall]);
 
   async function addEmployee() {
     const name = newName.trim();
@@ -338,6 +410,28 @@ export default function ContentTrackingPage() {
               <ChevronRight size={15} />
             </Button>
           </div>
+          <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+            {([
+              ["1d", t("วันนี้", "Today", "今天")],
+              ["7d", t("7 วัน", "7 days", "7天")],
+              ["30d", t("30 วัน", "30 days", "30天")],
+              ["month", t("เดือนนี้", "This month", "本月")],
+            ] as [RangeKey, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setRangeKey(key)}
+                className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  rangeKey === key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button size="icon-sm" variant="outline" onClick={handleRefresh} disabled={loading || refreshing} aria-label={t("โหลดใหม่", "Refresh", "刷新")} title={t("โหลดใหม่", "Refresh", "刷新")}>
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          </Button>
           <Button onClick={() => setAddOpen(true)}>
             <Plus size={14} className="mr-1.5" /> {t("เพิ่มแถวพนักงาน", "Add Employee Row", "添加员工行")}
           </Button>
@@ -516,14 +610,16 @@ export default function ContentTrackingPage() {
           </div>
           <div className="flex items-center gap-3 bg-[#FAF7F2] rounded-lg px-3 py-2">
             <div>
-              <p className="text-[10px] text-[#9CA3AF]">{t("สรุปรวมวันนี้", "Today's total", "今日总计")}</p>
-              <p className="text-base font-bold text-[#1A1A1A] tabular-nums">{overall.posted} / {overall.total}</p>
+              <p className="text-[10px] text-[#9CA3AF]">
+                {rangeKey === "1d" ? t("สรุปรวมวันนี้", "Today's total", "今日总计") : t("สรุปรวมช่วงนี้", "Total for period", "所选期间总计")}
+              </p>
+              <p className="text-base font-bold text-[#1A1A1A] tabular-nums">{periodOverall.posted} / {periodOverall.total}</p>
             </div>
             <div className="w-24">
               <div className="h-1.5 w-full bg-[#E8E5E0] rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${overall.pct === 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${overall.pct}%` }} />
+                <div className={`h-full rounded-full ${periodOverall.pct === 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${periodOverall.pct}%` }} />
               </div>
-              <p className="text-[10px] text-[#9CA3AF] mt-0.5 text-right tabular-nums">{overall.pct}%</p>
+              <p className="text-[10px] text-[#9CA3AF] mt-0.5 text-right tabular-nums">{periodOverall.pct}%</p>
             </div>
           </div>
         </div>

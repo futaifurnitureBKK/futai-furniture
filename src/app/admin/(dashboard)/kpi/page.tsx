@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X, Eye } from "lucide-react";
+import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X, Eye, RefreshCw } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
 } from "recharts";
@@ -215,34 +215,36 @@ export default function KpiPage() {
     editingRef.current = editing;
   }, [editing]);
 
+  const [refreshingLeads, setRefreshingLeads] = useState(false);
+
+  async function loadLeads(signal?: { cancelled: boolean }) {
+    const [leadsRes, adSpendRes] = await Promise.all([
+      fetch("/api/admin/leads"),
+      fetch("/api/admin/ad-spend"),
+    ]);
+    const leadsData = await leadsRes.json();
+    const adSpendData = await adSpendRes.json();
+    if (signal?.cancelled) return;
+    setLeads(leadsRes.ok ? leadsData.leads : []);
+    if (adSpendRes.ok) setAdSpendRows(adSpendData.rows);
+  }
+
   useEffect(() => {
-    let cancelled = false;
+    const signal = { cancelled: false };
     (async () => {
-      const res = await fetch("/api/admin/leads");
-      const data = await res.json();
-      if (!cancelled) {
-        setLeads(res.ok ? data.leads : []);
-        setLoading(false);
-      }
+      await loadLeads(signal);
+      if (!signal.cancelled) setLoading(false);
     })();
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
   }, []);
 
-  // Fetched once — the table is small (one row per day per owner), so it's
-  // simpler to just pull it all and look up per owner client-side.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/admin/ad-spend");
-      const data = await res.json();
-      if (!cancelled && res.ok) setAdSpendRows(data.rows);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  async function handleRefreshLeads() {
+    setRefreshingLeads(true);
+    await loadLeads();
+    setRefreshingLeads(false);
+  }
 
   function openAdd() {
     setEditing(null);
@@ -989,6 +991,16 @@ export default function KpiPage() {
                   setCustomTo(null);
                 }}
               />
+              <Button
+                size="icon-sm"
+                variant="outline"
+                onClick={handleRefreshLeads}
+                disabled={loading || refreshingLeads}
+                aria-label={t("โหลดใหม่", "Refresh", "刷新")}
+                title={t("โหลดใหม่", "Refresh", "刷新")}
+              >
+                <RefreshCw size={14} className={refreshingLeads ? "animate-spin" : ""} />
+              </Button>
             </div>
 
             <div>

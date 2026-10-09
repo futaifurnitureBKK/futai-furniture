@@ -10,11 +10,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const date = req.nextUrl.searchParams.get("date");
-  if (!date) {
-    return NextResponse.json({ error: "date is required" }, { status: 400 });
+  const from = req.nextUrl.searchParams.get("from");
+  const to = req.nextUrl.searchParams.get("to");
+  if (!date && !(from && to)) {
+    return NextResponse.json({ error: "date or from/to is required" }, { status: 400 });
   }
   const db = supabaseAdmin();
-  const { data, error } = await db.from("content_tracking_posts").select("*").eq("post_date", date);
+  let query = db.from("content_tracking_posts").select("*");
+  query = from && to ? query.gte("post_date", from).lte("post_date", to) : query.eq("post_date", date as string);
+  const { data, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

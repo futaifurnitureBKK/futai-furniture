@@ -2,7 +2,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck, ImageOff, RefreshCw, Eye, Download } from "lucide-react";
+import { Reorder, useDragControls } from "framer-motion";
+import { Plus, Trash2, Printer, Search, Save, FolderOpen, FilePlus2, Upload, Loader2, X, FileSpreadsheet, Archive, ArchiveRestore, Truck, ImageOff, RefreshCw, Eye, Download, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -623,6 +624,167 @@ function ImageUploadTile({ image, onChange }: { image: string | null; onChange: 
         </div>
       )}
     </label>
+  );
+}
+
+// A single draggable line-item card — split out from the list so each one
+// gets its own useDragControls() instance (hooks need a real component, not
+// an inline closure inside .map()). Dragging is restricted to the grip
+// handle (dragListener=false + dragControls) so clicking/typing into the
+// card's own inputs and buttons never accidentally starts a drag.
+function LineItemCard({
+  it, idx, isDeliveryNote, updateItem, removeItem, onPickStock,
+}: {
+  it: LineItem;
+  idx: number;
+  isDeliveryNote: boolean;
+  updateItem: (id: string, patch: Partial<LineItem>) => void;
+  removeItem: (id: string) => void;
+  onPickStock: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={it}
+      dragListener={false}
+      dragControls={dragControls}
+      className="border border-[#E8E5E0] rounded-lg p-3 space-y-2 bg-white"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onPointerDown={(e) => dragControls.start(e)}
+            aria-label={t("ลากเพื่อจัดเรียงใหม่", "Drag to reorder", "拖动排序")}
+            className="cursor-grab active:cursor-grabbing text-[#C8C5BE] hover:text-[#6B6B6B] touch-none shrink-0"
+          >
+            <GripVertical size={15} />
+          </button>
+          <span className="text-xs font-semibold text-[#9CA3AF]">#{idx + 1}</span>
+        </div>
+        <button type="button" onClick={() => removeItem(it.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600">
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <div className="flex gap-2">
+        <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
+        <div className="flex-1 min-w-0 space-y-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs w-full justify-start"
+            onClick={() => onPickStock(it.id)}
+          >
+            <Search size={13} className="mr-1.5 shrink-0" />
+            <span className="truncate">{t("เลือกสินค้าจากสต็อก...", "Pick from Stock...", "从库存选择...")}</span>
+          </Button>
+          {it.sku && (
+            <p className={`text-[11px] ${it.stock_variant_id ? "text-emerald-600" : "text-amber-600"}`}>
+              {it.stock_variant_id
+                ? t("✓ ผูกกับสต็อก", "✓ Linked to Stock", "✓ 已关联库存")
+                : t("ไม่ผูกสต็อก", "Not linked to Stock", "未关联库存")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Input
+          className="h-8 text-xs sm:col-span-2"
+          placeholder={t("ชื่อสินค้า", "Item Name", "产品名称")}
+          value={it.name}
+          onChange={(e) => updateItem(it.id, { name: e.target.value })}
+        />
+        <Input
+          className="h-8 text-xs font-mono"
+          placeholder={t("รหัสรุ่น / SKU", "Model / SKU", "型号/SKU")}
+          value={it.sku}
+          onChange={(e) => updateItem(it.id, { sku: e.target.value, stock_variant_id: null })}
+        />
+        <Input
+          className="h-8 text-xs"
+          placeholder={t("ขนาด (mm)", "Size (mm)", "规格 (mm)")}
+          value={it.size}
+          onChange={(e) => updateItem(it.id, { size: e.target.value, stock_variant_id: null })}
+        />
+      </div>
+
+      <div className={isDeliveryNote ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
+        <Input
+          type="number"
+          className="h-8 text-xs"
+          placeholder={t("จำนวน", "Qty", "数量")}
+          value={it.qty}
+          onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
+        />
+        {isDeliveryNote && (
+          <Input
+            className="h-8 text-xs"
+            list="delivery-note-units"
+            placeholder={t("หน่วย เช่น ชุด/ตัว", "Unit e.g. set/pc", "单位 如 套/件")}
+            value={it.unit}
+            onChange={(e) => updateItem(it.id, { unit: e.target.value })}
+          />
+        )}
+        {!isDeliveryNote && (
+          <>
+            <Select
+              value={String(it.seats)}
+              onValueChange={(v) => {
+                const seats = Number(v);
+                updateItem(it.id, { seats, unitPrice: computeSeatPrice(it.baseUnitPrice, seats) });
+              }}
+            >
+              <SelectTrigger size="sm" className="h-8 text-xs">
+                <SelectValue>{(v: string) => `${v} ${t("ที่นั่ง", "seats", "座")}`}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {SEAT_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} {t("ที่นั่ง", "seats", "座")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              className="h-8 text-xs"
+              placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
+              value={it.unitPrice}
+              onChange={(e) => {
+                const unitPrice = Number(e.target.value) || 0;
+                updateItem(it.id, {
+                  unitPrice,
+                  ...(it.seats === 1 ? { baseUnitPrice: unitPrice } : {}),
+                });
+              }}
+            />
+          </>
+        )}
+      </div>
+      <div className="flex gap-2 items-start">
+        <Input
+          className="h-8 text-xs flex-1"
+          placeholder={t("หมายเหตุ", "Remark", "备注")}
+          value={it.remark}
+          onChange={(e) => updateItem(it.id, { remark: e.target.value })}
+        />
+        <ImageUploadTile
+          image={it.remarkImage}
+          onChange={(url) => updateItem(it.id, { remarkImage: url })}
+        />
+      </div>
+      {!isDeliveryNote && (
+        <p className="text-right text-xs text-[#6B6B6B]">
+          {t("รวม", "Total", "总计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(it.qty * it.unitPrice)}</span>
+        </p>
+      )}
+    </Reorder.Item>
   );
 }
 
@@ -2368,134 +2530,22 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               </datalist>
             )}
 
-            {items.map((it, idx) => (
-              <div key={it.id} className="border border-[#E8E5E0] rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#9CA3AF]">#{idx + 1}</span>
-                  <button type="button" onClick={() => removeItem(it.id)} aria-label={t("ลบ", "Remove", "删除")} className="text-red-400 hover:text-red-600">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
-                  <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs w-full justify-start"
-                      onClick={() => {
-                        setStockPickerTarget(it.id);
-                        setStockPickerOpen(true);
-                      }}
-                    >
-                      <Search size={13} className="mr-1.5 shrink-0" />
-                      <span className="truncate">{t("เลือกสินค้าจากสต็อก...", "Pick from Stock...", "从库存选择...")}</span>
-                    </Button>
-                    {it.sku && (
-                      <p className={`text-[11px] ${it.stock_variant_id ? "text-emerald-600" : "text-amber-600"}`}>
-                        {it.stock_variant_id
-                          ? t("✓ ผูกกับสต็อก", "✓ Linked to Stock", "✓ 已关联库存")
-                          : t("ไม่ผูกสต็อก", "Not linked to Stock", "未关联库存")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Input
-                    className="h-8 text-xs sm:col-span-2"
-                    placeholder={t("ชื่อสินค้า", "Item Name", "产品名称")}
-                    value={it.name}
-                    onChange={(e) => updateItem(it.id, { name: e.target.value })}
-                  />
-                  <Input
-                    className="h-8 text-xs font-mono"
-                    placeholder={t("รหัสรุ่น / SKU", "Model / SKU", "型号/SKU")}
-                    value={it.sku}
-                    onChange={(e) => updateItem(it.id, { sku: e.target.value, stock_variant_id: null })}
-                  />
-                  <Input
-                    className="h-8 text-xs"
-                    placeholder={t("ขนาด (mm)", "Size (mm)", "规格 (mm)")}
-                    value={it.size}
-                    onChange={(e) => updateItem(it.id, { size: e.target.value, stock_variant_id: null })}
-                  />
-                </div>
-
-                <div className={isDeliveryNote ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
-                  <Input
-                    type="number"
-                    className="h-8 text-xs"
-                    placeholder={t("จำนวน", "Qty", "数量")}
-                    value={it.qty}
-                    onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) || 0 })}
-                  />
-                  {isDeliveryNote && (
-                    <Input
-                      className="h-8 text-xs"
-                      list="delivery-note-units"
-                      placeholder={t("หน่วย เช่น ชุด/ตัว", "Unit e.g. set/pc", "单位 如 套/件")}
-                      value={it.unit}
-                      onChange={(e) => updateItem(it.id, { unit: e.target.value })}
-                    />
-                  )}
-                  {!isDeliveryNote && (
-                    <>
-                      <Select
-                        value={String(it.seats)}
-                        onValueChange={(v) => {
-                          const seats = Number(v);
-                          updateItem(it.id, { seats, unitPrice: computeSeatPrice(it.baseUnitPrice, seats) });
-                        }}
-                      >
-                        <SelectTrigger size="sm" className="h-8 text-xs">
-                          <SelectValue>{(v: string) => `${v} ${t("ที่นั่ง", "seats", "座")}`}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SEAT_OPTIONS.map((n) => (
-                            <SelectItem key={n} value={String(n)}>
-                              {n} {t("ที่นั่ง", "seats", "座")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        className="h-8 text-xs"
-                        placeholder={t("ราคาต่อหน่วย", "Unit Price", "单价")}
-                        value={it.unitPrice}
-                        onChange={(e) => {
-                          const unitPrice = Number(e.target.value) || 0;
-                          updateItem(it.id, {
-                            unitPrice,
-                            ...(it.seats === 1 ? { baseUnitPrice: unitPrice } : {}),
-                          });
-                        }}
-                      />
-                    </>
-                  )}
-                </div>
-                <div className="flex gap-2 items-start">
-                  <Input
-                    className="h-8 text-xs flex-1"
-                    placeholder={t("หมายเหตุ", "Remark", "备注")}
-                    value={it.remark}
-                    onChange={(e) => updateItem(it.id, { remark: e.target.value })}
-                  />
-                  <ImageUploadTile
-                    image={it.remarkImage}
-                    onChange={(url) => updateItem(it.id, { remarkImage: url })}
-                  />
-                </div>
-                {!isDeliveryNote && (
-                  <p className="text-right text-xs text-[#6B6B6B]">
-                    {t("รวม", "Total", "总计")}: <span className="font-semibold text-[#1A1A1A]">฿{fmtMoney(it.qty * it.unitPrice)}</span>
-                  </p>
-                )}
-              </div>
-            ))}
+            <Reorder.Group as="div" axis="y" values={items} onReorder={setItems} className="space-y-3">
+              {items.map((it, idx) => (
+                <LineItemCard
+                  key={it.id}
+                  it={it}
+                  idx={idx}
+                  isDeliveryNote={isDeliveryNote}
+                  updateItem={updateItem}
+                  removeItem={removeItem}
+                  onPickStock={(id) => {
+                    setStockPickerTarget(id);
+                    setStockPickerOpen(true);
+                  }}
+                />
+              ))}
+            </Reorder.Group>
 
             <Button variant="outline" className="w-full" onClick={() => setItems((prev) => [...prev, newLine()])}>
               <Plus size={13} className="mr-1" /> {t("เพิ่มรายการ", "Add Item", "添加项目")}

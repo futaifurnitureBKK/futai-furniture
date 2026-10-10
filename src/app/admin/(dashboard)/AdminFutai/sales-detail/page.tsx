@@ -16,7 +16,7 @@ function channelLabel(channel: string, t: (th: string, en: string, zh: string) =
 }
 
 // A plain, printable breakdown of exactly which converted leads make up one
-// owner's (or everyone's) revenue total on the ADMINJ sales summary — opened
+// owner's (or everyone's) revenue total on the AdminFutai sales summary — opened
 // in its own tab from that table's ฿ figure, so "what's actually in this
 // number" is always one click + Ctrl/Cmd-P (save as PDF) away.
 function SalesDetailInner() {

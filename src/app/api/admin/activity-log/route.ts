@@ -4,7 +4,7 @@ import { isAdminRequest } from "@/lib/admin-auth";
 import { verifyPassword } from "@/lib/password-hash";
 
 // Gated the same way as /api/admin/logins and /api/admin/sessions, behind
-// the ADMINJ page's own extra code — this log can reveal who did what
+// the AdminFutai page's own extra code — this log can reveal who did what
 // across the whole site, so it sits behind the same extra wall.
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {

@@ -717,7 +717,7 @@ export default function AdminSecurityPage() {
                       <TableCell className="text-sm text-right">
                         {rangeLeads.some((l) => l.status === "converted") ? (
                           <Link
-                            href={`/admin/ADMINJ/sales-detail?${new URLSearchParams({ owner: "all", from: scopeFrom, to: scopeTo }).toString()}`}
+                            href={`/admin/AdminFutai/sales-detail?${new URLSearchParams({ owner: "all", from: scopeFrom, to: scopeTo }).toString()}`}
                             target="_blank"
                             className="underline decoration-dotted underline-offset-2 hover:text-[#C8102E]"
                           >
@@ -737,7 +737,7 @@ export default function AdminSecurityPage() {
                         <TableCell className="text-sm text-right">
                           {o.revenue ? (
                             <Link
-                              href={`/admin/ADMINJ/sales-detail?${new URLSearchParams({ owner: o.name, from: scopeFrom, to: scopeTo }).toString()}`}
+                              href={`/admin/AdminFutai/sales-detail?${new URLSearchParams({ owner: o.name, from: scopeFrom, to: scopeTo }).toString()}`}
                               target="_blank"
                               className="underline decoration-dotted underline-offset-2 hover:text-[#C8102E]"
                             >

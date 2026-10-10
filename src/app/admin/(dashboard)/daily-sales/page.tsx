@@ -23,7 +23,7 @@ import { useLanguage } from "@/store/language";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS } from "@/lib/saved-quote-options";
 import { SALES_HEADERS, buildDailySheetsWorkbook, downloadWorkbook, salesRowsToShippingRows } from "@/lib/daily-sheets-excel";
-import type { DailySalesRow, DailyShippingRow, SavedQuoteStatus } from "@/types";
+import type { DailySalesRow, DailyShippingRow, DailyExportRow, SavedQuoteStatus } from "@/types";
 
 type SavedListRow = {
   id: number;
@@ -243,7 +243,7 @@ function GridPickerDialog({
 }
 
 export default function DailySalesPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [date, setDate] = useState(todayStr());
   const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [rows, setRows] = useState<DailySalesRow[]>([]);
@@ -753,12 +753,12 @@ export default function DailySalesPage() {
   }
 
   async function buildAndDownloadExcel() {
-    // The export is always the full two-sheet workbook (Daily Sales + Daily
-    // Shipping) for the anchor date, so it matches the original template
-    // regardless of which page you export from. If nobody has entered or
-    // imported anything into Daily Shipping for this date yet, fall back to
-    // deriving the shipping sheet straight from these same sales rows rather
-    // than exporting it blank.
+    // The export is always the full three-sheet workbook (Daily Sales +
+    // Daily Shipping + Daily Export) for the anchor date, so it matches the
+    // original template regardless of which page you export from. If nobody
+    // has entered or imported anything into Daily Shipping for this date
+    // yet, fall back to deriving the shipping sheet straight from these same
+    // sales rows rather than exporting it blank.
     let shippingRows: DailyShippingRow[] = [];
     try {
       const res = await fetch(`/api/admin/daily-shipping?date=${date}`);
@@ -767,7 +767,36 @@ export default function DailySalesPage() {
     } catch {
       // if the shipping sheet can't be loaded, fall back below
     }
-    const wb = await buildDailySheetsWorkbook(date, exportRows, shippingRows.length ? shippingRows : salesRowsToShippingRows(exportRows));
+
+    // Daily Export's "sets deducted" column needs each shared-stock
+    // product's unit factor — same lookup Daily Export's own page builds,
+    // fetched fresh here since this page doesn't otherwise load Stock.
+    let exportRowsForDate: DailyExportRow[] = [];
+    const sharedStockMetaByVariant = new Map<number, { unitFactor: number }>();
+    try {
+      const [exportsRes, stockRes] = await Promise.all([
+        fetch(`/api/admin/daily-exports?date=${date}`),
+        fetch("/api/admin/stock?archived=false"),
+      ]);
+      const exportsData = await exportsRes.json();
+      if (exportsRes.ok) exportRowsForDate = exportsData.rows;
+      const stockData = await stockRes.json();
+      if (stockRes.ok) {
+        for (const p of stockData.products as { shared_stock: boolean; stock_variants: { id: number; unit_factor: number }[] }[]) {
+          if (!p.shared_stock) continue;
+          for (const v of p.stock_variants) sharedStockMetaByVariant.set(v.id, { unitFactor: v.unit_factor || 1 });
+        }
+      }
+    } catch {
+      // if the export sheet's data can't be loaded, it just comes out empty
+    }
+
+    const wb = await buildDailySheetsWorkbook(
+      date,
+      exportRows,
+      shippingRows.length ? shippingRows : salesRowsToShippingRows(exportRows),
+      { rows: exportRowsForDate, sharedStockMetaByVariant, lang }
+    );
     await downloadWorkbook(wb, `daily-sheets-${date}.xlsx`);
   }
 

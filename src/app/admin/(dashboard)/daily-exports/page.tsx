@@ -19,7 +19,7 @@ import { useLanguage } from "@/store/language";
 import { SALESPEOPLE } from "@/lib/saved-quote-options";
 import {
   PICTURE_COL_WIDTH, DATA_ROW_HEIGHT, TITLE_ROW_HEIGHT, THIN_BORDER, DATA_CELL_ALIGNMENT,
-  styleHeaderRow, embedRowImage, downloadWorkbook,
+  styleHeaderRow, embedRowImage, downloadWorkbook, EXPORT_HEADERS,
 } from "@/lib/daily-sheets-excel";
 import rawStock from "@/data/stock-demo.json";
 import type { DailyExportRow, DailyExportChannel } from "@/types";
@@ -102,23 +102,6 @@ function fmt(n: number) {
 function fmtMoney(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 0 });
 }
-
-const EXPORT_HEADERS = [
-  "序号\nNo. (เลขที่)",
-  "型号\nModel (แบบอย่าง)",
-  "图片\nPicture (รูปภาพ)",
-  "规格\n(mm) (ขนาด)",
-  "单价\nUnit Price (ราคาต่อหน่วย)",
-  "数量\nQuantity (ปริมาณ)",
-  "件数(2400mm换算)\nQty deducted (2400mm equiv.) (จำนวนที่ตัด เทียบเท่า 2400mm)",
-  "折扣%\nDiscount % (ส่วนลด)",
-  "总金额\nTotal (จำนวนเงินทั้งหมด)",
-  "渠道\nChannel (ช่องทาง)",
-  "备注\nRemark (หมายเหตุ)",
-  "客户\nCustomer (ชื่อลูกค้า)",
-  "经手人\nStaff (ผู้ดำเนินการ)",
-  "订单号\nPO No. (เลขที่ใบสั่งซื้อ)",
-];
 
 const CHANNEL_META: Record<DailyExportChannel, { th: string; en: string; zh: string; color: string }> = {
   shopee: { th: "Shopee", en: "Shopee", zh: "Shopee", color: "bg-orange-100 text-orange-700" },

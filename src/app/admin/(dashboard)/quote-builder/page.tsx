@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -1160,6 +1161,17 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // Note entry point's "ดึงจากใบเสนอราคา" — never opens the source for
   // editing, so the original quotation is never touched).
   const [listMode, setListMode] = useState<"saved" | "pull">("saved");
+  // Lets picking several quotations at once combine all their items into
+  // this one draft, instead of only ever replacing it from a single source.
+  const [selectedPullIds, setSelectedPullIds] = useState<Set<number>>(new Set());
+  // Cleared whenever listMode changes — adjusted during render (React's
+  // recommended way to reset state in response to a prop/flag change)
+  // rather than in an effect.
+  const [prevListMode, setPrevListMode] = useState(listMode);
+  if (listMode !== prevListMode) {
+    setPrevListMode(listMode);
+    setSelectedPullIds(new Set());
+  }
   const [showArchived, setShowArchived] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1357,55 +1369,74 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // touching the source quotation. Used for making a delivery note that
   // only covers part of what was quoted (some items shipped later), so
   // removing items here must never remove them from the original.
-  async function pullFromQuotation(id: number) {
-    const res = await fetch(`/api/admin/saved-quotes/${id}`);
-    const data = await res.json();
-    if (!res.ok) {
+  // Pulls one or several quotations at once — with several selected, every
+  // quote's items are combined into a single merged items list (customer /
+  // shipping / doc-level fields come from whichever quote was picked first).
+  // Either way this is always a brand-new document: never opens the
+  // source(s) for editing, so the original quotations are never touched,
+  // and "+ เพิ่มสินค้า" still works afterward to add more lines by hand.
+  async function pullFromQuotations(ids: number[]) {
+    if (!ids.length) return;
+    const results = await Promise.all(
+      ids.map(async (id) => {
+        const res = await fetch(`/api/admin/saved-quotes/${id}`);
+        const data = await res.json();
+        return { ok: res.ok, quote: data.quote as SavedQuote };
+      })
+    );
+    if (results.some((r) => !r.ok)) {
       toast.error(t("โหลดไม่สำเร็จ", "Load failed", "加载失败"));
       return;
     }
-    const q = data.quote as SavedQuote;
+    const quotes = results.map((r) => r.quote);
+    const first = quotes[0];
     setSavedId(null);
     setDocType(defaultDocType);
-    setLangMode(q.lang_mode);
+    setLangMode(first.lang_mode);
     setDocNo(`${DOC_LABELS[defaultDocType].prefix}${todayStr().replace(/-/g, "")}-01`);
     setDocNoTouched(false);
     setDocNoWarningAcked(false);
-    setChannel(q.channel ?? "other");
+    setChannel(first.channel ?? "other");
     setDate(todayStr());
-    setCustomerName(q.customer_name);
-    setCustomerAddress(q.customer_address);
-    setCustomerTaxId(q.customer_tax_id);
-    setShippingAddress(q.shipping_address);
-    setShippingDate(q.shipping_date || "");
-    setCustomerContact(q.contact_person);
-    setCustomerPhone(q.contact_phone);
-    setSalesperson(q.salesperson || "");
-    setOrderNotes(q.notes || "");
-    setTermsText(q.terms_text || defaultTermsText(q.lang_mode));
-    setDiscountPct(q.discount_pct ?? 0);
-    setVatPct(q.vat_pct);
-    setDepositPct(q.deposit_pct);
-    setItems(
-      q.items.length
-        ? q.items.map((it) => ({
-            ...it,
-            id: Math.random().toString(36).slice(2),
-            seats: it.seats ?? 1,
-            baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
-            remarkImage: it.remarkImage ?? null,
-            stock_variant_id: it.stock_variant_id ?? null,
-            unit: it.unit ?? "",
-          }))
-        : [newLine()]
+    setCustomerName(first.customer_name);
+    setCustomerAddress(first.customer_address);
+    setCustomerTaxId(first.customer_tax_id);
+    setShippingAddress(first.shipping_address);
+    setShippingDate(first.shipping_date || "");
+    setCustomerContact(first.contact_person);
+    setCustomerPhone(first.contact_phone);
+    setSalesperson(first.salesperson || "");
+    setOrderNotes(first.notes || "");
+    setTermsText(first.terms_text || defaultTermsText(first.lang_mode));
+    setDiscountPct(first.discount_pct ?? 0);
+    setVatPct(first.vat_pct);
+    setDepositPct(first.deposit_pct);
+    const mergedItems = quotes.flatMap((q) =>
+      q.items.map((it) => ({
+        ...it,
+        id: Math.random().toString(36).slice(2),
+        seats: it.seats ?? 1,
+        baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
+        remarkImage: it.remarkImage ?? null,
+        stock_variant_id: it.stock_variant_id ?? null,
+        unit: it.unit ?? "",
+      }))
     );
+    setItems(mergedItems.length ? mergedItems : [newLine()]);
     setListOpen(false);
+    setSelectedPullIds(new Set());
     toast.success(
-      t(
-        "ดึงข้อมูลจากใบเสนอราคาแล้ว — นี่คือเอกสารใหม่ ลบ/แก้รายการได้โดยไม่กระทบใบเสนอราคาต้นฉบับ",
-        "Pulled from the quotation — this is a new document; removing or editing items here won't affect the original",
-        "已从报价单导入 — 这是新文件，删除或编辑项目不会影响原报价单"
-      )
+      quotes.length > 1
+        ? t(
+            `รวมรายการจาก ${quotes.length} ใบเสนอราคาแล้ว — นี่คือเอกสารใหม่ ลบ/แก้รายการได้โดยไม่กระทบใบเสนอราคาต้นฉบับ`,
+            `Combined items from ${quotes.length} quotations — this is a new document; removing or editing items here won't affect the originals`,
+            `已合并 ${quotes.length} 份报价单的项目 — 这是新文件，删除或编辑项目不会影响原报价单`
+          )
+        : t(
+            "ดึงข้อมูลจากใบเสนอราคาแล้ว — นี่คือเอกสารใหม่ ลบ/แก้รายการได้โดยไม่กระทบใบเสนอราคาต้นฉบับ",
+            "Pulled from the quotation — this is a new document; removing or editing items here won't affect the original",
+            "已从报价单导入 — 这是新文件，删除或编辑项目不会影响原报价单"
+          )
     );
   }
 
@@ -2019,9 +2050,38 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             )}
           </div>
 
+          {listMode === "pull" && selectedPullIds.size > 0 && (
+            <div className="flex items-center justify-between gap-2 mb-3 bg-[#FAF7F2] border border-[#E8E5E0] rounded-lg px-3 py-2">
+              <p className="text-xs text-[#6B6B6B]">
+                {t(`เลือกไว้ ${selectedPullIds.size} ใบ`, `${selectedPullIds.size} selected`, `已选 ${selectedPullIds.size} 份`)}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setSelectedPullIds(new Set())}>
+                  {t("ล้างที่เลือก", "Clear", "清除选择")}
+                </Button>
+                <Button size="sm" onClick={() => pullFromQuotations([...selectedPullIds])}>
+                  {t(`รวม ${selectedPullIds.size} ใบเข้าด้วยกัน`, `Combine ${selectedPullIds.size} quotations`, `合并 ${selectedPullIds.size} 份报价单`)}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
+                {listMode === "pull" && (
+                  <TableHead className="text-xs w-8">
+                    <Checkbox
+                      checked={filteredSavedList.length > 0 && selectedPullIds.size === filteredSavedList.length}
+                      onCheckedChange={() =>
+                        setSelectedPullIds((prev) =>
+                          prev.size === filteredSavedList.length ? new Set() : new Set(filteredSavedList.map((q) => q.id))
+                        )
+                      }
+                      aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="text-xs">{t("เลขที่", "Doc No.", "单号")}</TableHead>
                 <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
                 <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
@@ -2035,13 +2095,13 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             <TableBody>
               {loadingList ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={listMode === "pull" ? 9 : 8} className="text-center py-8 text-[#6B6B6B]">
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
               ) : filteredSavedList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={listMode === "pull" ? 9 : 8} className="text-center py-8 text-[#6B6B6B]">
                     {savedList.length === 0
                       ? showArchived
                         ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
@@ -2052,6 +2112,22 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               ) : (
                 filteredSavedList.map((q) => (
                   <TableRow key={q.id} className="hover:bg-[#FAF7F2]/50">
+                    {listMode === "pull" && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedPullIds.has(q.id)}
+                          onCheckedChange={() =>
+                            setSelectedPullIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(q.id)) next.delete(q.id);
+                              else next.add(q.id);
+                              return next;
+                            })
+                          }
+                          aria-label={t("เลือก", "Select", "选择")}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-sm font-mono">{q.doc_no}</TableCell>
                     <TableCell className="text-xs">
                       {t(DOC_LABELS[q.doc_type].th, DOC_LABELS[q.doc_type].en, DOC_LABELS[q.doc_type].zh)}
@@ -2102,7 +2178,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     <TableCell>
                       <div className="flex gap-2 justify-end">
                         {listMode === "pull" ? (
-                          <Button size="sm" onClick={() => pullFromQuotation(q.id)}>
+                          <Button size="sm" variant="outline" onClick={() => pullFromQuotations([q.id])}>
                             {t("ใช้ใบนี้", "Use this", "使用此单")}
                           </Button>
                         ) : (

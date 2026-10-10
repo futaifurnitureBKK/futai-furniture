@@ -30,6 +30,7 @@ import {
   SALESPEOPLE, PAYMENT_METHOD_META, PAYMENT_METHOD_ORDER, PAYMENT_TYPE_META, PAYMENT_TYPE_ORDER,
   computeGrandTotal,
 } from "@/lib/saved-quote-options";
+import { embedRowImage, PICTURE_COL_WIDTH, DATA_ROW_HEIGHT } from "@/lib/daily-sheets-excel";
 import type ExcelJS from "exceljs";
 
 type DocType = SavedQuoteDocType;
@@ -1621,8 +1622,13 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     const wb = new ExcelJSLib.Workbook();
     const ws = wb.addWorksheet("Sheet1");
 
-    const numCols = isDeliveryNote ? 7 : 8;
-    const widths = isDeliveryNote ? [6, 26, 16, 16, 8, 10, 24] : [6, 22, 14, 14, 7, 12, 12, 20];
+    // Photo column width/row height match PICTURE_COL_WIDTH/DATA_ROW_HEIGHT
+    // exactly — embedRowImage's image sizing math assumes those dimensions.
+    const numCols = isDeliveryNote ? 8 : 9;
+    const widths = isDeliveryNote
+      ? [6, 26, 16, PICTURE_COL_WIDTH, 16, 8, 10, 24]
+      : [6, 22, 14, PICTURE_COL_WIDTH, 14, 7, 12, 12, 20];
+    const photoColIndex = 3; // 0-based: No, Item, Model, Photo, ...
     widths.forEach((w, i) => {
       ws.getColumn(i + 1).width = w;
     });
@@ -1717,7 +1723,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     nextRow();
 
     // Item table
-    const headerLabels = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colSize), L(TXT.colQty)];
+    const headerLabels = [L(TXT.colNo), L(TXT.colItem), L(TXT.colModel), L(TXT.colPhoto), L(TXT.colSize), L(TXT.colQty)];
     if (isDeliveryNote) headerLabels.push(L(TXT.colUnit));
     if (!isDeliveryNote) headerLabels.push(L(TXT.colUnitPrice), L(TXT.colAmount));
     headerLabels.push(L(TXT.colRemark));
@@ -1728,23 +1734,27 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       styleCell(cell, { bold: true, align: "center", fill: PEACH, border: true });
     });
 
-    items.forEach((it, idx) => {
+    for (const [idx, it] of items.entries()) {
       const row = nextRow();
-      const values: (string | number)[] = [idx + 1, it.name || "-", it.sku || "-", it.size || "-", it.qty];
+      // Photo column's cell stays blank text — the actual photo is a
+      // floating image embedded on top of it, same as the daily sheets.
+      const values: (string | number)[] = [idx + 1, it.name || "-", it.sku || "-", "", it.size || "-", it.qty];
       if (isDeliveryNote) values.push(it.unit || "-");
       if (!isDeliveryNote) values.push(it.unitPrice, it.qty * it.unitPrice);
       values.push(it.remark);
       values.forEach((v, i) => {
         const cell = ws.getCell(row, i + 1);
         cell.value = v;
-        const isMoneyCol = !isDeliveryNote && (i === 5 || i === 6);
+        const isMoneyCol = !isDeliveryNote && (i === 6 || i === 7);
         if (isMoneyCol) cell.numFmt = "#,##0.00";
         styleCell(cell, {
           align: i === 1 || i === headerLabels.length - 1 ? "left" : isMoneyCol ? "right" : "center",
           border: true,
         });
       });
-    });
+      ws.getRow(row).height = DATA_ROW_HEIGHT;
+      await embedRowImage(wb, ws, ws.getRow(row), it.image, photoColIndex);
+    }
     nextRow();
 
     // Totals

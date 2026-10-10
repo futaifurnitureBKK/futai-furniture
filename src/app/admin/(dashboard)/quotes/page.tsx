@@ -55,6 +55,9 @@ export default function QuotesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    // Lets the sidebar's "ใบเสนอราคา" bell badge re-count right away instead
+    // of waiting for its own 60s poll — the layout listens for this.
+    window.dispatchEvent(new Event("futai-quotes-changed"));
   }
 
   async function deleteQuote(id: string) {
@@ -65,6 +68,8 @@ export default function QuotesPage() {
     if (!res.ok) {
       setAllQuotes(prev);
       alert(t("ลบไม่สำเร็จ กรุณาลองใหม่", "Delete failed, please try again", "删除失败，请重试"));
+    } else {
+      window.dispatchEvent(new Event("futai-quotes-changed"));
     }
   }
 

@@ -365,9 +365,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     load();
     const interval = setInterval(load, 60_000);
+    // Fired by the quotes page right after a status change / delete, so the
+    // badge updates immediately instead of waiting for the next poll.
+    window.addEventListener("futai-quotes-changed", load);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("futai-quotes-changed", load);
     };
   }, []);
 

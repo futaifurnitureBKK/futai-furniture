@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   Package,
+  ShieldCheck,
   Users,
   FileText,
   Settings,
@@ -114,6 +115,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { href: "/admin/settings", labelTh: "ตั้งค่า", labelEn: "Settings", labelZh: "设置", icon: Settings },
+      { href: "/admin/AdminFutai", labelTh: "ระบบแอดมิน", labelEn: "Admin System", labelZh: "管理系统", icon: ShieldCheck },
     ],
   },
 ];

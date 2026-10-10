@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState, FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
 import Link from "next/link";
 import {
   Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
-  CheckCircle2, XCircle, Users, Clock, History, Search, X,
+  CheckCircle2, XCircle, Users, Clock, History, Search, X, ChevronDown,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -137,7 +137,8 @@ export default function AdminSecurityPage() {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [kickingId, setKickingId] = useState<string | null>(null);
+  const [kickingIds, setKickingIds] = useState<Set<string>>(new Set());
+  const [expandedNames, setExpandedNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
@@ -236,17 +237,48 @@ export default function AdminSecurityPage() {
 
   async function handleKick(session: ActiveSession) {
     if (!confirm(t(`ออกจากระบบ IP ${session.ip} เลยไหม?`, `Log out IP ${session.ip} now?`, `确定要注销 IP ${session.ip} 吗？`))) return;
-    setKickingId(session.id);
+    setKickingIds((prev) => new Set(prev).add(session.id));
     const res = await fetch(`/api/admin/sessions/${session.id}`, {
       method: "DELETE",
       headers: { "x-security-code": unlockedCode },
     });
-    setKickingId(null);
+    setKickingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(session.id);
+      return next;
+    });
     if (res.ok) {
       const wasSelf = session.id === currentSessionId;
       setActiveSessions((prev) => prev.filter((s) => s.id !== session.id));
       if (wasSelf) goToLogin();
     }
+  }
+
+  // Kicks every session belonging to one person at once — used by the
+  // "ออกจากระบบทั้งหมด" button on a grouped (same-name, multi-device) row.
+  async function handleKickGroup(sessions: ActiveSession[]) {
+    const name = sessions[0]?.name || t("ไม่ระบุ", "Not given", "未填写");
+    if (
+      !confirm(
+        t(`ออกจากระบบ ${name} ทั้งหมด (${sessions.length} เครื่อง) เลยไหม?`, `Log out all ${sessions.length} devices for ${name}?`, `确定要注销 ${name} 的全部 ${sessions.length} 台设备吗？`)
+      )
+    )
+      return;
+    const ids = sessions.map((s) => s.id);
+    setKickingIds((prev) => new Set([...prev, ...ids]));
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/sessions/${id}`, { method: "DELETE", headers: { "x-security-code": unlockedCode } }).then((res) => ({ id, ok: res.ok }))
+      )
+    );
+    const removedIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
+    setKickingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    setActiveSessions((prev) => prev.filter((s) => !removedIds.has(s.id)));
+    if (currentSessionId && removedIds.has(currentSessionId)) goToLogin();
   }
 
   // Sales-by-owner is only fetched once this page's own extra code has been
@@ -357,6 +389,27 @@ export default function AdminSecurityPage() {
   );
   const mostRecentSession = activeSessions[0] ?? null;
 
+  // Same person often has more than one device logged in at once (phone +
+  // laptop) — group by name so "who's online" shows one row per person
+  // instead of a separate row per device. A session with no name can't be
+  // reliably matched to anyone else, so each one stays its own group.
+  const groupedSessions = useMemo(() => {
+    const order: string[] = [];
+    const byKey = new Map<string, ActiveSession[]>();
+    activeSessions.forEach((s) => {
+      const key = s.name ? `n:${s.name}` : `u:${s.id}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, []);
+        order.push(key);
+      }
+      byKey.get(key)!.push(s);
+    });
+    return order.map((key) => {
+      const sessions = byKey.get(key)!;
+      return { key, name: sessions[0].name, sessions, latest: sessions[0] };
+    });
+  }, [activeSessions]);
+
   // Daily sales trend for the chart, over whatever date scope is active.
   const dailySalesTrend = useMemo(() => {
     const sums = new Map<string, number>();
@@ -452,8 +505,8 @@ export default function AdminSecurityPage() {
             icon={Users}
             iconClass="bg-indigo-50 text-indigo-600"
             label={t("กำลังใช้งานอยู่ตอนนี้", "Currently active", "当前活跃")}
-            value={t(`${activeSessions.length} คน`, `${activeSessions.length}`, `${activeSessions.length} 人`)}
-            sub={t("เซสชันที่ยังไม่หมดอายุ", "Sessions not yet expired", "尚未过期的会话")}
+            value={t(`${groupedSessions.length} คน`, `${groupedSessions.length}`, `${groupedSessions.length} 人`)}
+            sub={t(`${activeSessions.length} เซสชัน (รวมหลายเครื่อง)`, `${activeSessions.length} sessions (multi-device included)`, `共 ${activeSessions.length} 个会话（含多设备）`)}
           />
           <StatCard
             icon={Clock}
@@ -478,7 +531,7 @@ export default function AdminSecurityPage() {
             <div className="px-5 py-3 border-b border-[#E8E5E0] flex items-center gap-2">
               <Radio size={16} className="text-emerald-600" />
               <p className="text-sm font-semibold text-[#1A1A1A]">
-                {t(`กำลังใช้งานอยู่ตอนนี้ (${activeSessions.length})`, `Currently active (${activeSessions.length})`, `当前活跃 (${activeSessions.length})`)}
+                {t(`กำลังใช้งานอยู่ตอนนี้ (${groupedSessions.length})`, `Currently active (${groupedSessions.length})`, `当前活跃 (${groupedSessions.length})`)}
               </p>
             </div>
             {activeSessions.length === 0 ? (
@@ -495,32 +548,96 @@ export default function AdminSecurityPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeSessions.map((s) => (
-                    <TableRow key={s.id} className="hover:bg-[#FAF7F2]/50">
-                      <TableCell className="text-xs text-[#6B6B6B]">{new Date(s.created_at).toLocaleString("th-TH")}</TableCell>
-                      <TableCell className="text-sm font-medium text-[#1A1A1A]">
-                        {s.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
-                        {s.id === currentSessionId && (
-                          <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
-                            {t("เครื่องนี้", "This device", "本设备")}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm font-mono">{s.ip}</TableCell>
-                      <TableCell className="text-xs text-[#6B6B6B]">{briefUA(s.user_agent)}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => handleKick(s)}
-                          disabled={kickingId === s.id}
-                        >
-                          {kickingId === s.id ? <Loader2 size={13} className="animate-spin" /> : t("ออกจากระบบ", "Log out", "注销")}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {groupedSessions.map((g) => {
+                    const multi = g.sessions.length > 1;
+                    const expanded = expandedNames.has(g.key);
+                    const containsSelf = g.sessions.some((s) => s.id === currentSessionId);
+                    return (
+                      <Fragment key={g.key}>
+                        <TableRow className="hover:bg-[#FAF7F2]/50">
+                          <TableCell className="text-xs text-[#6B6B6B]">{new Date(g.latest.created_at).toLocaleString("th-TH")}</TableCell>
+                          <TableCell className="text-sm font-medium text-[#1A1A1A]">
+                            <div className="flex items-center gap-1.5">
+                              {multi && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedNames((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(g.key)) next.delete(g.key);
+                                      else next.add(g.key);
+                                      return next;
+                                    })
+                                  }
+                                  aria-label={t("แสดง/ซ่อนรายละเอียด", "Expand/collapse", "展开/收起")}
+                                  className="text-[#9CA3AF] hover:text-[#1A1A1A]"
+                                >
+                                  <ChevronDown size={14} className={`transition-transform ${expanded ? "" : "-rotate-90"}`} />
+                                </button>
+                              )}
+                              {g.name || <span className="text-[#9CA3AF] font-normal">{t("ไม่ระบุ", "Not given", "未填写")}</span>}
+                              {multi && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B]">
+                                  {t(`${g.sessions.length} เครื่อง`, `${g.sessions.length} devices`, `${g.sessions.length} 台设备`)}
+                                </span>
+                              )}
+                              {containsSelf && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                  {t("เครื่องนี้", "This device", "本设备")}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm font-mono">{multi ? t("หลายเครื่อง", "Multiple", "多个") : g.latest.ip}</TableCell>
+                          <TableCell className="text-xs text-[#6B6B6B]">{multi ? "-" : briefUA(g.latest.user_agent)}</TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => (multi ? handleKickGroup(g.sessions) : handleKick(g.latest))}
+                              disabled={g.sessions.some((s) => kickingIds.has(s.id))}
+                            >
+                              {g.sessions.some((s) => kickingIds.has(s.id)) ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : multi ? (
+                                t(`ออกจากระบบทั้งหมด (${g.sessions.length})`, `Log out all (${g.sessions.length})`, `全部注销 (${g.sessions.length})`)
+                              ) : (
+                                t("ออกจากระบบ", "Log out", "注销")
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {multi &&
+                          expanded &&
+                          g.sessions.map((s) => (
+                            <TableRow key={s.id} className="bg-[#FAF7F2]/40 hover:bg-[#FAF7F2]">
+                              <TableCell className="text-xs text-[#9CA3AF] pl-8">{new Date(s.created_at).toLocaleString("th-TH")}</TableCell>
+                              <TableCell className="text-xs text-[#9CA3AF]">
+                                {s.id === currentSessionId && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                    {t("เครื่องนี้", "This device", "本设备")}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-[#6B6B6B]">{s.ip}</TableCell>
+                              <TableCell className="text-xs text-[#6B6B6B]">{briefUA(s.user_agent)}</TableCell>
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-600 hover:bg-red-50 h-7 text-xs"
+                                  onClick={() => handleKick(s)}
+                                  disabled={kickingIds.has(s.id)}
+                                >
+                                  {kickingIds.has(s.id) ? <Loader2 size={12} className="animate-spin" /> : t("ออกจากระบบ", "Log out", "注销")}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

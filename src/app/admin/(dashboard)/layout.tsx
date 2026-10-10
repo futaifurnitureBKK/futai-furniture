@@ -33,6 +33,7 @@ import {
   Megaphone,
   PanelLeftClose,
   PanelLeftOpen,
+  Bell,
 } from "lucide-react";
 import { useLanguage } from "@/store/language";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -131,31 +132,51 @@ function groupContainingPath(pathname: string): string | null {
   return NAV_GROUPS.find((g) => g.items.some((it) => isActive(pathname, it.href)))?.key ?? null;
 }
 
+// Only the "ใบเสนอราคา" (incoming quote requests) item ever gets a badge —
+// it's the one place a new customer submission needs catching the admin's
+// eye without them having to go check the page.
+const QUOTE_REQUESTS_HREF = "/admin/quotes";
+
 function NavItemLink({
-  item, active, collapsed, onNavigate,
+  item, active, collapsed, onNavigate, pendingQuoteCount,
 }: {
   item: NavItem;
   active: boolean;
   collapsed: boolean;
   onNavigate?: () => void;
+  pendingQuoteCount?: number;
 }) {
   const { t } = useLanguage();
   const Icon = item.icon;
   const label = t(item.labelTh, item.labelEn, item.labelZh);
+  const badge = item.href === QUOTE_REQUESTS_HREF && pendingQuoteCount ? pendingQuoteCount : 0;
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
-      title={collapsed ? label : undefined}
+      title={collapsed ? (badge ? `${label} (${badge})` : label) : undefined}
       className={`group/item relative flex items-center gap-3 rounded-lg text-sm transition-colors duration-150 ${
         collapsed ? "justify-center px-2.5 py-2.5" : "px-3 py-2 ml-1"
       } ${active ? "bg-[#C8102E] text-white font-medium" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
     >
-      <Icon size={16} className="shrink-0" />
-      {!collapsed && <span className="truncate">{label}</span>}
+      <span className="relative shrink-0">
+        <Icon size={16} />
+        {collapsed && badge > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#C8102E] text-white text-[9px] font-bold flex items-center justify-center leading-none">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </span>
+      {!collapsed && <span className="truncate flex-1">{label}</span>}
+      {!collapsed && badge > 0 && (
+        <span className="flex items-center gap-1 shrink-0 rounded-full bg-[#C8102E] text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">
+          <Bell size={10} />
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
       {collapsed && (
         <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-[#1A1A1A] px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg ring-1 ring-white/10 transition-opacity duration-150 group-hover/item:opacity-100 z-50">
-          {label}
+          {badge ? `${label} (${badge})` : label}
         </span>
       )}
     </Link>
@@ -163,7 +184,7 @@ function NavItemLink({
 }
 
 function NavGroupSection({
-  group, pathname, collapsed, expanded, onToggle, onNavigate,
+  group, pathname, collapsed, expanded, onToggle, onNavigate, pendingQuoteCount,
 }: {
   group: NavGroup;
   pathname: string;
@@ -171,6 +192,7 @@ function NavGroupSection({
   expanded: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  pendingQuoteCount?: number;
 }) {
   const { t } = useLanguage();
   const visibleItems = group.items.filter((it) => !it.hidden);
@@ -184,7 +206,7 @@ function NavGroupSection({
     return (
       <div className="pt-2 mt-2 border-t border-white/10 first:border-t-0 first:mt-0 first:pt-0 space-y-1">
         {visibleItems.map((item) => (
-          <NavItemLink key={item.href} item={item} active={isActive(pathname, item.href)} collapsed onNavigate={onNavigate} />
+          <NavItemLink key={item.href} item={item} active={isActive(pathname, item.href)} collapsed onNavigate={onNavigate} pendingQuoteCount={pendingQuoteCount} />
         ))}
       </div>
     );
@@ -205,7 +227,7 @@ function NavGroupSection({
         <div className="overflow-hidden min-h-0">
           <div className="space-y-0.5 pb-1">
             {visibleItems.map((item) => (
-              <NavItemLink key={item.href} item={item} active={isActive(pathname, item.href)} collapsed={false} onNavigate={onNavigate} />
+              <NavItemLink key={item.href} item={item} active={isActive(pathname, item.href)} collapsed={false} onNavigate={onNavigate} pendingQuoteCount={pendingQuoteCount} />
             ))}
           </div>
         </div>
@@ -215,11 +237,12 @@ function NavGroupSection({
 }
 
 function NavLinks({
-  pathname, collapsed = false, onNavigate,
+  pathname, collapsed = false, onNavigate, pendingQuoteCount,
 }: {
   pathname: string;
   collapsed?: boolean;
   onNavigate?: () => void;
+  pendingQuoteCount?: number;
 }) {
   // All sections start open by default — keeps every page one glance away
   // instead of needing to hunt for which group it's hiding in.
@@ -268,6 +291,7 @@ function NavLinks({
             expanded={expandedKeys.includes(group.key)}
             onToggle={() => toggleGroup(group.key)}
             onNavigate={onNavigate}
+            pendingQuoteCount={pendingQuoteCount}
           />
         ))}
       </div>
@@ -309,6 +333,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const dateLocale = lang === "th" ? "th-TH" : lang === "zh" ? "zh-CN" : "en-US";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingQuoteCount, setPendingQuoteCount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -318,6 +343,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         // ignore — defaults to expanded
       }
     })();
+  }, []);
+
+  // Polls how many customer quote requests ("ใบเสนอราคา") are still
+  // "รอตอบกลับ" (pending) so the nav item can show a bell + count without
+  // needing to be on that page — the LINE push already covers "the instant
+  // it happens"; this covers "still outstanding right now, at a glance".
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/admin/quotes");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const quotes = (data.quotes ?? []) as { status: string }[];
+        setPendingQuoteCount(quotes.filter((q) => q.status === "pending").length);
+      } catch {
+        // ignore — badge just stays at its last known count
+      }
+    }
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   function toggleCollapsed() {
@@ -353,7 +404,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
           </Link>
         </div>
-        <NavLinks pathname={pathname} collapsed={collapsed} />
+        <NavLinks pathname={pathname} collapsed={collapsed} pendingQuoteCount={pendingQuoteCount} />
         <NavBottom collapsed={collapsed} />
         <button
           type="button"
@@ -387,7 +438,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <X size={20} />
               </button>
             </div>
-            <NavLinks pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
+            <NavLinks pathname={pathname} onNavigate={() => setMobileNavOpen(false)} pendingQuoteCount={pendingQuoteCount} />
             <NavBottom onNavigate={() => setMobileNavOpen(false)} />
           </aside>
         </div>

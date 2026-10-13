@@ -1264,6 +1264,16 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       setDocNoWarningAcked(true);
       return;
     }
+    // Nudges only — never block the save, just make sure these two common
+    // slip-ups get noticed instead of silently going out incomplete.
+    if (customerTaxId && customerTaxId.replace(/\D/g, "").length !== 13) {
+      toast.warning(
+        t("เลขผู้เสียภาษีไม่ครบ 13 หลัก — บันทึกต่อได้ แต่ควรแก้ก่อนส่งให้ลูกค้า", "Tax ID isn't 13 digits — saved anyway, but fix it before sending to the customer", "纳税人识别号不足13位 — 仍会保存，但发送给客户前请先修正")
+      );
+    }
+    if (!salesperson) {
+      toast.warning(t("ยังไม่ได้เลือกผู้ดูแลออเดอร์", "No order owner set yet", "尚未设置负责人"));
+    }
     setSaving(true);
     const payload = {
       doc_type: docType,
@@ -2432,6 +2442,11 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                         ))}
                       </SelectContent>
                     </Select>
+                    {!salesperson && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        {t("อย่าลืมเลือกผู้ดูแลออเดอร์", "Don't forget to set the order owner", "别忘了设置负责人")}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label>{t("หมายเหตุ", "Note", "备注")}</Label>
@@ -2548,6 +2563,15 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   <div className="sm:col-span-2">
                     <Label>{t("เลขผู้เสียภาษี", "Tax ID", "纳税人识别号")}</Label>
                     <Input className="mt-1" value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value)} />
+                    {customerTaxId && customerTaxId.replace(/\D/g, "").length !== 13 && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        {t(
+                          `เลขผู้เสียภาษีต้องมี 13 หลัก (ตอนนี้ ${customerTaxId.replace(/\D/g, "").length} หลัก)`,
+                          `Tax ID must be 13 digits (currently ${customerTaxId.replace(/\D/g, "").length})`,
+                          `纳税人识别号必须为13位数字（目前 ${customerTaxId.replace(/\D/g, "").length} 位）`
+                        )}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -2588,6 +2612,11 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     ))}
                   </SelectContent>
                 </Select>
+                {!salesperson && (
+                  <p className="mt-1 text-[11px] text-amber-600">
+                    {t("อย่าลืมเลือกผู้ดูแลออเดอร์", "Don't forget to set the order owner", "别忘了设置负责人")}
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Label>{t("หมายเหตุ", "Note", "备注")}</Label>

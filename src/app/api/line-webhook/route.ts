@@ -7,6 +7,12 @@ function isValidSignature(rawBody: string, signature: string | null, channelSecr
   return hash === signature;
 }
 
+// Turned off by default so the bot doesn't auto-reply "User ID ของคุณคือ..."
+// to every message it gets — flip this back to true for a moment whenever
+// a new person needs to be onboarded (message the bot, read their userId
+// from the reply, add it to LINE_ADMIN_USER_ID, flip this off again).
+const ENABLE_USERID_AUTOREPLY = false;
+
 export async function POST(req: NextRequest) {
   const channelSecret = process.env.LINE_CHANNEL_SECRET;
   const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -20,22 +26,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const body = JSON.parse(rawBody);
-
-  for (const event of body.events ?? []) {
-    if (event.type === "message" && event.replyToken) {
-      const userId = event.source?.userId ?? "ไม่พบ userId (อาจทักจากกลุ่มหรือ official account อื่น)";
-      await fetch("https://api.line.me/v2/bot/message/reply", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          replyToken: event.replyToken,
-          messages: [{ type: "text", text: `User ID ของคุณคือ:\n${userId}` }],
-        }),
-      });
+  if (ENABLE_USERID_AUTOREPLY) {
+    const body = JSON.parse(rawBody);
+    for (const event of body.events ?? []) {
+      if (event.type === "message" && event.replyToken) {
+        const userId = event.source?.userId ?? "ไม่พบ userId (อาจทักจากกลุ่มหรือ official account อื่น)";
+        await fetch("https://api.line.me/v2/bot/message/reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            replyToken: event.replyToken,
+            messages: [{ type: "text", text: `User ID ของคุณคือ:\n${userId}` }],
+          }),
+        });
+      }
     }
   }
 

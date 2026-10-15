@@ -2680,8 +2680,34 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           {!isDeliveryNote && (
             <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <Label>{t("ส่วนลด %", "Discount %", "折扣 %")}</Label>
-                <Input type="number" step="0.1" className="mt-1" value={discountPct} onChange={(e) => setDiscountPct(Number(e.target.value) || 0)} />
+                <Label>{t("ส่วนลด", "Discount", "折扣")}</Label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      className="pr-6"
+                      value={discountPct}
+                      onChange={(e) => setDiscountPct(Number(e.target.value) || 0)}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#9CA3AF]">%</span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="1"
+                      className="pr-6"
+                      value={subtotal > 0 ? Math.round(discountAmount) : 0}
+                      disabled={subtotal <= 0}
+                      title={subtotal <= 0 ? t("เพิ่มรายการสินค้าก่อนถึงจะใส่ส่วนลดเป็นจำนวนเงินได้", "Add items first to set a baht discount", "先添加产品项目才能按金额设置折扣") : undefined}
+                      onChange={(e) => {
+                        const baht = Number(e.target.value) || 0;
+                        setDiscountPct(subtotal > 0 ? (baht / subtotal) * 100 : 0);
+                      }}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#9CA3AF]">฿</span>
+                  </div>
+                </div>
               </div>
               <div>
                 <Label>VAT %</Label>

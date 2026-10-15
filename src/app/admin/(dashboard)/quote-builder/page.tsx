@@ -198,6 +198,9 @@ function fmtMoney(n: number) {
 function fmt0(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 1 });
 }
+function fmtPct(n: number) {
+  return Number(n.toFixed(2));
+}
 
 interface StockCat {
   key: string;
@@ -1085,6 +1088,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   const [orderNotes, setOrderNotes] = useState("");
   const [termsText, setTermsText] = useState(() => defaultTermsText("th-en-zh"));
   const [discountPct, setDiscountPct] = useState(0);
+  const [showDiscountPercent, setShowDiscountPercent] = useState(true);
   const [vatPct, setVatPct] = useState(7);
   const [depositPct, setDepositPct] = useState(50);
   const [items, setItems] = useState<LineItem[]>([newLine()]);
@@ -1802,7 +1806,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     if (!isDeliveryNote) {
       totalRow(L(TXT.subtotal), subtotal);
       if (discountPct > 0) {
-        totalRow(`${L(TXT.discount)} (${discountPct}%)`, -discountAmount, { color: RED });
+        totalRow(showDiscountPercent ? `${L(TXT.discount)} (${fmtPct(discountPct)}%)` : L(TXT.discount), -discountAmount, { color: RED });
         totalRow(L(TXT.afterDiscount), subtotalAfterDiscount);
       }
       totalRow(`${L(TXT.vatAmountLabel)} (${vatPct}%)`, vatAmount);
@@ -2708,6 +2712,10 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#9CA3AF]">฿</span>
                   </div>
                 </div>
+                <label className="mt-1.5 flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={showDiscountPercent} onCheckedChange={(v) => setShowDiscountPercent(Boolean(v))} />
+                  <span className="text-[11px] text-[#6B7280]">{t("แสดง % ในใบเสนอราคา", "Show % on the quote", "在报价单显示 %")}</span>
+                </label>
               </div>
               <div>
                 <Label>VAT %</Label>
@@ -2890,7 +2898,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   {discountPct > 0 && (
                     <>
                       <tr>
-                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)} ({discountPct}%)</td>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#C8102E]">{L(TXT.discount)}{showDiscountPercent ? ` (${fmtPct(discountPct)}%)` : ""}</td>
                         <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#C8102E]">-฿{fmtMoney(discountAmount)}</td>
                       </tr>
                       <tr>

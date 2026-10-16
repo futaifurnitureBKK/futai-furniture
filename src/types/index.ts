@@ -57,7 +57,7 @@ export type SavedQuoteLangMode = "th-en-zh" | "th-en" | "th-zh";
 export type SavedQuoteStatus = "in_progress" | "confirmed" | "awaiting_shipment" | "completed" | "shipped_unpaid" | "needs_followup";
 export type SavedQuoteChannel = "facebook" | "shopee" | "tiktok" | "other";
 export type PaymentMethod = "cash" | "transfer" | "credit_card" | "cheque" | "alipay" | "wechat" | "other";
-export type PaymentType = "deposit" | "additional" | "full" | "other";
+export type PaymentType = "deposit" | "additional" | "full" | "remaining_balance" | "other";
 
 export interface SavedQuotePayment {
   id: number;

@@ -66,7 +66,7 @@ export const PAYMENT_TYPE_META: Record<PaymentType, TriText> = {
   deposit:           { th: "เงินมัดจำ",         en: "Deposit",           zh: "定金" },
   additional:        { th: "ชำระเพิ่มเติม",     en: "Additional Payment", zh: "追加付款" },
   full:              { th: "ชำระเต็มจำนวน",     en: "Full Payment",      zh: "全额付款" },
-  remaining_balance: { th: "มัดจำเงินที่เหลือ", en: "Remaining Balance", zh: "尾款" },
+  remaining_balance: { th: "ชำระส่วนที่เหลือ",   en: "Remaining Balance", zh: "尾款" },
   other:             { th: "อื่นๆ",             en: "Other",             zh: "其他" },
 };
 export const PAYMENT_TYPE_ORDER: PaymentType[] = ["deposit", "additional", "full", "remaining_balance", "other"];

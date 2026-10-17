@@ -97,7 +97,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/daily-sales",    labelTh: "ยอดขายรายวัน",     labelEn: "Daily Sales",   labelZh: "每日销售", icon: ClipboardList },
       { href: "/admin/daily-exports",  labelTh: "การส่งออกรายวัน",  labelEn: "Daily Export",  labelZh: "每日出库", icon: PackageMinus },
-      { href: "/admin/kpi",            labelTh: "KPI ติดตามลูกค้า", labelEn: "Lead Tracker",  labelZh: "客户跟进", icon: Target },
+      { href: "/admin/StockDEMO",      labelTh: "สต็อก DEMO",       labelEn: "Stock DEMO",    labelZh: "库存 DEMO", icon: Warehouse },
       { href: "/admin/daily-shipping", labelTh: "จัดส่งสินค้ารายวัน", labelEn: "Daily Shipping", labelZh: "每日出货", icon: PackageCheck, hidden: true },
     ],
   },
@@ -107,7 +107,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Megaphone,
     items: [
       { href: "/admin/content-tracking", labelTh: "ติดตามโพสต์พนักงาน", labelEn: "Content Tracker", labelZh: "员工发帖跟踪", icon: Camera },
-      { href: "/admin/StockDEMO",        labelTh: "สต็อก DEMO",        labelEn: "Stock DEMO",     labelZh: "库存 DEMO",   icon: Warehouse },
+      { href: "/admin/kpi",              labelTh: "KPI ติดตามลูกค้า",   labelEn: "Lead Tracker",   labelZh: "客户跟进",   icon: Target },
     ],
   },
   {

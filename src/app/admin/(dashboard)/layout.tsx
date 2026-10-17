@@ -70,7 +70,6 @@ const NAV_GROUPS: NavGroup[] = [
     labelTh: "งานขายและคำสั่งซื้อ", labelEn: "Sales & Orders", labelZh: "销售与订单",
     icon: ShoppingCart,
     items: [
-      { href: "/admin/quotes",        labelTh: "ใบเสนอราคา",        labelEn: "Quotes",         labelZh: "报价单",       icon: FileText },
       { href: "/admin/quote-builder", labelTh: "สร้างใบเสนอราคา",   labelEn: "Quote Builder",  labelZh: "生成报价单",   icon: Receipt },
       { href: "/admin/unpaid-quotes", labelTh: "ใบเสนอราคาค้างชำระ", labelEn: "Unpaid Quotes",  labelZh: "待收款报价单", icon: Wallet },
       { href: "/admin/delivery-note", labelTh: "ใบส่งของ",          labelEn: "Delivery Note",  labelZh: "送货单",       icon: FileOutput },
@@ -87,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/products",        labelTh: "สินค้า",      labelEn: "Products",       labelZh: "产品",      icon: Package },
       { href: "/admin/categories",      labelTh: "รูปหมวดหมู่", labelEn: "Category Images", labelZh: "分类图片", icon: LayoutGrid },
       { href: "/admin/customers",       labelTh: "ลูกค้า",      labelEn: "Customers",      labelZh: "客户",      icon: Users },
+      { href: "/admin/quotes",          labelTh: "ใบเสนอราคา",  labelEn: "Quotes",         labelZh: "报价单",    icon: FileText },
       { href: "/admin/products/images", labelTh: "รูปสินค้า",   labelEn: "Product Images", labelZh: "产品图片", icon: ImagePlus, hidden: true },
     ],
   },

@@ -28,7 +28,8 @@ const STATUS_COLOR: Record<QuoteStatus, string> = {
 };
 
 export default function QuotesPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const dateLocale = lang === "th" ? "th-TH" : lang === "zh" ? "zh-CN" : "en-US";
   const [allQuotes, setAllQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<QuoteStatus | "all">("all");
@@ -133,7 +134,7 @@ export default function QuotesPage() {
               quotes.map((quote) => (
                 <TableRow key={quote.id} className="hover:bg-[#FAF7F2]/50">
                   <TableCell className="text-xs text-[#6B6B6B]">
-                    {new Date(quote.created_at).toLocaleDateString("th-TH")}
+                    {new Date(quote.created_at).toLocaleDateString(dateLocale)}
                   </TableCell>
                   <TableCell>
                     <p className="text-sm font-medium line-clamp-1">{quote.product_name_snapshot || "-"}</p>

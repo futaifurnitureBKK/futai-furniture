@@ -30,6 +30,10 @@ const STATUS_COLOR: Record<QuoteStatus, string> = {
 export default function QuotesPage() {
   const { t, lang } = useLanguage();
   const dateLocale = lang === "th" ? "th-TH" : lang === "zh" ? "zh-CN" : "en-US";
+  // zh-CN's plain numeric format ("2026/10/9") doesn't read as distinctly
+  // Chinese — spell it out with 年/月/日 instead.
+  const dateOpts: Intl.DateTimeFormatOptions | undefined =
+    lang === "zh" ? { year: "numeric", month: "long", day: "numeric" } : undefined;
   const [allQuotes, setAllQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<QuoteStatus | "all">("all");
@@ -134,7 +138,7 @@ export default function QuotesPage() {
               quotes.map((quote) => (
                 <TableRow key={quote.id} className="hover:bg-[#FAF7F2]/50">
                   <TableCell className="text-xs text-[#6B6B6B]">
-                    {new Date(quote.created_at).toLocaleDateString(dateLocale)}
+                    {new Date(quote.created_at).toLocaleDateString(dateLocale, dateOpts)}
                   </TableCell>
                   <TableCell>
                     <p className="text-sm font-medium line-clamp-1">{quote.product_name_snapshot || "-"}</p>

@@ -128,8 +128,20 @@ export async function adjustVariantField(
   }
 
   if (field === "available") {
-    const { error } = await db.rpc("adjust_stock_variant_available", { p_variant_id: variantId, p_delta: pieceDelta });
-    return error ? { ok: false, error: error.message } : { ok: true };
+    const { data: newAvailable, error } = await db.rpc("adjust_stock_variant_available", {
+      p_variant_id: variantId,
+      p_delta: pieceDelta,
+    });
+    if (error) return { ok: false, error: error.message };
+    // old = new - delta rather than a separate read, so this stays exact
+    // even though the RPC's own update already raced ahead of us.
+    await db.from("stock_movements").insert({
+      variant_id: variantId,
+      field,
+      old_value: Number(newAvailable) - pieceDelta,
+      new_value: Number(newAvailable),
+    });
+    return { ok: true };
   }
 
   // reserved/defective on a non-shared variant — no atomic RPC exists for
@@ -139,7 +151,9 @@ export async function adjustVariantField(
   const current = (data as Record<string, number> | null)?.[field] ?? 0;
   const next = current + pieceDelta;
   if (next < 0) return { ok: false, error: "insufficient_stock" };
-  await db.from("stock_variants").update({ [field]: next }).eq("id", variantId);
+  const { error } = await db.from("stock_variants").update({ [field]: next }).eq("id", variantId);
+  if (error) return { ok: false, error: error.message };
+  await db.from("stock_movements").insert({ variant_id: variantId, field, old_value: current, new_value: next });
   return { ok: true };
 }
 

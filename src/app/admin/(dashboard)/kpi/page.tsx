@@ -69,6 +69,26 @@ const RANGES: { key: RangeKey; days: number | null }[] = [
   { key: "ALL", days: null },
 ];
 
+type QuickRangeKey = "1d" | "7d" | "30d" | "month";
+function computeQuickRange(key: QuickRangeKey): { from: string; to: string } {
+  const to = todayStr();
+  const end = new Date();
+  if (key === "1d") return { from: to, to };
+  if (key === "7d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    return { from: toLocalDateStr(start), to };
+  }
+  if (key === "30d") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    return { from: toLocalDateStr(start), to };
+  }
+  const first = new Date(end.getFullYear(), end.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+  return { from: toLocalDateStr(first), to: toLocalDateStr(last) };
+}
+
 function daysAgoStr(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -977,6 +997,35 @@ export default function KpiPage() {
                   {t("ผู้ดูแล", "Owner", "负责人")}: {ownerFilter === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : ownerFilter} ✕
                 </button>
               )}
+              <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+                {(
+                  [
+                    ["1d", t("วันนี้", "Today", "今天")],
+                    ["7d", t("7 วัน", "7 days", "7天")],
+                    ["30d", t("30 วัน", "30 days", "30天")],
+                    ["month", t("เดือนนี้", "This month", "本月")],
+                  ] as [QuickRangeKey, string][]
+                ).map(([key, label]) => {
+                  const r = computeQuickRange(key);
+                  const active = customFrom === r.from && customTo === r.to;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(null);
+                        setCustomFrom(r.from);
+                        setCustomTo(r.to);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                        active ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
               <DateRangePicker
                 from={scopeFrom}
                 to={scopeTo}

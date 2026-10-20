@@ -2430,6 +2430,16 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                 </div>
               </div>
 
+              <StockProductPickerDialog
+                open={stockPickerOpen}
+                onOpenChange={setStockPickerOpen}
+                products={liveStockProducts}
+                onPick={(v) => {
+                  if (stockPickerTarget) pickStockProduct(stockPickerTarget, v);
+                  setStockPickerOpen(false);
+                }}
+              />
+
               <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white text-xs font-bold flex items-center justify-center shrink-0">4</span>

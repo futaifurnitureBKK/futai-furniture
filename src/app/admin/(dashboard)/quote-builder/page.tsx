@@ -2355,26 +2355,29 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                         <tr key={it.id} className="border-t border-[#E8E5E0] align-top">
                           <td className="p-2 pt-3 text-[#9CA3AF]">{idx + 1}</td>
                           <td className="p-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex flex-col items-center gap-1 shrink-0">
-                                <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
-                                <button
+                            <div className="flex items-start gap-2">
+                              <ImageUploadTile image={it.image} onChange={(url) => updateItem(it.id, { image: url })} />
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <Button
                                   type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-[11px] w-full justify-start px-2"
                                   onClick={() => {
                                     setStockPickerTarget(it.id);
                                     setStockPickerOpen(true);
                                   }}
-                                  className="text-[10px] text-[#9CA3AF] hover:text-[#C8102E] inline-flex items-center gap-0.5 whitespace-nowrap"
                                 >
-                                  <Search size={10} /> {t("จากสต็อก", "From Stock", "从库存")}
-                                </button>
+                                  <Search size={12} className="mr-1 shrink-0" />
+                                  <span className="truncate">{t("ค้นหาจากสต็อก...", "Search Stock...", "搜索库存...")}</span>
+                                </Button>
+                                <Input
+                                  className="h-8 text-xs"
+                                  placeholder={t("ชื่อสินค้า", "Item name", "产品名称")}
+                                  value={it.name}
+                                  onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                                />
                               </div>
-                              <Input
-                                className="h-8 text-xs"
-                                placeholder={t("ชื่อสินค้า", "Item name", "产品名称")}
-                                value={it.name}
-                                onChange={(e) => updateItem(it.id, { name: e.target.value })}
-                              />
                             </div>
                           </td>
                           <td className="p-2">

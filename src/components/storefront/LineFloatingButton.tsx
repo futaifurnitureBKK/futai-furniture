@@ -9,7 +9,7 @@ export function LineFloatingButton() {
   const { t } = useLanguage();
   return (
     <a
-      href="https://line.me/ti/p/KJFKqUTMk-"
+      href="https://line.me/ti/p/-zPGfSGDPH"
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t("แชทผ่าน LINE", "Chat on LINE", "通过LINE聊天")}

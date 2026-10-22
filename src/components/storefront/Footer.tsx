@@ -86,7 +86,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://line.me/ti/p/KJFKqUTMk-"
+                  href="https://line.me/ti/p/-zPGfSGDPH"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 mt-2 bg-[#06C755] text-white text-xs px-3 py-1.5 rounded hover:bg-[#05b34d] transition-colors"

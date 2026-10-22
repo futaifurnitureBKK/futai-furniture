@@ -76,7 +76,7 @@ const organizationJsonLd = {
     addressCountry: "TH",
   },
   telephone: "+66638261333",
-  sameAs: ["https://line.me/ti/p/KJFKqUTMk-"],
+  sameAs: ["https://line.me/ti/p/-zPGfSGDPH"],
 };
 
 export default function RootLayout({

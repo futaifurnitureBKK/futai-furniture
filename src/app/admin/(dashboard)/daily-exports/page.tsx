@@ -1569,18 +1569,18 @@ export default function DailyExportsPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
-                <TableHead className="text-xs w-10">{t("ที่", "No.", "序号")}</TableHead>
-                {showDateColumn && <TableHead className="text-xs w-24">{t("วันที่", "Date", "日期")}</TableHead>}
+                <TableHead className="text-xs w-10 text-center">{t("ที่", "No.", "序号")}</TableHead>
+                {showDateColumn && <TableHead className="text-xs w-24 text-center">{t("วันที่", "Date", "日期")}</TableHead>}
                 <TableHead className="text-xs w-44">{t("สินค้า", "Item", "商品")}</TableHead>
-                <TableHead className="text-xs w-16">{t("จำนวน", "Qty", "数量")}</TableHead>
-                <TableHead className="text-xs w-24">{t("ราคา/หน่วย", "Unit price", "单价")}</TableHead>
-                <TableHead className="text-xs w-20">{t("ส่วนลด%", "Disc. %", "折扣%")}</TableHead>
-                <TableHead className="text-xs w-24">{t("ยอดรวม", "Total", "总额")}</TableHead>
-                <TableHead className="text-xs w-32">{t("ช่องทาง", "Channel", "渠道")}</TableHead>
-                <TableHead className="text-xs">{t("หมายเหตุ", "Remark", "备注")}</TableHead>
-                <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
-                <TableHead className="text-xs w-32">{t("ผู้ดำเนินการ", "Staff", "经手人")}</TableHead>
-                <TableHead className="text-xs">{t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号")}</TableHead>
+                <TableHead className="text-xs w-16 text-center">{t("จำนวน", "Qty", "数量")}</TableHead>
+                <TableHead className="text-xs w-24 text-center">{t("ราคา/หน่วย", "Unit price", "单价")}</TableHead>
+                <TableHead className="text-xs w-20 text-center">{t("ส่วนลด%", "Disc. %", "折扣%")}</TableHead>
+                <TableHead className="text-xs w-24 text-center">{t("ยอดรวม", "Total", "总额")}</TableHead>
+                <TableHead className="text-xs w-32 text-center">{t("ช่องทาง", "Channel", "渠道")}</TableHead>
+                <TableHead className="text-xs text-center">{t("หมายเหตุ", "Remark", "备注")}</TableHead>
+                <TableHead className="text-xs text-center">{t("ลูกค้า", "Customer", "客户")}</TableHead>
+                <TableHead className="text-xs w-32 text-center">{t("ผู้ดำเนินการ", "Staff", "经手人")}</TableHead>
+                <TableHead className="text-xs text-center">{t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号")}</TableHead>
                 <TableHead className="text-xs" />
               </TableRow>
             </TableHeader>
@@ -1594,8 +1594,8 @@ export default function DailyExportsPage() {
               ) : (
                 rows.map((r, i) => (
                   <TableRow key={r.id} className="align-top">
-                    <TableCell className="text-sm text-[#6B6B6B] pt-3">{i + 1}</TableCell>
-                    {showDateColumn && <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap">{r.export_date}</TableCell>}
+                    <TableCell className="text-sm text-[#6B6B6B] pt-3 text-center">{i + 1}</TableCell>
+                    {showDateColumn && <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap text-center">{r.export_date}</TableCell>}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="relative w-11 h-11 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0]">
@@ -1607,39 +1607,39 @@ export default function DailyExportsPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Input
                         type="number"
                         min={0}
                         max={(liveAvailableByVariant.get(r.stock_variant_id) ?? 0) + r.qty}
-                        className="h-8 text-xs w-16"
+                        className="h-8 text-xs w-16 mx-auto"
                         value={r.qty}
                         onChange={(e) => patchLocal(r.id, { qty: Number(e.target.value) || 0 })}
                         onBlur={(e) => saveRow(r.id, { qty: Number(e.target.value) || 0 })}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Input
                         type="number"
-                        className="h-8 text-xs w-20"
+                        className="h-8 text-xs w-20 mx-auto"
                         value={r.unit_price}
                         onChange={(e) => patchLocal(r.id, { unit_price: Number(e.target.value) || 0 })}
                         onBlur={(e) => saveRow(r.id, { unit_price: Number(e.target.value) || 0 })}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Input
                         type="number"
                         min={0}
                         max={100}
-                        className="h-8 text-xs w-16"
+                        className="h-8 text-xs w-16 mx-auto"
                         value={r.discount_pct}
                         onChange={(e) => patchLocal(r.id, { discount_pct: Number(e.target.value) || 0 })}
                         onBlur={(e) => saveRow(r.id, { discount_pct: Number(e.target.value) || 0 })}
                       />
                     </TableCell>
-                    <TableCell className="text-xs font-semibold text-[#1A1A1A] pt-3">฿{fmtMoney(rowTotal(r))}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs font-semibold text-[#1A1A1A] pt-3 text-center">฿{fmtMoney(rowTotal(r))}</TableCell>
+                    <TableCell className="text-center">
                       <Select
                         value={r.channel || "__none"}
                         onValueChange={(v) => saveRow(r.id, { channel: (!v || v === "__none" ? null : v) as DailyExportChannel | null })}
@@ -1660,15 +1660,15 @@ export default function DailyExportsPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Input
-                        className="h-8 text-xs w-36"
+                        className="h-8 text-xs w-36 mx-auto"
                         value={r.remark}
                         onChange={(e) => patchLocal(r.id, { remark: e.target.value })}
                         onBlur={(e) => saveRow(r.id, { remark: e.target.value })}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <CustomerPicker
                         value={r.customer_name}
                         sku={r.sku}
@@ -1681,7 +1681,7 @@ export default function DailyExportsPage() {
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Select
                         value={r.salesperson || "__none"}
                         onValueChange={(v) => saveRow(r.id, { salesperson: !v || v === "__none" ? null : v })}
@@ -1697,9 +1697,9 @@ export default function DailyExportsPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Input
-                        className="h-8 text-xs w-28 font-mono"
+                        className="h-8 text-xs w-28 font-mono mx-auto"
                         value={r.po_no}
                         onChange={(e) => patchLocal(r.id, { po_no: e.target.value })}
                         onBlur={(e) => saveRow(r.id, { po_no: e.target.value })}

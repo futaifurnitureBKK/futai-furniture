@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import Image from "next/image";
 import {
   ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Pencil, ImageOff, Search,
@@ -134,6 +134,18 @@ async function uploadImage(file: File): Promise<string> {
   return data.url as string;
 }
 
+// Pulls the first pasted image out of a clipboard event, e.g. a screenshot
+// copied straight from another app — lets a cell be filled without saving a
+// file to disk first.
+function imageFromClipboard(e: ClipboardEvent<HTMLElement>): File | null {
+  const items = e.clipboardData?.items;
+  if (!items) return null;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith("image/")) return items[i].getAsFile();
+  }
+  return null;
+}
+
 type StatusFilter = "all" | "posted" | "pending" | "none";
 
 export default function ContentTrackingPage() {
@@ -146,6 +158,7 @@ export default function ContentTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingCell, setUploadingCell] = useState<string | null>(null);
+  const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -536,8 +549,32 @@ export default function ContentTrackingPage() {
                                 <span className="text-[10px] text-[#9CA3AF] tabular-nums">{fmtTime(post!.updated_at)}</span>
                               </button>
                             ) : (
-                              <label className="w-full flex flex-col items-center gap-1 cursor-pointer group mx-auto">
-                                <span className="relative w-16 h-16 rounded-lg border border-dashed border-[#E8E5E0] flex items-center justify-center bg-[#FAF7F2] group-hover:border-[#C8102E] group-hover:bg-white transition-colors mx-auto">
+                              <label
+                                tabIndex={0}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  setDragOverCell(cellKey);
+                                }}
+                                onDragLeave={() => setDragOverCell((k) => (k === cellKey ? null : k))}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setDragOverCell((k) => (k === cellKey ? null : k));
+                                  const file = e.dataTransfer.files?.[0];
+                                  if (file) addImageToCell(emp.id, platform.key, file);
+                                }}
+                                onPaste={(e) => {
+                                  const file = imageFromClipboard(e);
+                                  if (file) addImageToCell(emp.id, platform.key, file);
+                                }}
+                                className="w-full flex flex-col items-center gap-1 cursor-pointer group mx-auto focus:outline-none"
+                              >
+                                <span
+                                  className={`relative w-16 h-16 rounded-lg border border-dashed flex items-center justify-center transition-colors mx-auto ${
+                                    dragOverCell === cellKey
+                                      ? "border-[#C8102E] border-2 bg-[#C8102E]/5"
+                                      : "border-[#E8E5E0] bg-[#FAF7F2] group-hover:border-[#C8102E] group-hover:bg-white"
+                                  }`}
+                                >
                                   <input
                                     type="file"
                                     accept="image/*"
@@ -683,7 +720,27 @@ export default function ContentTrackingPage() {
                     </button>
                   </div>
                 ))}
-                <label className="relative aspect-square rounded-lg border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer hover:border-[#C8102E] hover:bg-[#FAF7F2] transition-colors">
+                <label
+                  tabIndex={0}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverCell("__dialog__");
+                  }}
+                  onDragLeave={() => setDragOverCell((k) => (k === "__dialog__" ? null : k))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverCell((k) => (k === "__dialog__" ? null : k));
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && cellDialog) addImageToCell(cellDialog.employeeId, cellDialog.platform, file);
+                  }}
+                  onPaste={(e) => {
+                    const file = imageFromClipboard(e);
+                    if (file && cellDialog) addImageToCell(cellDialog.employeeId, cellDialog.platform, file);
+                  }}
+                  className={`relative aspect-square rounded-lg border border-dashed flex items-center justify-center cursor-pointer transition-colors focus:outline-none ${
+                    dragOverCell === "__dialog__" ? "border-[#C8102E] border-2 bg-[#C8102E]/5" : "border-[#E8E5E0] hover:border-[#C8102E] hover:bg-[#FAF7F2]"
+                  }`}
+                >
                   <input
                     type="file"
                     accept="image/*"

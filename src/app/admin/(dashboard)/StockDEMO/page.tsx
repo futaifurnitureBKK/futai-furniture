@@ -1083,14 +1083,14 @@ export default function StockPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-[#FAF7F2]">
-                  <TableHead className="text-xs w-32">{t("รูป", "Photo", "图片")}</TableHead>
+                  <TableHead className="text-xs w-32 text-center">{t("รูป", "Photo", "图片")}</TableHead>
                   <TableHead className="text-xs">{t("รหัสสินค้า", "Code", "编号")}</TableHead>
                   <TableHead className="text-xs">{t("ขนาด (มม.) / ราคา ฿", "Size (mm) / Price ฿", "尺寸(mm) / 价格 ฿")}</TableHead>
-                  <TableHead className="text-xs w-24">{t("พร้อมขาย", "Available", "可售")}</TableHead>
-                  <TableHead className="text-xs w-24">{t("จอง/รอส่ง", "Reserved", "已预订")}</TableHead>
-                  <TableHead className="text-xs w-24">{t("ตำหนิ/เคลม", "Defective", "瑕疵")}</TableHead>
-                  <TableHead className="text-xs w-32">{t("ตำแหน่งเก็บ", "Location", "库位")}</TableHead>
-                  <TableHead className="text-xs">{t("สถานะ", "Status", "状态")}</TableHead>
+                  <TableHead className="text-xs w-24 text-center">{t("พร้อมขาย", "Available", "可售")}</TableHead>
+                  <TableHead className="text-xs w-24 text-center">{t("จอง/รอส่ง", "Reserved", "已预订")}</TableHead>
+                  <TableHead className="text-xs w-24 text-center">{t("ตำหนิ/เคลม", "Defective", "瑕疵")}</TableHead>
+                  <TableHead className="text-xs w-32 text-center">{t("ตำแหน่งเก็บ", "Location", "库位")}</TableHead>
+                  <TableHead className="text-xs text-center">{t("สถานะ", "Status", "状态")}</TableHead>
                   <TableHead className="text-xs" />
                 </TableRow>
               </TableHeader>
@@ -1132,7 +1132,7 @@ export default function StockPage() {
                                 dragOverProductId === p.id ? "bg-[#C8102E]/5 outline outline-2 outline-[#C8102E]/40 -outline-offset-2" : ""
                               } ${draggedProductId === p.id ? "opacity-50" : ""}`}
                             >
-                              <TableCell className="align-top">
+                              <TableCell className="align-top text-center">
                                 {(() => {
                                   const photos = effectivePhotos(p, v, first);
                                   // Read-only preview here — adding/removing photos (including
@@ -1140,11 +1140,11 @@ export default function StockPage() {
                                   // doesn't get cluttered with upload controls on every size.
                                   if (photos.length === 0) {
                                     return (
-                                      <button type="button" onClick={() => openDetail(p)} className="text-[10px] text-[#9CA3AF] text-left">-</button>
+                                      <button type="button" onClick={() => openDetail(p)} className="text-[10px] text-[#9CA3AF]">-</button>
                                     );
                                   }
                                   return (
-                                    <div className="flex flex-col gap-1.5">
+                                    <div className="flex flex-col items-center gap-1.5">
                                       {photos.map((url, i) => (
                                         <button
                                           key={url + i}
@@ -1256,19 +1256,19 @@ export default function StockPage() {
                                     const sharedPreciseValue =
                                       f === "available" ? sharedSetsAvailable(p) : f === "reserved" ? sharedSetsReserved(p) : sharedSetsDefective(p);
                                     return (
-                                      <TableCell key={f}>
+                                      <TableCell key={f} className="text-center">
                                         <Input
                                           type="number"
                                           step="any"
                                           disabled={archivedView || p.shared_stock}
                                           title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
-                                          className="h-8 w-20 text-xs"
+                                          className="h-8 w-20 text-xs mx-auto"
                                           value={hideForSharedStock ? "" : isReferenceRow ? sharedPreciseValue : v[f] || ""}
                                           placeholder={hideForSharedStock ? "–" : "0"}
                                           onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
                                         />
                                         {f === "available" && !archivedView && !p.shared_stock && (
-                                          <div className="flex gap-1 mt-1">
+                                          <div className="flex justify-center gap-1 mt-1">
                                             <button
                                               type="button"
                                               onClick={() => receiveStock(p, v)}
@@ -1290,16 +1290,16 @@ export default function StockPage() {
                                       </TableCell>
                                     );
                                   })}
-                                  <TableCell>
+                                  <TableCell className="text-center">
                                     <Input
-                                      className="h-8 w-28 text-xs"
+                                      className="h-8 w-28 text-xs mx-auto"
                                       disabled={archivedView}
                                       value={v.location}
                                       placeholder={t("เช่น โกดัง1-A2", "e.g. WH1-A2", "如 仓1-A2")}
                                       onChange={(e) => editVariant(p.id, v.id, { location: e.target.value })}
                                     />
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="text-center">
                                     <span className={`text-[11px] font-medium px-2 py-1 rounded whitespace-nowrap ${STATUS_STYLE[st]}`}>
                                       {STATUS_LABEL[st]}
                                     </span>

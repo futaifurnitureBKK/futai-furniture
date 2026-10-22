@@ -560,15 +560,15 @@ export default function DailySalesPage() {
   function columnMeta(key: ConfigColumnKey): { label: string; className?: string; sortKey?: SortKey } {
     switch (key) {
       case "photo": return { label: t("รูป / รหัสรุ่น", "Photo / Model", "图片/型号"), className: "w-32" };
-      case "size": return { label: t("ขนาด (มม.)", "Size (mm)", "规格"), sortKey: "size_text" };
-      case "unit_price": return { label: t("ราคาต่อหน่วย", "Unit Price", "单价"), className: "w-24", sortKey: "unit_price" };
-      case "qty": return { label: t("จำนวน", "Qty", "数量"), className: "w-20", sortKey: "qty" };
-      case "total": return { label: t("ยอดรวม", "Total", "总金额"), className: "w-24", sortKey: "total" };
-      case "remark": return { label: t("หมายเหตุ", "Remark", "备注"), sortKey: "remark" };
-      case "customer_name": return { label: t("ลูกค้า", "Customer", "客户"), sortKey: "customer_name" };
-      case "customer_phone": return { label: t("เบอร์ลูกค้า", "Customer Tel.", "客户电话"), className: "w-28", sortKey: "customer_phone" };
-      case "salesperson": return { label: t("ผู้ขาย", "Saler", "业务员"), className: "w-32", sortKey: "salesperson" };
-      case "po_no": return { label: t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号") };
+      case "size": return { label: t("ขนาด (มม.)", "Size (mm)", "规格"), className: "text-center", sortKey: "size_text" };
+      case "unit_price": return { label: t("ราคาต่อหน่วย", "Unit Price", "单价"), className: "w-24 text-center", sortKey: "unit_price" };
+      case "qty": return { label: t("จำนวน", "Qty", "数量"), className: "w-20 text-center", sortKey: "qty" };
+      case "total": return { label: t("ยอดรวม", "Total", "总金额"), className: "w-24 text-center", sortKey: "total" };
+      case "remark": return { label: t("หมายเหตุ", "Remark", "备注"), className: "text-center", sortKey: "remark" };
+      case "customer_name": return { label: t("ลูกค้า", "Customer", "客户"), className: "text-center", sortKey: "customer_name" };
+      case "customer_phone": return { label: t("เบอร์ลูกค้า", "Customer Tel.", "客户电话"), className: "w-28 text-center", sortKey: "customer_phone" };
+      case "salesperson": return { label: t("ผู้ขาย", "Saler", "业务员"), className: "w-32 text-center", sortKey: "salesperson" };
+      case "po_no": return { label: t("เลขที่ใบสั่งซื้อ", "PO No.", "订单号"), className: "text-center" };
     }
   }
 
@@ -638,9 +638,9 @@ export default function DailySalesPage() {
         );
       case "size":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
-              className="h-8 text-xs w-28"
+              className="h-8 text-xs w-28 mx-auto"
               value={r.size_text}
               onChange={(e) => patchLocal(r.id, { size_text: e.target.value })}
               onBlur={(e) => saveRow(r.id, { size_text: e.target.value })}
@@ -649,10 +649,10 @@ export default function DailySalesPage() {
         );
       case "unit_price":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
               type="number"
-              className="h-8 text-xs w-20"
+              className="h-8 text-xs w-20 mx-auto"
               value={r.unit_price}
               onChange={(e) => patchLocal(r.id, { unit_price: Number(e.target.value) || 0 })}
               onBlur={(e) => saveRow(r.id, { unit_price: Number(e.target.value) || 0 })}
@@ -661,10 +661,10 @@ export default function DailySalesPage() {
         );
       case "qty":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
               type="number"
-              className="h-8 text-xs w-16"
+              className="h-8 text-xs w-16 mx-auto"
               value={r.qty}
               onChange={(e) => patchLocal(r.id, { qty: Number(e.target.value) || 0 })}
               onBlur={(e) => saveRow(r.id, { qty: Number(e.target.value) || 0 })}
@@ -673,15 +673,15 @@ export default function DailySalesPage() {
         );
       case "total":
         return (
-          <TableCell key={key} className="text-sm font-semibold text-[#1A1A1A] pt-3">
+          <TableCell key={key} className="text-sm font-semibold text-[#1A1A1A] pt-3 text-center">
             ฿{fmt(r.qty * r.unit_price)}
           </TableCell>
         );
       case "remark":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
-              className="h-8 text-xs w-32"
+              className="h-8 text-xs w-32 mx-auto"
               value={r.remark}
               onChange={(e) => patchLocal(r.id, { remark: e.target.value })}
               onBlur={(e) => saveRow(r.id, { remark: e.target.value })}
@@ -690,9 +690,9 @@ export default function DailySalesPage() {
         );
       case "customer_name":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
-              className="h-8 text-xs w-36"
+              className="h-8 text-xs w-36 mx-auto"
               value={r.customer_name}
               onChange={(e) => patchLocal(r.id, { customer_name: e.target.value })}
               onBlur={(e) => saveRow(r.id, { customer_name: e.target.value })}
@@ -701,9 +701,9 @@ export default function DailySalesPage() {
         );
       case "customer_phone":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
-              className="h-8 text-xs w-28 font-mono"
+              className="h-8 text-xs w-28 font-mono mx-auto"
               value={r.customer_phone}
               onChange={(e) => patchLocal(r.id, { customer_phone: e.target.value })}
               onBlur={(e) => saveRow(r.id, { customer_phone: e.target.value })}
@@ -712,7 +712,7 @@ export default function DailySalesPage() {
         );
       case "salesperson":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Select
               value={r.salesperson || "__none"}
               onValueChange={(v) => saveRow(r.id, { salesperson: !v || v === "__none" ? null : v })}
@@ -731,9 +731,9 @@ export default function DailySalesPage() {
         );
       case "po_no":
         return (
-          <TableCell key={key}>
+          <TableCell key={key} className="text-center">
             <Input
-              className="h-8 text-xs w-28 font-mono"
+              className="h-8 text-xs w-28 font-mono mx-auto"
               value={r.po_no}
               onChange={(e) => patchLocal(r.id, { po_no: e.target.value })}
               onBlur={(e) => saveRow(r.id, { po_no: e.target.value })}
@@ -892,14 +892,14 @@ export default function DailySalesPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
-                <TableHead className="text-xs w-8">
+                <TableHead className="text-xs w-8 text-center">
                   <Checkbox
                     checked={searchedRows.length > 0 && selected.size === searchedRows.length}
                     onCheckedChange={() => toggleSelectAll()}
                     aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
                   />
                 </TableHead>
-                <TableHead className="text-xs w-10">{t("ที่", "No.", "序号")}</TableHead>
+                <TableHead className="text-xs w-10 text-center">{t("ที่", "No.", "序号")}</TableHead>
                 {visibleColumns.map((key) => {
                   const meta = columnMeta(key);
                   return meta.sortKey ? (
@@ -933,14 +933,14 @@ export default function DailySalesPage() {
               ) : (
                 displayRows.map((r, i) => (
                   <TableRow key={r.id} className="align-top">
-                    <TableCell className="pt-3">
+                    <TableCell className="pt-3 text-center">
                       <Checkbox
                         checked={selected.has(r.id)}
                         onCheckedChange={() => toggleRow(r.id)}
                         aria-label={t("เลือกแถว", "Select row", "选择行")}
                       />
                     </TableCell>
-                    <TableCell className="text-sm text-[#6B6B6B] pt-3">{i + 1}</TableCell>
+                    <TableCell className="text-sm text-[#6B6B6B] pt-3 text-center">{i + 1}</TableCell>
                     {visibleColumns.map((key) => renderColumnCell(key, r))}
                     {showDateColumn && (
                       <TableCell className="text-xs text-[#6B6B6B] pt-3 whitespace-nowrap">{r.sale_date}</TableCell>

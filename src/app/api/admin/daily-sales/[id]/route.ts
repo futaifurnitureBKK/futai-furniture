@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
-import { syncStockDeduction } from "@/lib/stock-auto-deduct";
 import { logActivity } from "@/lib/activity-log";
 
 const EDITABLE_FIELDS = [
@@ -15,7 +14,6 @@ const EDITABLE_FIELDS = [
   "customer_phone",
   "salesperson",
   "po_no",
-  "from_reserved",
 ] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,36 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const db = supabaseAdmin();
 
-  // Keep StockDEMO's available/reserved counts in sync whenever the item,
-  // quantity, or the "จากของที่จองไว้" checkbox changes — see
-  // syncStockDeduction for why this restores-then-applies instead of just
-  // subtracting the new quantity.
-  if ("sku" in body || "qty" in body || "size_text" in body || "from_reserved" in body) {
-    const { data: existing } = await db
-      .from("daily_sales_rows")
-      .select("sku, qty, size_text, from_reserved, stock_variant_id, stock_deducted_qty, stock_deducted_field")
-      .eq("id", id)
-      .single();
-    if (existing) {
-      const newSku = "sku" in body ? String(body.sku ?? "") : existing.sku;
-      const newQty = "qty" in body ? Number(body.qty) || 0 : existing.qty;
-      const newSizeText = "size_text" in body ? String(body.size_text ?? "") : existing.size_text;
-      const fromReserved = "from_reserved" in body ? !!body.from_reserved : existing.from_reserved;
-      const result = await syncStockDeduction(db, {
-        previousVariantId: existing.stock_variant_id,
-        previousQty: existing.stock_deducted_qty,
-        previousField: existing.stock_deducted_field,
-        newSku,
-        newQty,
-        newSizeText,
-        fromReserved,
-      });
-      update.stock_variant_id = result.variantId;
-      update.stock_deducted_qty = result.deductedQty;
-      update.stock_deducted_field = result.field;
-    }
-  }
-
+  // Daily Sales doesn't touch Stock — deducting is Daily Export's job only.
   const { data, error } = await db.from("daily_sales_rows").update(update).eq("id", id).select().single();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -85,20 +54,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { data: existing } = await db
     .from("daily_sales_rows")
-    .select("sale_date, sku, qty, unit_price, customer_name, stock_variant_id, stock_deducted_qty, stock_deducted_field")
+    .select("sale_date, sku, qty, unit_price, customer_name")
     .eq("id", id)
     .single();
-  if (existing?.stock_variant_id && existing.stock_deducted_qty) {
-    await syncStockDeduction(db, {
-      previousVariantId: existing.stock_variant_id,
-      previousQty: existing.stock_deducted_qty,
-      previousField: existing.stock_deducted_field,
-      newSku: "",
-      newQty: 0,
-      newSizeText: "",
-      fromReserved: false,
-    });
-  }
 
   const { error } = await db.from("daily_sales_rows").delete().eq("id", id);
   if (error) {

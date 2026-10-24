@@ -38,6 +38,7 @@ export default function AdminImagesPage() {
   /* ── Upload tab state ── */
   const [files, setFiles]       = useState<FileItem[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [publishOnUpload, setPublishOnUpload] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* ── Shopee tab state ── */
@@ -70,7 +71,9 @@ export default function AdminImagesPage() {
   );
 
   const updateSku = (idx: number, sku: string) =>
-    setFiles((prev) => prev.map((f, i) => (i === idx ? { ...f, sku } : f)));
+    setFiles((prev) =>
+      prev.map((f, i) => (i === idx ? { ...f, sku, status: f.status === "error" ? "idle" : f.status } : f))
+    );
 
   const removeFile = (idx: number) => {
     setFiles((prev) => {
@@ -84,24 +87,43 @@ export default function AdminImagesPage() {
       if (files[i].status !== "idle") continue;
       setFiles((prev) => prev.map((f, j) => j === i ? { ...f, status: "uploading" } : f));
 
-      const form = new FormData();
-      // rename file to SKU.ext so it's easy to map later
-      const ext  = files[i].file.name.split(".").pop();
-      const blob = new Blob([files[i].file], { type: files[i].file.type });
-      form.append("file", blob, `${files[i].sku}.${ext}`);
+      // Reuse the Blob URL from a previous attempt (e.g. only the SKU was
+      // wrong and got corrected) instead of re-uploading the same file.
+      let url = files[i].url;
+      if (!url) {
+        const form = new FormData();
+        // rename file to SKU.ext so it's easy to map later
+        const ext  = files[i].file.name.split(".").pop();
+        const blob = new Blob([files[i].file], { type: files[i].file.type });
+        form.append("file", blob, `${files[i].sku}.${ext}`);
 
+        try {
+          const res  = await fetch("/api/products/upload", { method: "POST", body: form });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          url = data.url;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Upload failed";
+          setFiles((prev) => prev.map((f, j) => j === i ? { ...f, status: "error", error: msg } : f));
+          continue;
+        }
+      }
+
+      // Attach the uploaded image straight to the matching product.
       try {
-        const res  = await fetch("/api/products/upload", { method: "POST", body: form });
+        const res = await fetch(`/api/admin/products/${encodeURIComponent(files[i].sku)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: [url], ...(publishOnUpload ? { is_active: true } : {}) }),
+        });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Upload failed");
-        setFiles((prev) =>
-          prev.map((f, j) => j === i ? { ...f, status: "done", url: data.url } : f)
-        );
+        if (!res.ok) throw new Error(data.error || "บันทึกเข้าสินค้าไม่สำเร็จ");
+        setFiles((prev) => prev.map((f, j) => j === i ? { ...f, status: "done", url } : f));
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Upload failed";
-        setFiles((prev) =>
-          prev.map((f, j) => j === i ? { ...f, status: "error", error: msg } : f)
-        );
+        const msg = err instanceof Error
+          ? `อัปโหลดรูปสำเร็จ แต่หา SKU "${files[i].sku}" ในระบบไม่เจอ — แก้ SKU แล้วลองใหม่ (${err.message})`
+          : "เชื่อมรูปกับสินค้าไม่สำเร็จ";
+        setFiles((prev) => prev.map((f, j) => j === i ? { ...f, status: "error", error: msg, url } : f));
       }
     }
   };
@@ -141,7 +163,7 @@ export default function AdminImagesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("จัดการรูปสินค้า", "Product Images", "商品图片管理")}</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">{t("อัปโหลดรูปสินค้าหรือดึงจาก Shopee", "Upload product images or import from Shopee", "上传商品图片或从Shopee导入")}</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{t("อัปโหลดรูปสินค้าแบบจำนวนมากทีเดียว — ตั้งชื่อไฟล์เป็น SKU แล้วระบบจะบันทึกเข้าสินค้านั้นให้อัตโนมัติ หรือดึงจาก Shopee", "Bulk-upload product images in one go — name each file as its SKU and it's saved to that product automatically — or import from Shopee", "批量上传商品图片 — 将文件命名为SKU即可自动保存到对应商品，或从Shopee导入")}</p>
         </div>
       </div>
 
@@ -192,22 +214,33 @@ export default function AdminImagesPage() {
             <ImageIcon size={36} className="mx-auto text-[#C8C5BE] mb-3" />
             <p className="font-medium text-[#1A1A1A]">{t("ลากรูปมาวางหรือคลิกเพื่อเลือก", "Drag images here or click to select", "拖放图片到此处或点击选择")}</p>
             <p className="text-sm text-[#6B6B6B] mt-1">{t("รองรับ JPG, PNG, WebP — หลายรูปพร้อมกันได้", "Supports JPG, PNG, WebP — multiple files at once", "支持 JPG、PNG、WebP — 可同时上传多张")}</p>
-            <p className="text-xs text-[#9B9B9B] mt-2">💡 {t("ตั้งชื่อไฟล์เป็น SKU เช่น", "Name the file as the SKU, e.g.", "将文件名设为SKU，例如")} <code>HJ-350A.jpg</code> {t("จะ map ให้อัตโนมัติ", "and it will be mapped automatically", "系统会自动匹配")}</p>
+            <p className="text-xs text-[#9B9B9B] mt-2">💡 {t("ตั้งชื่อไฟล์เป็น SKU เช่น", "Name the file as the SKU, e.g.", "将文件名设为SKU，例如")} <code>HJ-350A.jpg</code> {t("จะ map และบันทึกเข้าสินค้า SKU นั้นให้อัตโนมัติ", "and it will be mapped and saved to that product automatically", "系统会自动匹配并保存到该SKU商品")}</p>
           </div>
 
           {/* File list */}
           {files.length > 0 && (
             <>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-[#6B6B6B]">{files.length} {t("ไฟล์", "files", "个文件")} · {t("อัปโหลดแล้ว", "Uploaded", "已上传")} {doneCount}</p>
-                <button
-                  onClick={uploadAll}
-                  disabled={idleCount === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#C8102E] text-white text-sm font-medium rounded-lg disabled:opacity-40 hover:bg-[#a30d25] transition-colors"
-                >
-                  <Upload size={14} />
-                  {t("อัปโหลดทั้งหมด", "Upload All", "全部上传")} ({idleCount})
-                </button>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <p className="text-sm text-[#6B6B6B]">{files.length} {t("ไฟล์", "files", "个文件")} · {t("บันทึกเข้าสินค้าแล้ว", "Saved to product", "已保存到商品")} {doneCount}</p>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-xs text-[#6B6B6B] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={publishOnUpload}
+                      onChange={(e) => setPublishOnUpload(e.target.checked)}
+                      className="accent-[#C8102E]"
+                    />
+                    {t("เปิดขายทันทีหลังอัปโหลด", "Go live immediately after upload", "上传后立即上架")}
+                  </label>
+                  <button
+                    onClick={uploadAll}
+                    disabled={idleCount === 0}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#C8102E] text-white text-sm font-medium rounded-lg disabled:opacity-40 hover:bg-[#a30d25] transition-colors"
+                  >
+                    <Upload size={14} />
+                    {t("อัปโหลดทั้งหมด", "Upload All", "全部上传")} ({idleCount})
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -247,15 +280,18 @@ export default function AdminImagesPage() {
                         value={f.sku}
                         onChange={(e) => updateSku(i, e.target.value)}
                         placeholder={t("SKU สินค้า", "Product SKU", "商品SKU")}
+                        disabled={f.status === "uploading"}
                         className={`w-full text-xs px-2 py-1.5 border rounded-lg focus:outline-none focus:border-[#C8102E] ${
-                          KNOWN_SKUS.includes(f.sku)
+                          f.status === "done"
                             ? "border-green-400 bg-green-50"
-                            : "border-[#E8E5E0]"
+                            : f.status === "error"
+                              ? "border-red-300 bg-red-50"
+                              : "border-[#E8E5E0]"
                         }`}
                       />
-                      {KNOWN_SKUS.includes(f.sku) && (
+                      {f.status === "done" && (
                         <p className="text-[10px] text-green-600 flex items-center gap-1">
-                          <CheckCircle2 size={10} /> {t("พบ SKU ในระบบ", "SKU found in system", "系统中找到该SKU")}
+                          <CheckCircle2 size={10} /> {t("บันทึกเข้าสินค้าแล้ว", "Saved to product", "已保存到商品")}
                         </p>
                       )}
                       {f.status === "done" && f.url && (

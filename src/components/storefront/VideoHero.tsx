@@ -22,6 +22,7 @@ export function VideoHero() {
   const [opacity, setOpacity] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRun = useRef(true);
 
   const goNext = useCallback(() => {
     // fade out
@@ -32,10 +33,24 @@ export function VideoHero() {
     }, 600);
   }, []);
 
-  // load & play whenever current changes
+  // load & play whenever current changes. The first video is already wired
+  // up via the <source> tag in the server-rendered markup below, so the
+  // browser's preload scanner can start fetching it immediately instead of
+  // waiting for React to hydrate and this effect to run — that JS-only
+  // video.src assignment was delaying first paint of the hero by seconds.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise.catch(() => {
+          timerRef.current = setTimeout(goNext, 3000);
+        });
+      }
+      return;
+    }
     video.src = VIDEOS[current];
     video.load();
     const playPromise = video.play();
@@ -79,10 +94,18 @@ export function VideoHero() {
         autoPlay
         muted
         playsInline
-        poster="/hero.png"
+        preload="auto"
+        poster="/hero.webp"
         onEnded={goNext}
         onError={goNext}
-      />
+      >
+        {/* Static source for the first video so the browser's preload
+           scanner can start fetching it straight from the initial HTML,
+           instead of waiting on React hydration + the imperative src set
+           in the effect above (which only handles switching to the next
+           video in the carousel). */}
+        <source src={VIDEOS[0]} type="video/mp4" />
+      </video>
 
       {/* Dot indicators */}
       <div className="absolute bottom-20 right-6 flex flex-col gap-1.5 z-10">

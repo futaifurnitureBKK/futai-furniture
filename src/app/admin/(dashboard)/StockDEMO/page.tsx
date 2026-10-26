@@ -270,20 +270,6 @@ export default function StockPage() {
     };
   }, [archivedView, reloadTick]);
 
-  // Stock is often edited straight in Supabase (SQL fixes, bulk adjustments)
-  // rather than through this page, so poll periodically and re-check
-  // whenever the tab regains focus — switching back here after running a
-  // query elsewhere refetches without needing a manual F5.
-  useEffect(() => {
-    const interval = setInterval(() => setReloadTick((t) => t + 1), 120000);
-    const onFocus = () => setReloadTick((t) => t + 1);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, []);
-
   // ── variant edits: optimistic, saved 0.6s after the last keystroke ──
   function editVariant(pid: number, vid: number, change: Partial<DbVariant>) {
     const stockTouched = "available" in change || "reserved" in change || "defective" in change;

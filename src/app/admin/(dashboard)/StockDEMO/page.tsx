@@ -275,7 +275,7 @@ export default function StockPage() {
   // whenever the tab regains focus — switching back here after running a
   // query elsewhere refetches without needing a manual F5.
   useEffect(() => {
-    const interval = setInterval(() => setReloadTick((t) => t + 1), 30000);
+    const interval = setInterval(() => setReloadTick((t) => t + 1), 120000);
     const onFocus = () => setReloadTick((t) => t + 1);
     window.addEventListener("focus", onFocus);
     return () => {

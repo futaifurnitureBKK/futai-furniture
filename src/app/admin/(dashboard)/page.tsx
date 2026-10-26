@@ -1,24 +1,25 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ShoppingBag,
   Package,
   Users,
   AlertCircle,
   Eye,
-  BarChart3,
   Wallet,
   ImageOff,
   ArrowUpRight,
+  Banknote,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/browser";
 import { useLanguage } from "@/store/language";
-import type { Order, Customer, QuoteRequest, Product, Category } from "@/types";
+import { computeGrandTotal } from "@/lib/saved-quote-options";
+import type { Order, Customer, QuoteRequest, Product, Category, SavedQuoteItem } from "@/types";
 
 interface VisitStats {
   totalViews: number;
@@ -40,6 +41,34 @@ interface UnpaidQuote {
   lastPaidDate: string | null;
 }
 
+interface DailySalesRow {
+  id: number;
+  sale_date: string;
+  sku: string;
+  unit_price: number;
+  qty: number;
+  customer_name: string;
+}
+
+interface DailyShippingRow {
+  id: number;
+  ship_date: string;
+  sku: string;
+  qty: number;
+  customer_name: string;
+  consignee: string;
+}
+
+interface SavedQuoteListItem {
+  doc_type: string;
+  doc_date: string;
+  salesperson: string | null;
+  items: SavedQuoteItem[];
+  discount_pct: number;
+  vat_pct: number;
+  archived: boolean;
+}
+
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   confirmed: "bg-blue-100 text-blue-700",
@@ -49,8 +78,22 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
+const WEEKDAY_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
 function money(n: number) {
   return "฿" + Math.round(n).toLocaleString("th-TH");
+}
+
+function moneyCompact(n: number) {
+  if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k";
+  return String(Math.round(n));
+}
+
+function toLocalDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default function AdminDashboard() {
@@ -70,26 +113,53 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [visits, setVisits] = useState<VisitStats | null>(null);
   const [unpaidQuotes, setUnpaidQuotes] = useState<UnpaidQuote[]>([]);
+  const [weekSales, setWeekSales] = useState<DailySalesRow[]>([]);
+  const [todayShipping, setTodayShipping] = useState<DailyShippingRow[]>([]);
+  const [savedQuotes, setSavedQuotes] = useState<SavedQuoteListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  const todayStr = useMemo(() => toLocalDateStr(new Date()), []);
+  const weekStartStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return toLocalDateStr(d);
+  }, []);
+  const monthPrefix = todayStr.slice(0, 7); // "YYYY-MM"
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [ordersRes, customersRes, quotesRes, productsRes, categoriesRes, visitsRes, unpaidRes] =
-        await Promise.all([
-          fetch("/api/admin/orders"),
-          fetch("/api/admin/customers"),
-          fetch("/api/admin/quotes"),
-          supabase.from("products").select("*"),
-          supabase.from("categories").select("*"),
-          fetch("/api/admin/visits"),
-          fetch("/api/admin/saved-quotes/unpaid"),
-        ]);
+      const [
+        ordersRes,
+        customersRes,
+        quotesRes,
+        productsRes,
+        categoriesRes,
+        visitsRes,
+        unpaidRes,
+        weekSalesRes,
+        shippingRes,
+        savedQuotesRes,
+      ] = await Promise.all([
+        fetch("/api/admin/orders"),
+        fetch("/api/admin/customers"),
+        fetch("/api/admin/quotes"),
+        supabase.from("products").select("*"),
+        supabase.from("categories").select("*"),
+        fetch("/api/admin/visits"),
+        fetch("/api/admin/saved-quotes/unpaid"),
+        fetch(`/api/admin/daily-sales?from=${weekStartStr}&to=${todayStr}`),
+        fetch(`/api/admin/daily-shipping?date=${todayStr}`),
+        fetch("/api/admin/saved-quotes?archived=false"),
+      ]);
       const ordersData = await ordersRes.json();
       const customersData = await customersRes.json();
       const quotesData = await quotesRes.json();
       const visitsData = await visitsRes.json();
       const unpaidData = await unpaidRes.json();
+      const weekSalesData = await weekSalesRes.json();
+      const shippingData = await shippingRes.json();
+      const savedQuotesData = await savedQuotesRes.json();
       if (!cancelled) {
         setOrders(ordersRes.ok ? ordersData.orders : []);
         setCustomers(customersRes.ok ? customersData.customers : []);
@@ -98,13 +168,16 @@ export default function AdminDashboard() {
         setCategories((categoriesRes.data as Category[]) ?? []);
         setVisits(visitsRes.ok ? visitsData : null);
         setUnpaidQuotes(unpaidRes.ok ? unpaidData.quotes : []);
+        setWeekSales(weekSalesRes.ok ? weekSalesData.rows : []);
+        setTodayShipping(shippingRes.ok ? shippingData.rows : []);
+        setSavedQuotes(savedQuotesRes.ok ? savedQuotesData.quotes : []);
         setLoaded(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [todayStr, weekStartStr]);
 
   const pendingOrdersCount = orders.filter((o) => o.status === "pending").length;
   const pendingQuotesCount = quotes.filter((q) => q.status === "pending").length;
@@ -113,13 +186,51 @@ export default function AdminDashboard() {
   const hasAnyViews = topProducts.some((p) => p.view_count > 0);
   const needsAttention = pendingOrdersCount > 0 || pendingQuotesCount > 0 || unpaidQuotes.length > 0;
 
+  // Last 7 days of real sales, bucketed by date.
+  const last7Days = useMemo(() => {
+    const days: { date: string; total: number; label: string; isToday: boolean }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = toLocalDateStr(d);
+      const total = weekSales
+        .filter((r) => r.sale_date === dateStr)
+        .reduce((sum, r) => sum + r.unit_price * r.qty, 0);
+      days.push({ date: dateStr, total, label: WEEKDAY_TH[d.getDay()], isToday: dateStr === todayStr });
+    }
+    return days;
+  }, [weekSales, todayStr]);
+  const todaySalesTotal = last7Days.find((d) => d.isToday)?.total ?? 0;
+  const weekSalesTotal = last7Days.reduce((sum, d) => sum + d.total, 0);
+  const maxDaySales = Math.max(1, ...last7Days.map((d) => d.total));
+
+  // Real quote activity per salesperson this month — count + value, no
+  // fabricated call-tracking or sales targets (we don't track those).
+  const salespersonActivity = useMemo(() => {
+    const byPerson = new Map<string, { count: number; total: number }>();
+    for (const q of savedQuotes) {
+      if (q.doc_type !== "quotation" || q.archived) continue;
+      if (!q.doc_date?.startsWith(monthPrefix)) continue;
+      const name = q.salesperson?.trim();
+      if (!name) continue;
+      const cur = byPerson.get(name) ?? { count: 0, total: 0 };
+      cur.count += 1;
+      cur.total += computeGrandTotal(q.items || [], q.discount_pct, q.vat_pct);
+      byPerson.set(name, cur);
+    }
+    return [...byPerson.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [savedQuotes, monthPrefix]);
+
   const KPI = [
     {
-      title: t("ออเดอร์รอดำเนินการ", "Pending Orders", "待处理订单"),
-      value: pendingOrdersCount,
-      icon: AlertCircle,
-      tone: "alert" as const,
-      href: "/admin/orders",
+      title: t("ยอดขายวันนี้", "Sales Today", "今日销售额"),
+      value: money(todaySalesTotal),
+      icon: Banknote,
+      tone: "positive" as const,
+      href: "/admin/daily-sales",
     },
     {
       title: t("ใบเสนอราคาค้างชำระ", "Unpaid Quotes", "待收款报价单"),
@@ -130,10 +241,17 @@ export default function AdminDashboard() {
       href: "/admin/unpaid-quotes",
     },
     {
-      title: t("ออเดอร์ทั้งหมด", "Total Orders", "订单总数"),
-      value: orders.length,
-      icon: ShoppingBag,
-      tone: "neutral" as const,
+      title: t("คิวจัดส่งวันนี้", "Shipments Today", "今日出货"),
+      value: todayShipping.length,
+      icon: Truck,
+      tone: "info" as const,
+      href: "/admin/daily-exports",
+    },
+    {
+      title: t("ออเดอร์รอดำเนินการ", "Pending Orders", "待处理订单"),
+      value: pendingOrdersCount,
+      icon: AlertCircle,
+      tone: "alert" as const,
       href: "/admin/orders",
     },
     {
@@ -150,22 +268,22 @@ export default function AdminDashboard() {
       tone: "neutral" as const,
       href: "/admin/customers",
     },
-    {
-      title: t("คนเข้าชมวันนี้", "Visitors Today", "今日访客"),
-      value: visits?.todayVisitors ?? 0,
-      icon: BarChart3,
-      tone: "neutral" as const,
-      href: "/admin",
-    },
   ];
 
+  const toneChip: Record<string, string> = {
+    positive: "bg-emerald-50 text-emerald-600",
+    alert: "bg-[#C8102E] text-white",
+    info: "bg-blue-50 text-blue-600",
+    neutral: "bg-[#F5F3EF] text-[#1A1A1A]",
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("ภาพรวมปฏิบัติการ ฟูไท่ เฟอร์นิเจอร์", "Futai Furniture Operations Overview", "富泰家具运营概览")}</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">
-            {t("ภาพรวมธุรกิจ ฟูไท่ เฟอร์นิเจอร์", "Futai Furniture business overview", "富泰家具业务概览")}
+            {t("มอนิเตอร์ยอดขายรายวัน คิวจัดส่งสินค้า ใบเสนอราคา และสินค้าในระบบ", "Monitor daily sales, shipping queue, quotes, and your product catalog", "监控每日销售、发货队列、报价单及产品目录")}
           </p>
         </div>
         <div className="flex gap-3">
@@ -188,30 +306,20 @@ export default function AdminDashboard() {
             <Card
               className={cn(
                 "transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer h-full ring-1",
-                kpi.tone === "alert" && kpi.value > 0
+                kpi.tone === "alert" && Number(kpi.value) > 0
                   ? "ring-[#C8102E]/20 bg-[#FFF8F8]"
                   : "ring-[#E8E5E0] bg-white"
               )}
             >
               <CardContent className="p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <div
-                    className={cn(
-                      "flex items-center justify-center w-9 h-9 rounded-lg",
-                      kpi.tone === "alert" && kpi.value > 0
-                        ? "bg-[#C8102E] text-white"
-                        : "bg-[#F5F3EF] text-[#1A1A1A]"
-                    )}
-                  >
+                  <div className={cn("flex items-center justify-center w-9 h-9 rounded-lg", toneChip[kpi.tone])}>
                     <kpi.icon size={16} />
                   </div>
-                  <ArrowUpRight
-                    size={14}
-                    className="text-[#C8C5BE] opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
+                  <ArrowUpRight size={14} className="text-[#C8C5BE] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-[#1A1A1A] leading-none">{kpi.value}</p>
+                  <p className="text-2xl font-bold text-[#1A1A1A] leading-none font-mono">{kpi.value}</p>
                   <p className="text-[11px] text-[#9B9B9B] mt-2 leading-tight">{kpi.title}</p>
                   {kpi.sub && <p className="text-[11px] font-semibold text-[#C8102E] mt-0.5">{kpi.sub}</p>}
                 </div>
@@ -258,6 +366,50 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Weekly sales chart */}
+      <Card className="ring-[#E8E5E0]">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base">{t("ยอดขายรายวัน 7 วันล่าสุด", "Daily Sales, Last 7 Days", "近7日每日销售额")}</CardTitle>
+            <span className="text-xs text-[#6B6B6B]">
+              {t("รวมสัปดาห์นี้", "Week total", "本周合计")}: <strong className="text-[#1A1A1A] font-mono">{money(weekSalesTotal)}</strong>
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!loaded ? null : weekSalesTotal === 0 ? (
+            <p className="text-sm text-[#6B6B6B] py-6 text-center">
+              {t("ยังไม่มีข้อมูลยอดขายรายวันในช่วง 7 วันนี้", "No daily sales logged for the last 7 days yet", "近7日暂无每日销售数据")}
+            </p>
+          ) : (
+            <div className="grid grid-cols-7 gap-2 md:gap-3 items-end h-40 pt-4">
+              {last7Days.map((d) => (
+                <div key={d.date} className="flex flex-col items-center h-full justify-end group">
+                  <span
+                    className={cn(
+                      "text-[10px] mb-1 font-mono",
+                      d.isToday ? "font-bold text-[#C8102E]" : "text-[#9B9B9B] opacity-0 group-hover:opacity-100 transition-opacity"
+                    )}
+                  >
+                    {moneyCompact(d.total)}
+                  </span>
+                  <div
+                    className={cn(
+                      "w-full max-w-[40px] rounded-t-md transition-all",
+                      d.isToday ? "bg-[#C8102E]" : "bg-[#F0EDE8] group-hover:bg-[#C8102E]/40"
+                    )}
+                    style={{ height: `${Math.max(3, (d.total / maxDaySales) * 100)}%` }}
+                  />
+                  <span className={cn("text-[11px] mt-2", d.isToday ? "font-bold text-[#C8102E]" : "text-[#9B9B9B]")}>
+                    {d.isToday ? t("วันนี้", "Today", "今天") : d.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders */}
@@ -334,6 +486,76 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's shipping queue */}
+        <Card className="ring-[#E8E5E0]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{t("คิวจัดส่งวันนี้", "Today's Shipping Queue", "今日发货队列")}</CardTitle>
+              <Link href="/admin/daily-exports" className="text-xs text-[#C8102E] hover:underline">
+                {t("จัดการการส่งออกรายวัน", "Manage Daily Export", "管理每日出库")} →
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {todayShipping.length === 0 ? (
+                <p className="text-sm text-[#6B6B6B] py-4 text-center">
+                  {t("ไม่มีคิวจัดส่งวันนี้", "No shipments queued for today", "今日暂无发货安排")}
+                </p>
+              ) : (
+                todayShipping.slice(0, 6).map((row) => (
+                  <div key={row.id} className="flex items-center justify-between py-2 border-b border-[#F0EDE8] last:border-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#1A1A1A] font-mono truncate">{row.sku || "—"}</p>
+                      <p className="text-xs text-[#9B9B9B] truncate">{row.consignee || row.customer_name || "—"}</p>
+                    </div>
+                    <span className="text-xs text-[#6B6B6B] shrink-0 ml-3">× {row.qty}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Salesperson activity this month — real quote counts/value, no
+            fabricated call-tracking or targets since we don't track those. */}
+        <Card className="ring-[#E8E5E0]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{t("ใบเสนอราคาเดือนนี้ตามพนักงานขาย", "Quotes This Month by Salesperson", "本月各销售员报价单")}</CardTitle>
+              <Link href="/admin/kpi" className="text-xs text-[#C8102E] hover:underline">
+                {t("ดู KPI ทีมขาย", "View Sales KPI", "查看销售KPI")} →
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {salespersonActivity.length === 0 ? (
+              <p className="text-sm text-[#6B6B6B] py-4 text-center">
+                {t("ยังไม่มีใบเสนอราคาที่ระบุพนักงานขายในเดือนนี้", "No quotes with a salesperson assigned this month yet", "本月暂无已指定销售员的报价单")}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {salespersonActivity.map((s) => (
+                  <div key={s.name} className="flex items-center justify-between py-2 border-b border-[#F0EDE8] last:border-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-[#1A1A1A] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {s.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <p className="text-sm font-medium text-[#1A1A1A] truncate">{s.name}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-semibold text-[#1A1A1A]">{s.count} {t("ใบ", "quotes", "单")}</p>
+                      <p className="text-xs text-[#9B9B9B] font-mono">{money(s.total)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Top Products */}
       <Card className="ring-[#E8E5E0]">
         <CardHeader className="pb-3">
@@ -402,7 +624,7 @@ export default function AdminDashboard() {
               { label: t("หมวดหมู่", "Categories", "分类"), value: categories.length },
               { label: t("สินค้ามีสต็อก", "In Stock", "有库存"), value: products.filter((p) => p.stock_status === "in_stock").length },
               { label: t("สินค้า Featured", "Featured Products", "推荐产品"), value: products.filter((p) => p.is_featured).length },
-              { label: t("คนเข้าชมทั้งหมด", "Total Visitors", "访客总数"), value: visits?.totalVisitors ?? 0 },
+              { label: t("คนเข้าชมวันนี้", "Visitors Today", "今日访客"), value: visits?.todayVisitors ?? 0 },
               { label: t("ยอดเข้าชมทั้งหมด", "Total Views", "浏览总数"), value: visits?.totalViews ?? 0 },
             ].map((s) => (
               <div key={s.label}>

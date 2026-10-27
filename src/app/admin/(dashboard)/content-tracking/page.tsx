@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Pencil, ImageOff, Search,
@@ -136,8 +136,9 @@ async function uploadImage(file: File): Promise<string> {
 
 // Pulls the first pasted image out of a clipboard event, e.g. a screenshot
 // copied straight from another app — lets a cell be filled without saving a
-// file to disk first.
-function imageFromClipboard(e: ClipboardEvent<HTMLElement>): File | null {
+// file to disk first. Structurally typed so it accepts both React's
+// synthetic ClipboardEvent and the native one from a window-level listener.
+function imageFromClipboard(e: { clipboardData: DataTransfer | null }): File | null {
   const items = e.clipboardData?.items;
   if (!items) return null;
   for (let i = 0; i < items.length; i++) {
@@ -159,6 +160,7 @@ export default function ContentTrackingPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingCell, setUploadingCell] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -345,6 +347,32 @@ export default function ContentTrackingPage() {
       setUploadingCell(null);
     }
   }
+
+  // Ctrl+V anywhere on the page adds the clipboard's image to whichever cell
+  // the mouse is hovering (or the open photo dialog, if one's open) — no
+  // need to click into a cell first, which would otherwise pop the native
+  // file picker since these cells double as click-to-browse upload targets.
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const file = imageFromClipboard(e);
+      if (!file) return;
+      if (cellDialog) {
+        e.preventDefault();
+        addImageToCell(cellDialog.employeeId, cellDialog.platform, file);
+        return;
+      }
+      if (hoveredCell) {
+        const sep = hoveredCell.indexOf("-");
+        const employeeId = Number(hoveredCell.slice(0, sep));
+        const platform = hoveredCell.slice(sep + 1);
+        e.preventDefault();
+        addImageToCell(employeeId, platform, file);
+      }
+    }
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cellDialog, hoveredCell]);
 
   async function removeImageFromCell(post: Post, imageUrl: string) {
     const nextUrls = post.image_urls.filter((u) => u !== imageUrl);
@@ -551,6 +579,8 @@ export default function ContentTrackingPage() {
                             ) : (
                               <label
                                 tabIndex={0}
+                                onMouseEnter={() => setHoveredCell(cellKey)}
+                                onMouseLeave={() => setHoveredCell((k) => (k === cellKey ? null : k))}
                                 onDragOver={(e) => {
                                   e.preventDefault();
                                   setDragOverCell(cellKey);
@@ -562,10 +592,7 @@ export default function ContentTrackingPage() {
                                   const file = e.dataTransfer.files?.[0];
                                   if (file) addImageToCell(emp.id, platform.key, file);
                                 }}
-                                onPaste={(e) => {
-                                  const file = imageFromClipboard(e);
-                                  if (file) addImageToCell(emp.id, platform.key, file);
-                                }}
+                                title={t("วางเมาส์ไว้ตรงนี้แล้วกด Ctrl+V เพื่อแปะรูปได้เลย", "Hover here and press Ctrl+V to paste an image", "鼠标悬停在此处并按 Ctrl+V 粘贴图片")}
                                 className="w-full flex flex-col items-center gap-1 cursor-pointer group mx-auto focus:outline-none"
                               >
                                 <span
@@ -733,10 +760,7 @@ export default function ContentTrackingPage() {
                     const file = e.dataTransfer.files?.[0];
                     if (file && cellDialog) addImageToCell(cellDialog.employeeId, cellDialog.platform, file);
                   }}
-                  onPaste={(e) => {
-                    const file = imageFromClipboard(e);
-                    if (file && cellDialog) addImageToCell(cellDialog.employeeId, cellDialog.platform, file);
-                  }}
+                  title={t("กด Ctrl+V เพื่อแปะรูปได้เลย", "Press Ctrl+V to paste an image", "按 Ctrl+V 粘贴图片")}
                   className={`relative aspect-square rounded-lg border border-dashed flex items-center justify-center cursor-pointer transition-colors focus:outline-none ${
                     dragOverCell === "__dialog__" ? "border-[#C8102E] border-2 bg-[#C8102E]/5" : "border-[#E8E5E0] hover:border-[#C8102E] hover:bg-[#FAF7F2]"
                   }`}

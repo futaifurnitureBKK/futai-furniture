@@ -1205,7 +1205,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       if (listMode === "pull" && row.doc_type !== "quotation") return false;
       if (listMode === "saved" && defaultDocType === "delivery_note" && row.doc_type !== "delivery_note") return false;
       if (listMode === "saved" && defaultDocType !== "delivery_note" && row.doc_type === "delivery_note") return false;
-      if (q && !row.customer_name.toLowerCase().includes(q)) return false;
+      if (q && !row.customer_name.toLowerCase().includes(q) && !row.doc_no.toLowerCase().includes(q)) return false;
       if (listDateFrom && row.doc_date < listDateFrom) return false;
       if (listDateTo && row.doc_date > listDateTo) return false;
       return true;
@@ -2029,14 +2029,14 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
 
           <div className="flex flex-wrap items-end gap-2 mb-3">
             <div className="flex-1 min-w-[180px]">
-              <Label className="text-xs">{t("ค้นหาชื่อบริษัท/ลูกค้า", "Search company / customer", "搜索公司/客户名称")}</Label>
+              <Label className="text-xs">{t("ค้นหาชื่อลูกค้า/เลขที่ใบเสนอราคา", "Search customer / doc no.", "搜索客户名称/单号")}</Label>
               <div className="relative mt-1">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                 <Input
                   className="pl-8 h-8 text-sm"
                   value={listSearch}
                   onChange={(e) => setListSearch(e.target.value)}
-                  placeholder={t("พิมพ์ชื่อบริษัทหรือลูกค้า...", "Type a company or customer name...", "输入公司或客户名称...")}
+                  placeholder={t("พิมพ์ชื่อลูกค้าหรือเลขที่ใบเสนอราคา...", "Type a customer name or doc no...", "输入客户名称或单号...")}
                 />
               </div>
             </div>

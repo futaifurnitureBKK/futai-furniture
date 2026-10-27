@@ -1,25 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
-import { verifyPassword } from "@/lib/password-hash";
 
-// Gated the same way as /api/admin/logins and /api/admin/sessions, behind
-// the AdminFutai page's own extra code — this log can reveal who did what
-// across the whole site, so it sits behind the same extra wall.
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const db = supabaseAdmin();
-
-  const { data: cred } = await db.from("admin_credentials").select("password_hash").eq("id", "security_code").maybeSingle();
-  const envSecret = process.env.SECURITY_LOG_CODE;
-  const code = req.headers.get("x-security-code") || "";
-  const codeOk = cred?.password_hash ? await verifyPassword(code, cred.password_hash) : !envSecret || code === envSecret;
-  if (!codeOk) {
-    return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 403 });
-  }
 
   const actor = req.nextUrl.searchParams.get("actor");
   const entityType = req.nextUrl.searchParams.get("entityType");

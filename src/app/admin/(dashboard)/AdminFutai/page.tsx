@@ -1,15 +1,14 @@
 "use client";
-import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Loader2, Lock, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
+  Loader2, ShieldAlert, ShieldCheck, TrendingUp, LogOut, Radio,
   CheckCircle2, XCircle, Users, Clock, History, Search, X, ChevronDown,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -58,8 +57,6 @@ const ACTION_META: Record<string, { th: string; color: string }> = {
   adjust: { th: "ปรับสต็อก", color: "bg-amber-100 text-amber-700" },
   other: { th: "อื่นๆ", color: "bg-[#E8E5E0] text-[#6B6B6B]" },
 };
-
-const CODE_KEY = "futai-security-code";
 
 // Kept as a standalone module-scope function (rather than assigning
 // window.location.href inline inside a state-updating handler) so React
@@ -126,13 +123,6 @@ function StatCard({
 
 export default function AdminSecurityPage() {
   const { t } = useLanguage();
-  const [unlocked, setUnlocked] = useState(false);
-  const [checkingStoredCode, setCheckingStoredCode] = useState(true);
-  const [codeInput, setCodeInput] = useState("");
-  const [codeError, setCodeError] = useState("");
-  const [unlocking, setUnlocking] = useState(false);
-  const [unlockedCode, setUnlockedCode] = useState("");
-
   const [logins, setLogins] = useState<Login[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -156,22 +146,18 @@ export default function AdminSecurityPage() {
   const [activityActor, setActivityActor] = useState("all");
   const [activityAction, setActivityAction] = useState("all");
 
-  async function load(code: string) {
+  async function load() {
     setLoading(true);
     setError(null);
     try {
       const [loginsRes, sessionsRes] = await Promise.all([
-        fetch("/api/admin/logins", { headers: { "x-security-code": code } }),
-        fetch("/api/admin/sessions", { headers: { "x-security-code": code } }),
+        fetch("/api/admin/logins"),
+        fetch("/api/admin/sessions"),
       ]);
       const data = await loginsRes.json();
       if (!loginsRes.ok) {
-        if (loginsRes.status === 403) {
-          setCodeError(data.error || t("รหัสไม่ถูกต้อง", "Wrong code", "代码错误"));
-        } else {
-          setError(data.error || "Load failed");
-        }
-        return false;
+        setError(data.error || "Load failed");
+        return;
       }
       setLogins(data.logins);
       setAttempts(data.attempts);
@@ -182,53 +168,18 @@ export default function AdminSecurityPage() {
         setActiveSessions(sessData.sessions);
         setCurrentSessionId(sessData.currentSessionId);
       }
-
-      setUnlockedCode(code);
-      return true;
     } catch {
       setError("Network error");
-      return false;
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      let stored = "";
-      try {
-        stored = sessionStorage.getItem(CODE_KEY) ?? "";
-      } catch {
-        // private mode / storage blocked — just show the code prompt
-      }
-      if (stored) {
-        const ok = await load(stored);
-        if (!cancelled && ok) setUnlocked(true);
-      }
-      if (!cancelled) setCheckingStoredCode(false);
+      await load();
     })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function handleUnlock(e: FormEvent) {
-    e.preventDefault();
-    setUnlocking(true);
-    setCodeError("");
-    const ok = await load(codeInput);
-    setUnlocking(false);
-    if (ok) {
-      setUnlocked(true);
-      try {
-        sessionStorage.setItem(CODE_KEY, codeInput);
-      } catch {
-        // ignore — just means it'll ask again next time
-      }
-    }
-  }
 
   async function handleLogout() {
     await fetch("/api/admin/auth", { method: "DELETE" });
@@ -238,10 +189,7 @@ export default function AdminSecurityPage() {
   async function handleKick(session: ActiveSession) {
     if (!confirm(t(`ออกจากระบบ IP ${session.ip} เลยไหม?`, `Log out IP ${session.ip} now?`, `确定要注销 IP ${session.ip} 吗？`))) return;
     setKickingIds((prev) => new Set(prev).add(session.id));
-    const res = await fetch(`/api/admin/sessions/${session.id}`, {
-      method: "DELETE",
-      headers: { "x-security-code": unlockedCode },
-    });
+    const res = await fetch(`/api/admin/sessions/${session.id}`, { method: "DELETE" });
     setKickingIds((prev) => {
       const next = new Set(prev);
       next.delete(session.id);
@@ -268,7 +216,7 @@ export default function AdminSecurityPage() {
     setKickingIds((prev) => new Set([...prev, ...ids]));
     const results = await Promise.all(
       ids.map((id) =>
-        fetch(`/api/admin/sessions/${id}`, { method: "DELETE", headers: { "x-security-code": unlockedCode } }).then((res) => ({ id, ok: res.ok }))
+        fetch(`/api/admin/sessions/${id}`, { method: "DELETE" }).then((res) => ({ id, ok: res.ok }))
       )
     );
     const removedIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
@@ -281,10 +229,7 @@ export default function AdminSecurityPage() {
     if (currentSessionId && removedIds.has(currentSessionId)) goToLogin();
   }
 
-  // Sales-by-owner is only fetched once this page's own extra code has been
-  // entered — it sits behind the same gate as the login log, same as on /admin/kpi.
   useEffect(() => {
-    if (!unlocked) return;
     let cancelled = false;
     (async () => {
       setLeadsLoading(true);
@@ -296,16 +241,15 @@ export default function AdminSecurityPage() {
     return () => {
       cancelled = true;
     };
-  }, [unlocked]);
+  }, []);
 
-  // Fetched once (last 200 entries) and filtered client-side — same pattern
-  // as the login log above, and plenty for "who touched what recently".
+  // Fetched once (last 200 entries) and filtered client-side — plenty for
+  // "who touched what recently".
   useEffect(() => {
-    if (!unlocked || !unlockedCode) return;
     let cancelled = false;
     (async () => {
       setActivityLoading(true);
-      const res = await fetch("/api/admin/activity-log", { headers: { "x-security-code": unlockedCode } });
+      const res = await fetch("/api/admin/activity-log");
       const data = await res.json();
       if (!cancelled && res.ok) setActivity(data.entries);
       setActivityLoading(false);
@@ -313,7 +257,7 @@ export default function AdminSecurityPage() {
     return () => {
       cancelled = true;
     };
-  }, [unlocked, unlockedCode]);
+  }, []);
 
   const rangeStart = useMemo(() => {
     const days = RANGES.find((r) => r.key === range)?.days;
@@ -424,39 +368,6 @@ export default function AdminSecurityPage() {
       });
     return Array.from(sums.entries()).map(([date, total]) => ({ date, total }));
   }, [leads, scopeFrom, scopeTo]);
-
-  if (checkingStoredCode) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm py-16 text-center text-sm text-[#6B6B6B]">
-        <Loader2 size={20} className="mx-auto mb-2 animate-spin" />
-        {t("กำลังโหลด...", "Loading...", "加载中...")}
-      </div>
-    );
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="max-w-sm mx-auto mt-16 bg-white rounded-xl shadow-sm p-6 text-center space-y-3">
-        <Lock size={24} className="mx-auto text-[#9CA3AF]" />
-        <p className="text-sm font-semibold text-[#1A1A1A]">
-          {t("หน้านี้ต้องใส่รหัสเพิ่มเติม", "This page needs an extra code", "此页面需要额外的密码")}
-        </p>
-        <form onSubmit={handleUnlock} className="space-y-2">
-          <Input
-            type="password"
-            autoFocus
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            placeholder={t("รหัส", "Code", "密码")}
-          />
-          {codeError && <p className="text-xs text-red-600">{codeError}</p>}
-          <Button type="submit" className="w-full" disabled={unlocking || !codeInput}>
-            {unlocking ? t("กำลังตรวจสอบ...", "Checking...", "验证中...") : t("เข้าดู", "Unlock", "解锁")}
-          </Button>
-        </form>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">

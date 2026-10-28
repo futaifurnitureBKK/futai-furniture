@@ -1154,6 +1154,8 @@ export default function StockPage() {
                                 setDragOverProductId(null);
                               }}
                               className={`hover:bg-[#FAF7F2]/50 ${first ? "border-t-2 border-t-[#E8E5E0]" : ""} ${
+                                p.shared_stock && v?.is_shared_reference ? "bg-blue-50/60 hover:bg-blue-50" : ""
+                              } ${
                                 dragOverProductId === p.id ? "bg-[#C8102E]/5 outline outline-2 outline-[#C8102E]/40 -outline-offset-2" : ""
                               } ${draggedProductId === p.id ? "opacity-50" : ""}`}
                             >
@@ -1259,7 +1261,24 @@ export default function StockPage() {
                                           <TriangleAlert size={12} />
                                         </span>
                                       )}
+                                      {p.shared_stock && v.is_shared_reference && (
+                                        <span
+                                          title={t(
+                                            "แถวนี้คือตัวนับหลักของสต็อกร่วม — แก้ตัวเลขที่นี่ ไซส์อื่นคำนวณตามอัตโนมัติ",
+                                            "This is the main counter for the shared pool — edit the number here, other sizes follow automatically",
+                                            "这是共享库存的主计数行 — 在此修改数量，其他尺寸会自动跟随"
+                                          )}
+                                          className="ml-1.5 inline-flex items-center gap-0.5 align-middle text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700"
+                                        >
+                                          <Database size={9} /> {t("ตัวนับหลัก", "Main counter", "主计数行")}
+                                        </span>
+                                      )}
                                     </p>
+                                    {p.shared_stock && !v.is_shared_reference && (
+                                      <p className="text-[10px] text-blue-600/70">
+                                        → {t(`นับที่แถว "${sharedReferenceLabel(p)}"`, `see the "${sharedReferenceLabel(p)}" row`, `数量见"${sharedReferenceLabel(p)}"行`)}
+                                      </p>
+                                    )}
                                     {v.available < 0 && (
                                       <p className="text-amber-700">{t(`ล็อกเกินของในโกดัง ${fmt(-v.available)} ชิ้น`, `over-locked by ${fmt(-v.available)}`, `锁单超出库存 ${fmt(-v.available)}`)}</p>
                                     )}
@@ -1270,13 +1289,13 @@ export default function StockPage() {
                                     </p>
                                   </TableCell>
                                   {(["available", "reserved", "defective"] as const).map((f) => {
-                                    // For a shared-stock product, only the product's reference
-                                    // size (p.reference_unit_factor) carries the real number now
-                                    // — shown as the exact set count (e.g. 4.5), not its own
-                                    // floor-divided piece count, so it matches what
-                                    // receive/reserve/adjust use. Every other size is left blank
-                                    // here (the picker still shows a real sellable count per size
-                                    // when selling).
+                                    // For a shared-stock product, only the variant flagged
+                                    // is_shared_reference carries the real number now — shown as
+                                    // the exact set count (e.g. 4.5), not its own floor-divided
+                                    // piece count, so it matches what receive/reserve/adjust use.
+                                    // Every other size is left blank here (the "→ นับที่..." note
+                                    // above points to the reference row; the picker still shows a
+                                    // real sellable count per size when selling).
                                     const isReferenceRow = p.shared_stock && v.is_shared_reference;
                                     const hideForSharedStock = p.shared_stock && !v.is_shared_reference;
                                     const sharedPreciseValue =
@@ -1575,6 +1594,16 @@ export default function StockPage() {
                           <TableCell>
                             <Input className="h-8 w-36 text-xs font-mono" value={v.is_round || v.width_mm == null ? v.size_text : `${v.width_mm}*${v.depth_mm ?? ""}${v.height_mm != null ? "*" + v.height_mm : ""}`} onChange={(e) => editSize(detail.id, v.id, e.target.value)} />
                             {v.flag && <p className="text-[10px] text-amber-700 max-w-[10rem] mt-0.5">{v.flag}</p>}
+                            {detail.shared_stock && v.is_shared_reference && (
+                              <p className="inline-flex items-center gap-0.5 mt-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                <Database size={9} /> {t("ตัวนับหลัก", "Main counter", "主计数行")}
+                              </p>
+                            )}
+                            {detail.shared_stock && !v.is_shared_reference && (
+                              <p className="text-[9px] text-blue-600/70 mt-0.5">
+                                → {t(`นับที่แถว "${sharedReferenceLabel(detail)}"`, `see the "${sharedReferenceLabel(detail)}" row`, `数量见"${sharedReferenceLabel(detail)}"行`)}
+                              </p>
+                            )}
                           </TableCell>
                           <TableCell><Input type="number" min={0} className="h-8 w-24 text-xs" value={v.price ?? ""} onChange={(e) => editVariant(detail.id, v.id, { price: e.target.value === "" ? null : num(e.target.value) })} /></TableCell>
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>

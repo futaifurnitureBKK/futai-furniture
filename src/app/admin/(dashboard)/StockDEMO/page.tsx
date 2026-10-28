@@ -81,6 +81,12 @@ interface DbProduct {
   shared_available_modules: number;
   shared_reserved_modules: number;
   shared_defective_modules: number;
+  // Which variant's unit_factor counts as "1 set" / "the main size" for
+  // this product's display and manual receive/reserve/adjust prompts —
+  // 2 for YN-01-4/QC-A2401/YN-05 (their 2400mm/4-seat row), but a product
+  // whose reference size isn't a 2-module size (e.g. DZ2802's 4-seat row
+  // is 4 modules) needs its own value here.
+  reference_unit_factor: number;
 }
 interface Movement {
   id: number;
@@ -323,17 +329,27 @@ export default function StockPage() {
     editVariant(p.id, v.id, { available: v.available - qty, reserved: v.reserved + qty });
   }
 
-  // ── Shared-stock (YN-01-4, QC-A2401, YN-05): one pool across every size,
-  // entered in sets (.5 allowed) at the product level instead of pieces at
-  // the variant level — see src/lib/shared-stock.ts. ──
+  // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
+  // across every size, entered in sets at the product level instead of
+  // pieces at the variant level — see src/lib/shared-stock.ts. ──
   function sharedSetsAvailable(p: DbProduct) {
-    return p.shared_available_modules / 2;
+    return p.shared_available_modules / p.reference_unit_factor;
   }
   function sharedSetsReserved(p: DbProduct) {
-    return p.shared_reserved_modules / 2;
+    return p.shared_reserved_modules / p.reference_unit_factor;
   }
   function sharedSetsDefective(p: DbProduct) {
-    return p.shared_defective_modules / 2;
+    return p.shared_defective_modules / p.reference_unit_factor;
+  }
+  // The variant that "1 set" refers to — whichever size carries the
+  // product's reference_unit_factor (the one shown as the live editable
+  // number in the table; every other size is read-only/derived from it).
+  function sharedReferenceVariant(p: DbProduct): DbVariant | undefined {
+    return p.stock_variants.find((v) => v.unit_factor === p.reference_unit_factor);
+  }
+  function sharedReferenceLabel(p: DbProduct): string {
+    const v = sharedReferenceVariant(p);
+    return v ? v.label || sizeLabel(v) : "2400mm/4 ที่นั่ง";
   }
 
   async function callSharedAdjust(p: DbProduct, field: "available" | "reserved" | "defective", sets: number) {
@@ -353,11 +369,12 @@ export default function StockPage() {
 
   function receiveSharedStock(p: DbProduct) {
     const current = sharedSetsAvailable(p);
+    const ref = sharedReferenceLabel(p);
     const input = prompt(
       t(
-        `รับเข้าเพิ่มกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ตอนนี้พร้อมขาย ${current} ตัว) — ใส่ .5 ได้`,
-        `How many came in (in 2400mm/4-seat equivalent pieces)? (currently ${current} available) — .5 allowed`,
-        `入库多少件（按2400mm/4座换算）？（当前可售 ${current} 件）— 可输入 .5`
+        `รับเข้าเพิ่มกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้พร้อมขาย ${current} ตัว)`,
+        `How many came in (in ${ref} equivalent pieces)? (currently ${current} available)`,
+        `入库多少件（按${ref}换算）？（当前可售 ${current} 件）`
       )
     );
     if (!input) return;
@@ -368,11 +385,12 @@ export default function StockPage() {
 
   async function reserveSharedStock(p: DbProduct) {
     const current = sharedSetsAvailable(p);
+    const ref = sharedReferenceLabel(p);
     const input = prompt(
       t(
-        `ลูกค้าจองกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (พร้อมขายตอนนี้ ${current} ตัว)`,
-        `How many did the customer reserve (in 2400mm/4-seat equivalent pieces)? (currently ${current} available)`,
-        `客户预订多少件（按2400mm/4座换算）？（当前可售 ${current} 件）`
+        `ลูกค้าจองกี่ตัว (เทียบเท่า ${ref})? (พร้อมขายตอนนี้ ${current} ตัว)`,
+        `How many did the customer reserve (in ${ref} equivalent pieces)? (currently ${current} available)`,
+        `客户预订多少件（按${ref}换算）？（当前可售 ${current} 件）`
       )
     );
     if (!input) return;
@@ -395,11 +413,12 @@ export default function StockPage() {
 
   function adjustSharedAvailable(p: DbProduct) {
     const current = sharedSetsAvailable(p);
+    const ref = sharedReferenceLabel(p);
     const input = prompt(
       t(
-        `ปรับยอดพร้อมขายเป็นกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ตอนนี้ ${current} ตัว)`,
-        `Set available to how many (in 2400mm/4-seat equivalent pieces)? (currently ${current})`,
-        `将可售调整为多少件（按2400mm/4座换算）？（当前 ${current} 件）`
+        `ปรับยอดพร้อมขายเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้ ${current} ตัว)`,
+        `Set available to how many (in ${ref} equivalent pieces)? (currently ${current})`,
+        `将可售调整为多少件（按${ref}换算）？（当前 ${current} 件）`
       )
     );
     if (input == null || input === "") return;
@@ -412,11 +431,12 @@ export default function StockPage() {
 
   function adjustSharedDefective(p: DbProduct) {
     const current = sharedSetsDefective(p);
+    const ref = sharedReferenceLabel(p);
     const input = prompt(
       t(
-        `มีตำหนิกี่ตัว (เทียบเท่า 2400mm/4 ที่นั่ง)? (ปัจจุบัน ${current} ตัว) ใส่ติดลบเพื่อลด`,
-        `How many defective (in 2400mm/4-seat equivalent pieces)? (currently ${current}) negative to reduce`,
-        `次品多少件（按2400mm/4座换算）？（当前 ${current} 件）输入负数以减少`
+        `มีตำหนิกี่ตัว (เทียบเท่า ${ref})? (ปัจจุบัน ${current} ตัว) ใส่ติดลบเพื่อลด`,
+        `How many defective (in ${ref} equivalent pieces)? (currently ${current}) negative to reduce`,
+        `次品多少件（按${ref}换算）？（当前 ${current} 件）输入负数以减少`
       )
     );
     if (input == null || input === "") return;
@@ -1192,7 +1212,7 @@ export default function StockPage() {
                                     {p.shared_stock && (
                                       <div className="mt-1 text-[10px] text-blue-700 bg-blue-50 rounded px-1.5 py-1 space-y-0.5">
                                         <p className="text-[9px] text-blue-600/70">
-                                          {t("ตัวเลขดูได้ที่แถว 2400mm ด้านขวา", "See the 2400mm row for the number", "数量见右侧2400mm行")}
+                                          {t(`ตัวเลขดูได้ที่แถว ${sharedReferenceLabel(p)} ด้านขวา`, `See the ${sharedReferenceLabel(p)} row for the number`, `数量见右侧${sharedReferenceLabel(p)}行`)}
                                         </p>
                                         {!archivedView && (
                                           <div className="flex flex-wrap gap-1 pt-0.5">
@@ -1245,14 +1265,15 @@ export default function StockPage() {
                                     </p>
                                   </TableCell>
                                   {(["available", "reserved", "defective"] as const).map((f) => {
-                                    // For a shared-stock product, only the 2400mm/4-seat
-                                    // row carries the real number now — shown as the exact
-                                    // set count (e.g. 4.5), not its own floor-divided piece
-                                    // count, so it matches what receive/reserve/adjust use.
-                                    // Every other size is left blank here (the picker still
-                                    // shows a real sellable count per size when selling).
-                                    const isReferenceRow = p.shared_stock && v.unit_factor === 2;
-                                    const hideForSharedStock = p.shared_stock && v.unit_factor !== 2;
+                                    // For a shared-stock product, only the product's reference
+                                    // size (p.reference_unit_factor) carries the real number now
+                                    // — shown as the exact set count (e.g. 4.5), not its own
+                                    // floor-divided piece count, so it matches what
+                                    // receive/reserve/adjust use. Every other size is left blank
+                                    // here (the picker still shows a real sellable count per size
+                                    // when selling).
+                                    const isReferenceRow = p.shared_stock && v.unit_factor === p.reference_unit_factor;
+                                    const hideForSharedStock = p.shared_stock && v.unit_factor !== p.reference_unit_factor;
                                     const sharedPreciseValue =
                                       f === "available" ? sharedSetsAvailable(p) : f === "reserved" ? sharedSetsReserved(p) : sharedSetsDefective(p);
                                     return (
@@ -1554,8 +1575,8 @@ export default function StockPage() {
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>
                           {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => {
                             const isMovementField = f === "available" || f === "reserved" || f === "defective";
-                            const isReferenceRow = detail.shared_stock && isMovementField && v.unit_factor === 2;
-                            const hideForSharedStock = detail.shared_stock && isMovementField && v.unit_factor !== 2;
+                            const isReferenceRow = detail.shared_stock && isMovementField && v.unit_factor === detail.reference_unit_factor;
+                            const hideForSharedStock = detail.shared_stock && isMovementField && v.unit_factor !== detail.reference_unit_factor;
                             const sharedPreciseValue =
                               f === "available" ? sharedSetsAvailable(detail) : f === "reserved" ? sharedSetsReserved(detail) : sharedSetsDefective(detail);
                             return (

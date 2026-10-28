@@ -12,16 +12,19 @@ export type StockField = "available" | "reserved" | "defective";
 
 // ── Pure math — no DB, exported so it's directly unit-testable ──────────
 
-// 1 set = 2 modules. Staff enter quantities in sets (supports .5); anything
-// that isn't a whole number of modules is rejected rather than rounded
-// silently, since modules must always stay a whole number.
-export function setsToModules(sets: number): number | null {
-  const modules = Math.round(sets * 2);
-  if (Math.abs(modules - sets * 2) > 1e-9) return null;
+// 1 set = unitsPerSet modules (2 by default — the reference variant's own
+// unit_factor for products where the "main" displayed size isn't the
+// product-wide default of 2, e.g. DZ2802 where the 4-seat reference is 4
+// modules). Staff enter quantities in sets (supports fractions down to
+// 1/unitsPerSet); anything that isn't a whole number of modules is rejected
+// rather than rounded silently, since modules must always stay whole.
+export function setsToModules(sets: number, unitsPerSet = 2): number | null {
+  const modules = Math.round(sets * unitsPerSet);
+  if (Math.abs(modules - sets * unitsPerSet) > 1e-9) return null;
   return modules;
 }
-export function modulesToSets(modules: number): number {
-  return modules / 2;
+export function modulesToSets(modules: number, unitsPerSet = 2): number {
+  return modules / unitsPerSet;
 }
 
 // What a module pool becomes after a delta — never lets it go negative.
@@ -165,9 +168,10 @@ export async function adjustSharedStockBySets(
   db: SupabaseClient,
   productId: number,
   field: StockField,
-  sets: number
+  sets: number,
+  unitsPerSet = 2
 ): Promise<{ ok: boolean; error?: string }> {
-  const modules = setsToModules(sets);
+  const modules = setsToModules(sets, unitsPerSet);
   if (modules == null) return { ok: false, error: "sets_must_be_half_increment" };
   if (modules === 0) return { ok: true };
   const { error } = await db.rpc("adjust_shared_stock_modules", { p_product_id: productId, p_field: field, p_module_delta: modules });

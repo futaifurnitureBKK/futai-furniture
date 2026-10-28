@@ -28,16 +28,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const db = supabaseAdmin();
-  const { data: product } = await db.from("stock_products").select("id, shared_stock").eq("id", id).single();
+  const { data: product } = await db.from("stock_products").select("id, shared_stock, reference_unit_factor").eq("id", id).single();
   if (!product?.shared_stock) {
     return NextResponse.json({ error: "ไม่ใช่สินค้าสต็อกร่วม" }, { status: 400 });
   }
 
-  const result = await adjustSharedStockBySets(db, Number(id), field, sets);
+  const unitsPerSet = product.reference_unit_factor || 2;
+  const result = await adjustSharedStockBySets(db, Number(id), field, sets, unitsPerSet);
   if (!result.ok) {
     const insufficientStock = result.error !== "sets_must_be_half_increment";
     return NextResponse.json(
-      { error: insufficientStock ? "สต็อกเหลือไม่พอ" : "จำนวนต้องเป็นหน่วย 0.5 ตัว" },
+      { error: insufficientStock ? "สต็อกเหลือไม่พอ" : `จำนวนต้องเป็นหน่วยละ ${(1 / unitsPerSet).toString()} ตัว` },
       { status: insufficientStock ? 409 : 400 }
     );
   }

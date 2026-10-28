@@ -75,7 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/delivery-note", labelTh: "ใบส่งของ",          labelEn: "Delivery Note",  labelZh: "送货单",       icon: FileOutput },
       { href: "/admin/shipping",      labelTh: "จัดส่งสินค้า",      labelEn: "Shipping",       labelZh: "发货",         icon: Truck },
       { href: "/admin/pos",           labelTh: "POS",               labelEn: "POS",            labelZh: "收银台",       icon: MonitorPlay, hidden: true },
-      { href: "/admin/orders",        labelTh: "คำสั่งซื้อ",        labelEn: "Orders",         labelZh: "订单",         icon: ShoppingBag, hidden: true },
+      { href: "/admin/orders",        labelTh: "คำสั่งซื้อ",        labelEn: "Orders",         labelZh: "订单",         icon: ShoppingBag },
     ],
   },
   {

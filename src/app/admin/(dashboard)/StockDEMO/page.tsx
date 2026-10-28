@@ -58,6 +58,12 @@ interface DbVariant {
   archived: boolean;
   image_urls: string[];
   unit_factor: number;
+  // Marks the one variant (per shared-stock product) that carries the live
+  // editable "sets" number — see sharedReferenceVariant() below. Needed
+  // because two sizes can share the same unit_factor (e.g. DZ2404's
+  // 1-seat and 2-seat rows are the same physical footprint), so the
+  // reference row can't always be picked by unit_factor alone.
+  is_shared_reference: boolean;
 }
 interface DbProduct {
   id: number;
@@ -81,12 +87,6 @@ interface DbProduct {
   shared_available_modules: number;
   shared_reserved_modules: number;
   shared_defective_modules: number;
-  // Which variant's unit_factor counts as "1 set" / "the main size" for
-  // this product's display and manual receive/reserve/adjust prompts —
-  // 2 for YN-01-4/QC-A2401/YN-05 (their 2400mm/4-seat row), but a product
-  // whose reference size isn't a 2-module size (e.g. DZ2802's 4-seat row
-  // is 4 modules) needs its own value here.
-  reference_unit_factor: number;
 }
 interface Movement {
   id: number;
@@ -332,20 +332,25 @@ export default function StockPage() {
   // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
   // across every size, entered in sets at the product level instead of
   // pieces at the variant level — see src/lib/shared-stock.ts. ──
+  // The variant marked is_shared_reference — the one shown as the live
+  // editable number in the table (every other size is read-only/derived
+  // from it). A variant flag rather than matching on unit_factor, since
+  // two sizes can share the same unit_factor (e.g. DZ2404's 1-seat and
+  // 2-seat rows are the same physical footprint).
+  function sharedReferenceVariant(p: DbProduct): DbVariant | undefined {
+    return p.stock_variants.find((v) => v.is_shared_reference);
+  }
+  function sharedReferenceUnitFactor(p: DbProduct) {
+    return sharedReferenceVariant(p)?.unit_factor || 2;
+  }
   function sharedSetsAvailable(p: DbProduct) {
-    return p.shared_available_modules / p.reference_unit_factor;
+    return p.shared_available_modules / sharedReferenceUnitFactor(p);
   }
   function sharedSetsReserved(p: DbProduct) {
-    return p.shared_reserved_modules / p.reference_unit_factor;
+    return p.shared_reserved_modules / sharedReferenceUnitFactor(p);
   }
   function sharedSetsDefective(p: DbProduct) {
-    return p.shared_defective_modules / p.reference_unit_factor;
-  }
-  // The variant that "1 set" refers to — whichever size carries the
-  // product's reference_unit_factor (the one shown as the live editable
-  // number in the table; every other size is read-only/derived from it).
-  function sharedReferenceVariant(p: DbProduct): DbVariant | undefined {
-    return p.stock_variants.find((v) => v.unit_factor === p.reference_unit_factor);
+    return p.shared_defective_modules / sharedReferenceUnitFactor(p);
   }
   function sharedReferenceLabel(p: DbProduct): string {
     const v = sharedReferenceVariant(p);
@@ -1272,8 +1277,8 @@ export default function StockPage() {
                                     // receive/reserve/adjust use. Every other size is left blank
                                     // here (the picker still shows a real sellable count per size
                                     // when selling).
-                                    const isReferenceRow = p.shared_stock && v.unit_factor === p.reference_unit_factor;
-                                    const hideForSharedStock = p.shared_stock && v.unit_factor !== p.reference_unit_factor;
+                                    const isReferenceRow = p.shared_stock && v.is_shared_reference;
+                                    const hideForSharedStock = p.shared_stock && !v.is_shared_reference;
                                     const sharedPreciseValue =
                                       f === "available" ? sharedSetsAvailable(p) : f === "reserved" ? sharedSetsReserved(p) : sharedSetsDefective(p);
                                     return (
@@ -1575,8 +1580,8 @@ export default function StockPage() {
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>
                           {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => {
                             const isMovementField = f === "available" || f === "reserved" || f === "defective";
-                            const isReferenceRow = detail.shared_stock && isMovementField && v.unit_factor === detail.reference_unit_factor;
-                            const hideForSharedStock = detail.shared_stock && isMovementField && v.unit_factor !== detail.reference_unit_factor;
+                            const isReferenceRow = detail.shared_stock && isMovementField && v.is_shared_reference;
+                            const hideForSharedStock = detail.shared_stock && isMovementField && !v.is_shared_reference;
                             const sharedPreciseValue =
                               f === "available" ? sharedSetsAvailable(detail) : f === "reserved" ? sharedSetsReserved(detail) : sharedSetsDefective(detail);
                             return (

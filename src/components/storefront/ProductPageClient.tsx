@@ -82,6 +82,25 @@ export function ProductPageClient({ product, related }: { product: Product; rela
     toast.success(t("เพิ่มลงตะกร้าแล้ว", "Added to cart", "已加入购物车"));
   };
 
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = t(product.name_th, product.name_en, product.name_zh);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // user dismissed the native share sheet — nothing to do
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("คัดลอกลิงก์สินค้าแล้ว", "Product link copied", "商品链接已复制"));
+    } catch {
+      toast.error(t("คัดลอกลิงก์ไม่สำเร็จ", "Couldn't copy the link", "复制链接失败"));
+    }
+  };
+
   return (
     <div className="bg-[#FAF7F2] min-h-screen">
       {/* Breadcrumb */}
@@ -135,6 +154,15 @@ export function ProductPageClient({ product, related }: { product: Product; rela
               <span className={`text-xs px-2 py-1 rounded font-medium ${stockColor[product.stock_status]}`}>
                 {stockLabel[product.stock_status]}
               </span>
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label={t("แชร์สินค้านี้", "Share this product", "分享此产品")}
+                title={t("แชร์สินค้านี้", "Share this product", "分享此产品")}
+                className="ml-auto w-8 h-8 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#6B6B6B] flex items-center justify-center transition-colors shrink-0"
+              >
+                <Share2 size={14} />
+              </button>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] leading-tight mb-2">

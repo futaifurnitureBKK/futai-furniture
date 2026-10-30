@@ -463,6 +463,31 @@ export default function StockPage() {
     callSharedAdjust(p, "available", delta);
   }
 
+  // Releases/corrects the "จอง/รอส่ง" number directly — covers both a
+  // cancelled reservation (type a lower number, the difference goes back to
+  // "available") and marking it shipped out (type a lower number, same as
+  // above — staff then separately record the actual sale wherever that
+  // happens; this button only ever touches the reserved bucket itself).
+  function adjustSharedReserved(p: DbProduct) {
+    const current = sharedSetsReserved(p);
+    const ref = sharedReferenceLabel(p);
+    const input = prompt(
+      t(
+        `ปรับยอดจองเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้จอง ${current} ตัว) — ส่วนที่ลดลงจะกลับไปที่พร้อมขาย`,
+        `Set reserved to how many (in ${ref} equivalent pieces)? (currently ${current}) — any decrease goes back to available`,
+        `将已预订调整为多少件（按${ref}换算）？（当前 ${current} 件）—— 减少的部分会退回可售`
+      )
+    );
+    if (input == null || input === "") return;
+    const target = Number(input);
+    if (!Number.isFinite(target) || target < 0) return;
+    const delta = target - current;
+    if (delta === 0) return;
+    callSharedAdjust(p, "reserved", delta).then((ok) => {
+      if (ok) callSharedAdjust(p, "available", -delta);
+    });
+  }
+
   function adjustSharedDefective(p: DbProduct) {
     const current = sharedSetsDefective(p);
     const ref = sharedReferenceLabel(p);
@@ -1259,7 +1284,10 @@ export default function StockPage() {
                                               {t("จอง", "Reserve", "预订")}
                                             </button>
                                             <button type="button" onClick={() => adjustSharedAvailable(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
-                                              {t("ปรับยอด", "Adjust", "调整")}
+                                              {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
+                                            </button>
+                                            <button type="button" onClick={() => adjustSharedReserved(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
+                                              {t("ปรับยอดจอง", "Adjust reserved", "调整已预订")}
                                             </button>
                                             <button type="button" onClick={() => adjustSharedDefective(p)} className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100">
                                               {t("ตำหนิ", "Defective", "次品")}
@@ -1578,7 +1606,10 @@ export default function StockPage() {
                       {t("จอง", "Reserve", "预订")}
                     </button>
                     <button type="button" onClick={() => adjustSharedAvailable(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
-                      {t("ปรับยอด", "Adjust", "调整")}
+                      {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
+                    </button>
+                    <button type="button" onClick={() => adjustSharedReserved(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
+                      {t("ปรับยอดจอง", "Adjust reserved", "调整已预订")}
                     </button>
                     <button type="button" onClick={() => adjustSharedDefective(detail)} className="px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-medium">
                       {t("ตำหนิ", "Defective", "次品")}

@@ -57,9 +57,6 @@ function Reveal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px 0px" });
-  const offsets = { up: [0, 40], left: [-40, 0], right: [40, 0], none: [0, 0] };
-  const [x, y] = direction === "up" ? [0, offsets.up[1]] : direction === "left" ? [offsets.left[0], 0] : direction === "right" ? [offsets.right[0], 0] : [0, 0];
-
   return (
     <motion.div
       ref={ref}

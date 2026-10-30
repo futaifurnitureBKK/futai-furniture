@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // Node.js < 22 has no native WebSocket; @supabase/supabase-js requires one
 // even though this app never uses realtime subscriptions.
 if (typeof globalThis.WebSocket === "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- must load synchronously, before any client is constructed
   const { default: WebSocket } = require("ws") as typeof import("ws");
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = WebSocket;
 }

@@ -24,19 +24,17 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
   // stays inside the middle copy — when it drifts into copy 1 or 3, it gets
   // silently shifted back by ±count (same photo, so the jump is invisible).
   const track = useMemo(() => [...photos, ...photos, ...photos], [photos]);
-  const skipAnimRef = useRef(false);
 
-  const [centerIndex, setCenterIndex] = useState(() => count + Math.floor(count / 2));
+  // `skip` travels together with the index it belongs to, so the render that
+  // consumes it always sees the right value — no ref read during render.
+  const [centerIndex, setCenterIndex] = useState(() => ({
+    value: count + Math.floor(count / 2),
+    skip: false,
+  }));
   const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const trackContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Runs after every render — clears the "instant jump" flag once the
-    // motion.div has already picked it up for the render that needed it.
-    skipAnimRef.current = false;
-  });
 
   useEffect(() => {
     const el = trackContainerRef.current;
@@ -50,23 +48,24 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
 
   const step = useCallback(
     (delta: number) => {
-      setCenterIndex((i) => {
-        let n = i + delta;
+      setCenterIndex(({ value }) => {
+        let n = value + delta;
+        let skip = false;
         if (n >= 2 * count) {
-          skipAnimRef.current = true;
+          skip = true;
           n -= count;
         } else if (n < count) {
-          skipAnimRef.current = true;
+          skip = true;
           n += count;
         }
-        return n;
+        return { value: n, skip };
       });
     },
     [count]
   );
   const prev = useCallback(() => step(-1), [step]);
   const next = useCallback(() => step(1), [step]);
-  const goTo = useCallback((i: number) => step(i - centerIndex), [step, centerIndex]);
+  const goTo = useCallback((i: number) => step(i - centerIndex.value), [step, centerIndex.value]);
 
   // Autoplay — endless loop in one direction, no bounce, no visible jump-cut.
   useEffect(() => {
@@ -122,12 +121,12 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
           <motion.div
             className="absolute top-1/2 left-0"
             style={{ y: "-50%" }}
-            animate={{ x: trackWidth / 2 - COL_WIDTH / 2 - centerIndex * COL_WIDTH }}
-            transition={skipAnimRef.current ? { duration: 0 } : { type: "spring", stiffness: 240, damping: 30 }}
+            animate={{ x: trackWidth / 2 - COL_WIDTH / 2 - centerIndex.value * COL_WIDTH }}
+            transition={centerIndex.skip ? { duration: 0 } : { type: "spring", stiffness: 240, damping: 30 }}
           >
             <div className="flex">
               {track.map((src, i) => {
-                const dist = i - centerIndex;
+                const dist = i - centerIndex.value;
                 const abs = Math.abs(dist);
                 if (abs > RADIUS) return <div key={i} style={{ width: COL_WIDTH }} />;
 
@@ -173,7 +172,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
         </button>
       </div>
       <p className="text-[#999] text-xs mt-3 tracking-wide">
-        {mod(centerIndex, count) + 1} / {count}
+        {mod(centerIndex.value, count) + 1} / {count}
       </p>
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}

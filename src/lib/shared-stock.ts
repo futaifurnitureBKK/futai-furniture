@@ -170,7 +170,8 @@ export async function adjustSharedStockBySets(
   field: StockField,
   sets: number,
   unitsPerSet = 2,
-  note?: string | null
+  note?: string | null,
+  actor?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const modules = setsToModules(sets, unitsPerSet);
   if (modules == null) return { ok: false, error: "sets_must_be_half_increment" };
@@ -180,6 +181,7 @@ export async function adjustSharedStockBySets(
     p_field: field,
     p_module_delta: modules,
     p_note: note ?? null,
+    p_actor: actor ?? null,
   });
   return error ? { ok: false, error: error.message } : { ok: true };
 }

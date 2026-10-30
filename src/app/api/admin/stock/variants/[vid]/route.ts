@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { getSessionName } from "@/lib/admin-session";
 import { TRACKED_MOVEMENT_FIELDS, VARIANT_FIELDS, pick } from "@/lib/stock-fields";
 import { logActivity } from "@/lib/activity-log";
+
+const SESSION_COOKIE = "futai_admin_auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vid: string }> }) {
   if (!(await isAdminRequest(req))) {
@@ -14,6 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
   // Optional per-save note (e.g. "จองให้ใคร/ออเดอร์ไหน") — attached to the
   // stock_movements rows this save produces, not stored on the variant itself.
   const movementNote = typeof body.movement_note === "string" && body.movement_note.trim() ? body.movement_note.trim() : null;
+  const actor = await getSessionName(req.cookies.get(SESSION_COOKIE)?.value);
 
   const db = supabaseAdmin();
   const { data: before, error: readErr } = await db
@@ -45,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
 
   const moves = TRACKED_MOVEMENT_FIELDS.filter(
     (f) => f in body && Number(body[f]) !== Number(before[f])
-  ).map((f) => ({ variant_id: Number(vid), field: f, old_value: Number(before[f]), new_value: Number(body[f]), note: movementNote }));
+  ).map((f) => ({ variant_id: Number(vid), field: f, old_value: Number(before[f]), new_value: Number(body[f]), note: movementNote, actor }));
   if (moves.length) await db.from("stock_movements").insert(moves);
 
   const label = (before as unknown as { code?: string; size_text?: string }).code || (before as unknown as { size_text?: string }).size_text || `#${vid}`;

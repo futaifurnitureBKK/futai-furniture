@@ -95,6 +95,7 @@ interface Movement {
   old_value: number | null;
   new_value: number | null;
   note: string | null;
+  actor: string | null;
   created_at: string;
 }
 
@@ -1704,6 +1705,9 @@ export default function StockPage() {
                           <span className="text-[#1A1A1A]">{fieldLabel[m.field] ?? m.field}</span>
                           <span className="font-semibold shrink-0">{fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}</span>
                           {m.note && <span className="text-[#9CA3AF] italic truncate">· {m.note}</span>}
+                          {m.actor && (
+                            <span className="text-[10px] text-blue-600/70 shrink-0 ml-auto pl-2">{t("โดย", "by", "由")} {m.actor}</span>
+                          )}
                         </div>
                       );
                     })}

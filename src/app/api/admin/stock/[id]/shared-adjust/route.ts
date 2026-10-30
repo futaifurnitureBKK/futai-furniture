@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { getSessionName } from "@/lib/admin-session";
 import { adjustSharedStockBySets } from "@/lib/shared-stock";
 import { logActivity } from "@/lib/activity-log";
 
 const FIELDS = ["available", "reserved", "defective"] as const;
+const SESSION_COOKIE = "futai_admin_auth";
 
 // Receive/adjust/reserve/defective for a shared-stock model (YN-01-4,
 // QC-A2401, YN-05) — entered in sets (supports .5), applied to the whole
@@ -27,6 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "sets is required" }, { status: 400 });
   }
   const note = typeof body.note === "string" && body.note.trim() ? body.note.trim() : null;
+  const actor = await getSessionName(req.cookies.get(SESSION_COOKIE)?.value);
 
   const db = supabaseAdmin();
   const { data: product } = await db
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const refVariant = product.stock_variants?.find((v) => v.is_shared_reference);
   const unitsPerSet = refVariant?.unit_factor || 2;
-  const result = await adjustSharedStockBySets(db, Number(id), field, sets, unitsPerSet, note);
+  const result = await adjustSharedStockBySets(db, Number(id), field, sets, unitsPerSet, note, actor);
   if (!result.ok) {
     const insufficientStock = result.error !== "sets_must_be_half_increment";
     return NextResponse.json(

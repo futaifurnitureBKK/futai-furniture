@@ -11,6 +11,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
   const { vid } = await params;
   const body = await req.json();
   const update: Record<string, unknown> = { ...pick(body, VARIANT_FIELDS), updated_at: new Date().toISOString() };
+  // Optional per-save note (e.g. "จองให้ใคร/ออเดอร์ไหน") — attached to the
+  // stock_movements rows this save produces, not stored on the variant itself.
+  const movementNote = typeof body.movement_note === "string" && body.movement_note.trim() ? body.movement_note.trim() : null;
 
   const db = supabaseAdmin();
   const { data: before, error: readErr } = await db
@@ -42,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
 
   const moves = TRACKED_MOVEMENT_FIELDS.filter(
     (f) => f in body && Number(body[f]) !== Number(before[f])
-  ).map((f) => ({ variant_id: Number(vid), field: f, old_value: Number(before[f]), new_value: Number(body[f]) }));
+  ).map((f) => ({ variant_id: Number(vid), field: f, old_value: Number(before[f]), new_value: Number(body[f]), note: movementNote }));
   if (moves.length) await db.from("stock_movements").insert(moves);
 
   const label = (before as unknown as { code?: string; size_text?: string }).code || (before as unknown as { size_text?: string }).size_text || `#${vid}`;

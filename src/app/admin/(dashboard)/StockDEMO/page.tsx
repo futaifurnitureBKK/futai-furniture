@@ -94,6 +94,7 @@ interface Movement {
   field: string;
   old_value: number | null;
   new_value: number | null;
+  note: string | null;
   created_at: string;
 }
 
@@ -307,7 +308,7 @@ export default function StockPage() {
 
   // Moves stock from "พร้อมขาย" to "จอง" as one step, so a reservation never
   // has to be hand-calculated across two separate number fields.
-  function reserveStock(p: DbProduct, v: DbVariant) {
+  async function reserveStock(p: DbProduct, v: DbVariant) {
     if (p.shared_stock) return reserveSharedStock(p);
     const input = prompt(
       t(`ลูกค้าจองกี่ชิ้น? (พร้อมขายตอนนี้ ${v.available})`, `How many did the customer reserve? (currently ${v.available} available)`, `客户预订多少件？（当前可售 ${v.available}）`)
@@ -326,7 +327,31 @@ export default function StockPage() {
       )
     )
       return;
-    editVariant(p.id, v.id, { available: v.available - qty, reserved: v.reserved + qty });
+    const note = prompt(
+      t("จองให้ใคร/ออเดอร์ไหน (ไม่บังคับ)", "Who's it for / which order? (optional)", "预订给谁/哪个订单？（可选）")
+    );
+    // Bypasses the debounced autosave (scheduleVariantSave) — this is one
+    // discrete action, not a keystroke, and needs its own note attached to
+    // exactly the movement rows it produces.
+    const res = await fetch(`/api/admin/stock/variants/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        available: v.available - qty,
+        reserved: v.reserved + qty,
+        movement_note: note?.trim() || null,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+      return;
+    }
+    setProducts((list) =>
+      list.map((pp) =>
+        pp.id !== p.id ? pp : { ...pp, stock_variants: pp.stock_variants.map((vv) => (vv.id === v.id ? { ...vv, ...data.variant } : vv)) }
+      )
+    );
   }
 
   // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
@@ -357,11 +382,11 @@ export default function StockPage() {
     return v ? v.label || sizeLabel(v) : "2400mm/4 ที่นั่ง";
   }
 
-  async function callSharedAdjust(p: DbProduct, field: "available" | "reserved" | "defective", sets: number) {
+  async function callSharedAdjust(p: DbProduct, field: "available" | "reserved" | "defective", sets: number, note?: string | null) {
     const res = await fetch(`/api/admin/stock/${p.id}/shared-adjust`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ field, sets }),
+      body: JSON.stringify({ field, sets, note: note || undefined }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -412,8 +437,11 @@ export default function StockPage() {
       )
     )
       return;
-    const ok = await callSharedAdjust(p, "available", -sets);
-    if (ok) await callSharedAdjust(p, "reserved", sets);
+    const note = prompt(
+      t("จองให้ใคร/ออเดอร์ไหน (ไม่บังคับ)", "Who's it for / which order? (optional)", "预订给谁/哪个订单？（可选）")
+    );
+    const ok = await callSharedAdjust(p, "available", -sets, note);
+    if (ok) await callSharedAdjust(p, "reserved", sets, note);
   }
 
   function adjustSharedAvailable(p: DbProduct) {
@@ -1674,7 +1702,8 @@ export default function StockPage() {
                           <span className="text-[#9CA3AF] w-36 shrink-0">{new Date(m.created_at).toLocaleString("th-TH")}</span>
                           <span className="font-mono text-[#6B6B6B] w-40 truncate">{v ? `${v.code} ${sizeLabel(v)}` : "-"}</span>
                           <span className="text-[#1A1A1A]">{fieldLabel[m.field] ?? m.field}</span>
-                          <span className="font-semibold">{fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}</span>
+                          <span className="font-semibold shrink-0">{fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}</span>
+                          {m.note && <span className="text-[#9CA3AF] italic truncate">· {m.note}</span>}
                         </div>
                       );
                     })}

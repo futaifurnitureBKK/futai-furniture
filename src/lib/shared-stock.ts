@@ -169,12 +169,18 @@ export async function adjustSharedStockBySets(
   productId: number,
   field: StockField,
   sets: number,
-  unitsPerSet = 2
+  unitsPerSet = 2,
+  note?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const modules = setsToModules(sets, unitsPerSet);
   if (modules == null) return { ok: false, error: "sets_must_be_half_increment" };
   if (modules === 0) return { ok: true };
-  const { error } = await db.rpc("adjust_shared_stock_modules", { p_product_id: productId, p_field: field, p_module_delta: modules });
+  const { error } = await db.rpc("adjust_shared_stock_modules", {
+    p_product_id: productId,
+    p_field: field,
+    p_module_delta: modules,
+    p_note: note ?? null,
+  });
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

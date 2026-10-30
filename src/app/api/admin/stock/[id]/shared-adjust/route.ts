@@ -26,6 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!Number.isFinite(sets) || sets === 0) {
     return NextResponse.json({ error: "sets is required" }, { status: 400 });
   }
+  const note = typeof body.note === "string" && body.note.trim() ? body.note.trim() : null;
 
   const db = supabaseAdmin();
   const { data: product } = await db
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const refVariant = product.stock_variants?.find((v) => v.is_shared_reference);
   const unitsPerSet = refVariant?.unit_factor || 2;
-  const result = await adjustSharedStockBySets(db, Number(id), field, sets, unitsPerSet);
+  const result = await adjustSharedStockBySets(db, Number(id), field, sets, unitsPerSet, note);
   if (!result.ok) {
     const insufficientStock = result.error !== "sets_must_be_half_increment";
     return NextResponse.json(

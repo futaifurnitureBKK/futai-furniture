@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Search, Download, PackageSearch, TriangleAlert, Plus, Trash2, Archive, ArchiveRestore,
-  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon, GripVertical,
+  Loader2, Upload, History, Database, RefreshCw, Store, Image as ImageIcon, GripVertical, ClipboardList,
 } from "lucide-react";
 import type { Plan } from "@/lib/stock-sync";
 import { toast } from "sonner";
@@ -94,6 +94,15 @@ interface Movement {
   field: string;
   old_value: number | null;
   new_value: number | null;
+  note: string | null;
+  actor: string | null;
+  created_at: string;
+}
+interface StockReservation {
+  id: number;
+  product_id: number;
+  variant_id: number | null;
+  qty: number;
   note: string | null;
   actor: string | null;
   created_at: string;
@@ -247,12 +256,20 @@ export default function StockPage() {
   const [uploading, setUploading] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
 
+  const [reservationsForId, setReservationsForId] = useState<number | null>(null);
+  const [reservations, setReservations] = useState<StockReservation[]>([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+
   const [addOpen, setAddOpen] = useState(false);
   const [newProd, setNewProd] = useState(emptyNew);
   const [newSizes, setNewSizes] = useState<NewSize[]>([{ size_text: "", price: "", note: "" }]);
   const [creating, setCreating] = useState(false);
 
   const detail = useMemo(() => products.find((p) => p.id === detailId) ?? null, [products, detailId]);
+  const reservationsProduct = useMemo(
+    () => products.find((p) => p.id === reservationsForId) ?? null,
+    [products, reservationsForId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -353,6 +370,7 @@ export default function StockPage() {
         pp.id !== p.id ? pp : { ...pp, stock_variants: pp.stock_variants.map((vv) => (vv.id === v.id ? { ...vv, ...data.variant } : vv)) }
       )
     );
+    await createReservationEntry(p.id, v.id, qty, note);
   }
 
   // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
@@ -396,6 +414,85 @@ export default function StockPage() {
     }
     setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...data.product } : x)));
     return true;
+  }
+
+  // Itemized reservation ledger — see api/admin/stock/reservations. Called
+  // right after the scalar "reserved" count already moved, so a failure
+  // here only means the breakdown list misses an entry; it never blocks or
+  // rolls back the reservation itself.
+  async function createReservationEntry(productId: number, variantId: number | null, qty: number, note?: string | null) {
+    try {
+      await fetch("/api/admin/stock/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: productId, variant_id: variantId, qty, note: note || undefined }),
+      });
+    } catch {
+      // best-effort
+    }
+  }
+
+  async function openReservations(p: DbProduct) {
+    setReservationsForId(p.id);
+    setReservationsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/stock/reservations?product_id=${p.id}`);
+      const data = await res.json();
+      if (res.ok) setReservations(data.reservations);
+    } finally {
+      setReservationsLoading(false);
+    }
+  }
+
+  // Releases (fully or partially) one specific reservation entry — reduces
+  // the scalar "reserved" count the same isolated way the "ปรับยอดจอง"
+  // button does (never touches "available"), then shrinks or removes the
+  // ledger row by the same amount so the two never drift apart.
+  async function releaseReservation(p: DbProduct, r: StockReservation) {
+    const input = prompt(
+      t(`ปล่อยคืนกี่ตัว? (มีอยู่ ${r.qty})`, `How many to release? (currently ${r.qty})`, `释放多少件？（当前 ${r.qty}）`),
+      String(r.qty)
+    );
+    if (input == null || input === "") return;
+    const releaseQty = Number(input);
+    if (!releaseQty || releaseQty <= 0 || releaseQty > r.qty) return;
+
+    if (p.shared_stock) {
+      const ok = await callSharedAdjust(p, "reserved", -releaseQty);
+      if (!ok) return;
+    } else {
+      const v = p.stock_variants.find((vv) => vv.id === r.variant_id);
+      if (!v) return;
+      const res = await fetch(`/api/admin/stock/variants/${v.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reserved: v.reserved - releaseQty }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+        return;
+      }
+      setProducts((list) =>
+        list.map((pp) =>
+          pp.id !== p.id ? pp : { ...pp, stock_variants: pp.stock_variants.map((vv) => (vv.id === v.id ? { ...vv, ...data.variant } : vv)) }
+        )
+      );
+    }
+
+    if (releaseQty >= r.qty) {
+      await fetch(`/api/admin/stock/reservations/${r.id}`, { method: "DELETE" });
+      setReservations((list) => list.filter((x) => x.id !== r.id));
+    } else {
+      const res = await fetch(`/api/admin/stock/reservations/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qty: r.qty - releaseQty }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setReservations((list) => list.map((x) => (x.id === r.id ? data.reservation : x)));
+    }
+    toast.success(t("ปล่อยคืนแล้ว", "Released", "已释放"));
   }
 
   function receiveSharedStock(p: DbProduct) {
@@ -442,7 +539,9 @@ export default function StockPage() {
       t("จองให้ใคร/ออเดอร์ไหน (ไม่บังคับ)", "Who's it for / which order? (optional)", "预订给谁/哪个订单？（可选）")
     );
     const ok = await callSharedAdjust(p, "available", -sets, note);
-    if (ok) await callSharedAdjust(p, "reserved", sets, note);
+    if (!ok) return;
+    const reservedOk = await callSharedAdjust(p, "reserved", sets, note);
+    if (reservedOk) await createReservationEntry(p.id, null, sets, note);
   }
 
   function adjustSharedAvailable(p: DbProduct) {
@@ -1282,6 +1381,9 @@ export default function StockPage() {
                                             <button type="button" onClick={() => reserveSharedStock(p)} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">
                                               {t("จอง", "Reserve", "预订")}
                                             </button>
+                                            <button type="button" onClick={() => openReservations(p)} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                              <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
+                                            </button>
                                             <button type="button" onClick={() => adjustSharedAvailable(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
                                               {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
                                             </button>
@@ -1386,6 +1488,16 @@ export default function StockPage() {
                                             >
                                               {t("จอง", "Reserve", "预订")}
                                             </button>
+                                            {v.reserved > 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => openReservations(p)}
+                                                title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")}
+                                                className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                              >
+                                                <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
+                                              </button>
+                                            )}
                                           </div>
                                         )}
                                       </TableCell>
@@ -1604,6 +1716,9 @@ export default function StockPage() {
                     <button type="button" onClick={() => reserveSharedStock(detail)} className="px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium">
                       {t("จอง", "Reserve", "预订")}
                     </button>
+                    <button type="button" onClick={() => openReservations(detail)} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">
+                      <ClipboardList size={11} /> {t("รายการจอง", "Reservations", "预订明细")}
+                    </button>
                     <button type="button" onClick={() => adjustSharedAvailable(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
                       {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
                     </button>
@@ -1773,6 +1888,61 @@ export default function StockPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailId(null)}>{t("ปิด", "Close", "关闭")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── itemized "who reserved what" list, released one entry at a time ── */}
+      <Dialog open={!!reservationsForId} onOpenChange={(v) => !v && setReservationsForId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {t("รายการจอง", "Reservations", "预订明细")}
+              {reservationsProduct && <span className="font-mono text-sm text-[#6B6B6B] ml-1.5">{reservationsProduct.code}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {reservationsLoading ? (
+            <p className="text-sm text-[#9CA3AF] py-6 text-center">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>
+          ) : reservations.length === 0 ? (
+            <p className="text-sm text-[#9CA3AF] py-6 text-center">
+              {t(
+                "ยังไม่มีรายการจองที่บันทึกไว้ (อาจเป็นยอดจองเก่าก่อนมีฟีเจอร์นี้ — ใช้ปุ่ม \"ปรับยอดจอง\" แทน)",
+                'No itemized reservations logged yet (may be an older reservation from before this feature — use "Adjust reserved" instead)',
+                '暂无已记录的预订明细（可能是此功能上线前的旧预订 — 请改用"调整已预订"）'
+              )}
+            </p>
+          ) : (
+            <div className="divide-y divide-[#F0EDE6] -mx-1 max-h-[60vh] overflow-y-auto">
+              {reservations.map((r) => {
+                const v = reservationsProduct?.stock_variants.find((vv) => vv.id === r.variant_id);
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-3 px-1 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#1A1A1A]">
+                        {fmt(r.qty)} {t("ตัว", "pcs", "件")}
+                        {v && <span className="font-normal text-[#6B6B6B] ml-1">· {sizeLabel(v)}</span>}
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">{r.note || t("(ไม่มีโน้ต)", "(no note)", "（无备注）")}</p>
+                      <p className="text-[10px] text-[#9CA3AF]">
+                        {new Date(r.created_at).toLocaleString("th-TH")}
+                        {r.actor && <> · {t("โดย", "by", "由")} {r.actor}</>}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => reservationsProduct && releaseReservation(reservationsProduct, r)}
+                      className="shrink-0"
+                    >
+                      {t("ปล่อยคืน", "Release", "释放")}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReservationsForId(null)}>{t("ปิด", "Close", "关闭")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

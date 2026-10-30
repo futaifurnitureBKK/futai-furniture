@@ -271,23 +271,38 @@ function StockGridPickerDialog({
                       key={v.variantId}
                       type="button"
                       disabled={v.available <= 0 && v.reserved <= 0}
-                      onClick={() => {
+                      onClick={async () => {
                         let deductField: "available" | "reserved" = "available";
                         if (v.reserved > 0) {
+                          // Show exactly who/what makes up that reserved
+                          // number (not just the total) before asking —
+                          // same ledger the StockDEMO "รายการจอง" list reads.
+                          let breakdown = "";
+                          try {
+                            const res = await fetch(`/api/admin/stock/reservations?product_id=${p.productId}`);
+                            const data = await res.json();
+                            const rows = (res.ok ? data.reservations : []) as { variant_id: number | null; qty: number; note: string | null }[];
+                            const relevant = rows.filter((r) => p.sharedStock || r.variant_id === v.variantId);
+                            if (relevant.length) {
+                              breakdown = "\n" + relevant.map((r) => `• ${fmt(r.qty)} ${t("ตัว", "pcs", "件")}${r.note ? ` — ${r.note}` : ""}`).join("\n");
+                            }
+                          } catch {
+                            // fall back to just the aggregate number below
+                          }
                           const fromReserved =
                             v.available <= 0
                               ? confirm(
                                   t(
-                                    `พร้อมขายหมดแล้ว แต่มีจองอยู่ ${fmt(v.reserved)} ตัว — ส่งออกชุดนี้จากยอดจองเลยไหม?`,
-                                    `None available, but ${fmt(v.reserved)} is reserved — export this from the reserved amount?`,
-                                    `可售已为零，但有 ${fmt(v.reserved)} 件已预订 —— 是否从预订数量出库？`
+                                    `พร้อมขายหมดแล้ว แต่มีจองอยู่ ${fmt(v.reserved)} ตัว${breakdown}\n\nส่งออกชุดนี้จากยอดจองเลยไหม?`,
+                                    `None available, but ${fmt(v.reserved)} is reserved${breakdown}\n\nExport this from the reserved amount?`,
+                                    `可售已为零，但有 ${fmt(v.reserved)} 件已预订${breakdown}\n\n是否从预订数量出库？`
                                   )
                                 )
                               : confirm(
                                   t(
-                                    `สินค้านี้มีจองอยู่ ${fmt(v.reserved)} ตัว — ส่งออกชุดนี้เป็นการส่งของที่จองไว้ใช่ไหม?`,
-                                    `${fmt(v.reserved)} of this size is currently reserved — is this export fulfilling that reservation?`,
-                                    `此规格当前有 ${fmt(v.reserved)} 件已预订 —— 本次出库是否为履行该预订？`
+                                    `สินค้านี้มีจองอยู่ ${fmt(v.reserved)} ตัว${breakdown}\n\nส่งออกชุดนี้เป็นการส่งของที่จองไว้ใช่ไหม?`,
+                                    `${fmt(v.reserved)} of this size is currently reserved${breakdown}\n\nIs this export fulfilling that reservation?`,
+                                    `此规格当前有 ${fmt(v.reserved)} 件已预订${breakdown}\n\n本次出库是否为履行该预订？`
                                   )
                                 );
                           if (fromReserved) deductField = "reserved";

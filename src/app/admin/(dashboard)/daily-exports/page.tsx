@@ -124,6 +124,7 @@ interface VariantOption {
   code: string;
   size_text: string;
   available: number;
+  reserved: number;
   unitFactor: number;
   imageUrls: string[];
 }
@@ -142,6 +143,7 @@ interface PickedVariant {
   size_text: string;
   image_url: string | null;
   available: number;
+  deductField: "available" | "reserved";
 }
 
 // A wall of big photos — one card per MODEL (not per size, which used to
@@ -183,7 +185,7 @@ function StockGridPickerDialog({
     const query = q.trim().toLowerCase();
     return products.filter((p) => {
       if (cat !== "all" && p.category !== cat) return false;
-      if (onlyInStock && !p.variants.some((v) => v.available > 0)) return false;
+      if (onlyInStock && !p.variants.some((v) => v.available > 0 || v.reserved > 0)) return false;
       if (!query) return true;
       return (
         p.code.toLowerCase().includes(query) ||
@@ -268,25 +270,47 @@ function StockGridPickerDialog({
                     <button
                       key={v.variantId}
                       type="button"
-                      disabled={v.available <= 0}
-                      onClick={() =>
+                      disabled={v.available <= 0 && v.reserved <= 0}
+                      onClick={() => {
+                        let deductField: "available" | "reserved" = "available";
+                        if (v.reserved > 0) {
+                          const fromReserved =
+                            v.available <= 0
+                              ? confirm(
+                                  t(
+                                    `พร้อมขายหมดแล้ว แต่มีจองอยู่ ${fmt(v.reserved)} ตัว — ส่งออกชุดนี้จากยอดจองเลยไหม?`,
+                                    `None available, but ${fmt(v.reserved)} is reserved — export this from the reserved amount?`,
+                                    `可售已为零，但有 ${fmt(v.reserved)} 件已预订 —— 是否从预订数量出库？`
+                                  )
+                                )
+                              : confirm(
+                                  t(
+                                    `สินค้านี้มีจองอยู่ ${fmt(v.reserved)} ตัว — ส่งออกชุดนี้เป็นการส่งของที่จองไว้ใช่ไหม?`,
+                                    `${fmt(v.reserved)} of this size is currently reserved — is this export fulfilling that reservation?`,
+                                    `此规格当前有 ${fmt(v.reserved)} 件已预订 —— 本次出库是否为履行该预订？`
+                                  )
+                                );
+                          if (fromReserved) deductField = "reserved";
+                        }
+                        if (deductField === "available" && v.available <= 0) return;
                         onPick({
                           variantId: v.variantId,
                           code: v.code || p.code,
                           size_text: v.size_text,
                           image_url: v.imageUrls[0] || p.image_url,
                           available: v.available,
-                        })
-                      }
-                      title={v.available <= 0 ? t("หมด", "Out of stock", "缺货") : undefined}
+                          deductField,
+                        });
+                      }}
+                      title={v.available <= 0 && v.reserved <= 0 ? t("หมด", "Out of stock", "缺货") : undefined}
                       className={`text-[10px] px-1.5 py-1 rounded border font-mono transition-colors ${
-                        v.available > 0
+                        v.available > 0 || v.reserved > 0
                           ? "border-[#E8E5E0] bg-[#FAF7F2] text-[#1A1A1A] hover:border-[#C8102E] hover:bg-white"
                           : "border-[#F0EDE6] bg-[#F5F3EF] text-[#C8C5BE] line-through cursor-not-allowed"
                       }`}
                     >
                       {v.code && v.code !== p.code && <span className="block">{v.code}</span>}
-                      {v.size_text || "-"} ({fmt(v.available)})
+                      {v.size_text || "-"} ({fmt(v.available)}{v.reserved > 0 ? ` · ${t("จอง", "rsv.", "订")} ${fmt(v.reserved)}` : ""})
                     </button>
                   ))}
                 </div>
@@ -1258,11 +1282,11 @@ export default function DailyExportsPage() {
       const grouped: GroupedProduct[] = [];
       for (const p of data.products as {
         id: number; code: string; category: string; image_url: string | null; shared_stock: boolean; shared_available_modules: number;
-        stock_variants: { id: number; code: string; size_text: string; available: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
+        stock_variants: { id: number; code: string; size_text: string; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
       }[]) {
         const variants = p.stock_variants
           .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, available: v.available, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
+          .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, available: v.available, reserved: v.reserved || 0, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
         if (!variants.length) continue;
         grouped.push({
           productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
@@ -1303,6 +1327,7 @@ export default function DailyExportsPage() {
         image_url: v.image_url,
         qty: 1,
         salesperson: currentUser,
+        stock_deducted_field: v.deductField,
       }),
     });
     const data = await res.json();
@@ -1312,7 +1337,11 @@ export default function DailyExportsPage() {
       // instead of creating a duplicate — the server returns that same row.
       setRows((prev) => (prev.some((r) => r.id === data.row.id) ? prev.map((r) => (r.id === data.row.id ? data.row : r)) : [...prev, data.row]));
       bumpSessionDelta(v.variantId, 1);
-      toast.success(t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`));
+      toast.success(
+        v.deductField === "reserved"
+          ? t(`ตัด ${v.code} แล้ว 1 ชิ้น (จากยอดจอง)`, `Deducted 1 of ${v.code} (from reserved)`, `已扣除 ${v.code} 1 件（来自预订）`)
+          : t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`)
+      );
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));
     }
@@ -1602,7 +1631,14 @@ export default function DailyExportsPage() {
                           {r.image_url && <Image src={r.image_url} alt="" fill sizes="44px" className="object-contain" />}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate">{r.sku}</p>
+                          <p className="text-xs font-mono font-semibold text-[#1A1A1A] truncate flex items-center gap-1">
+                            {r.sku}
+                            {r.stock_deducted_field === "reserved" && (
+                              <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                {t("จากยอดจอง", "from reserved", "来自预订")}
+                              </span>
+                            )}
+                          </p>
                           <p className="text-[11px] text-[#6B6B6B] truncate">{r.size_text || "-"}</p>
                         </div>
                       </div>

@@ -330,6 +330,7 @@ export interface DailyExportRow {
   salesperson: string | null;
   po_no: string;
   stock_deducted_qty: number;
+  stock_deducted_field: "available" | "reserved";
   quotation_id: number | null;
   quotation_item_id: string | null;
   created_at: string;

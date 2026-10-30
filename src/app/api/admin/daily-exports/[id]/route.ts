@@ -50,18 +50,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ("qty" in body || "stock_variant_id" in body) {
     const { data: existing } = await db
       .from("daily_export_rows")
-      .select("stock_variant_id, stock_deducted_qty")
+      .select("stock_variant_id, stock_deducted_qty, stock_deducted_field")
       .eq("id", id)
       .single();
     if (existing) {
       const newVariantId = "stock_variant_id" in body ? Number(body.stock_variant_id) : existing.stock_variant_id;
       const newQty = "qty" in body ? Number(body.qty) || 0 : existing.stock_deducted_qty;
 
+      // Stays on whichever bucket (available/reserved) this row was
+      // originally deducted from — changing that is a delete + re-add.
       const result = await restoreThenApply(db, {
         oldVariantId: existing.stock_variant_id,
         oldQty: existing.stock_deducted_qty,
         newVariantId,
         newQty,
+        field: existing.stock_deducted_field === "reserved" ? "reserved" : "available",
       });
       if (!result.ok) {
         return NextResponse.json({ error: "สต็อกเหลือไม่พอสำหรับจำนวนนี้" }, { status: 409 });
@@ -99,11 +102,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { data: existing } = await db
     .from("daily_export_rows")
-    .select("export_date, sku, size_text, qty, customer_name, stock_variant_id, stock_deducted_qty")
+    .select("export_date, sku, size_text, qty, customer_name, stock_variant_id, stock_deducted_qty, stock_deducted_field")
     .eq("id", id)
     .single();
   if (existing?.stock_deducted_qty) {
-    await adjustVariantField(db, existing.stock_variant_id, "available", existing.stock_deducted_qty);
+    await adjustVariantField(
+      db,
+      existing.stock_variant_id,
+      existing.stock_deducted_field === "reserved" ? "reserved" : "available",
+      existing.stock_deducted_qty
+    );
   }
 
   const { error } = await db.from("daily_export_rows").delete().eq("id", id);

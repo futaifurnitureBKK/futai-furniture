@@ -49,6 +49,10 @@ export async function POST(req: NextRequest) {
   const unitPrice = Number(body.unit_price) || 0;
   const quotationId: number | null = body.quotation_id ? Number(body.quotation_id) : null;
   const quotationItemId: string | null = body.quotation_item_id || null;
+  // Normally comes out of "available" — pass "reserved" when this shipment
+  // fulfills stock that was already reserved earlier, so it isn't deducted
+  // twice (once at reserve time, again here).
+  const stockField: "available" | "reserved" = body.stock_deducted_field === "reserved" ? "reserved" : "available";
 
   const db = supabaseAdmin();
 
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
   // so two staff picking the last unit at the same instant can't both get
   // through — and, for a shared-stock product, deducts the whole module
   // pool so every sibling size's cached count updates together.
-  const deduct = await adjustVariantField(db, stock_variant_id, "available", -qty);
+  const deduct = await adjustVariantField(db, stock_variant_id, stockField, -qty);
   if (!deduct.ok) {
     return NextResponse.json({ error: `สต็อก ${sku || ""} ${size_text || ""} เหลือไม่พอ`.trim() }, { status: 409 });
   }
@@ -84,8 +88,16 @@ export async function POST(req: NextRequest) {
   // row's qty instead of creating a duplicate — but only within the same
   // origin (two plain picks merge; a quotation line only merges with an
   // earlier pick of that exact same line), so each quotation item's
-  // shipped/remaining stays attributable to that item alone.
-  let mergeQuery = db.from("daily_export_rows").select("*").eq("export_date", export_date).eq("stock_variant_id", stock_variant_id);
+  // shipped/remaining stays attributable to that item alone. A pick that
+  // deducts from a different bucket (available vs. reserved) than an
+  // existing row never merges with it, so each row's stock_deducted_field
+  // stays a single, unambiguous value for restoring later.
+  let mergeQuery = db
+    .from("daily_export_rows")
+    .select("*")
+    .eq("export_date", export_date)
+    .eq("stock_variant_id", stock_variant_id)
+    .eq("stock_deducted_field", stockField);
   mergeQuery = quotationItemId ? mergeQuery.eq("quotation_item_id", quotationItemId) : mergeQuery.is("quotation_item_id", null);
   const { data: existing } = await mergeQuery.maybeSingle();
 
@@ -101,7 +113,7 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
     if (error) {
-      await adjustVariantField(db, stock_variant_id, "available", qty);
+      await adjustVariantField(db, stock_variant_id, stockField, qty);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     await logActivity(req, {
@@ -140,12 +152,13 @@ export async function POST(req: NextRequest) {
       quotation_id: quotationId,
       quotation_item_id: quotationItemId,
       stock_deducted_qty: qty,
+      stock_deducted_field: stockField,
     })
     .select()
     .single();
   if (error) {
     // Roll back the deduction so a failed insert never leaves stock short.
-    await adjustVariantField(db, stock_variant_id, "available", qty);
+    await adjustVariantField(db, stock_variant_id, stockField, qty);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
   await logActivity(req, {

@@ -463,19 +463,20 @@ export default function StockPage() {
     callSharedAdjust(p, "available", delta);
   }
 
-  // Releases/corrects the "จอง/รอส่ง" number directly — covers both a
-  // cancelled reservation (type a lower number, the difference goes back to
-  // "available") and marking it shipped out (type a lower number, same as
-  // above — staff then separately record the actual sale wherever that
-  // happens; this button only ever touches the reserved bucket itself).
+  // Corrects the "จอง/รอส่ง" number directly — on its own, same as
+  // adjustSharedAvailable/adjustSharedDefective below. Deliberately does NOT
+  // touch "available": a lower reserved count doesn't always mean those
+  // units go back on sale (e.g. the order shipped), so that's a separate,
+  // explicit step via the available-adjust button when that's actually what
+  // happened.
   function adjustSharedReserved(p: DbProduct) {
     const current = sharedSetsReserved(p);
     const ref = sharedReferenceLabel(p);
     const input = prompt(
       t(
-        `ปรับยอดจองเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้จอง ${current} ตัว) — ส่วนที่ลดลงจะกลับไปที่พร้อมขาย`,
-        `Set reserved to how many (in ${ref} equivalent pieces)? (currently ${current}) — any decrease goes back to available`,
-        `将已预订调整为多少件（按${ref}换算）？（当前 ${current} 件）—— 减少的部分会退回可售`
+        `ปรับยอดจองเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้จอง ${current} ตัว)`,
+        `Set reserved to how many (in ${ref} equivalent pieces)? (currently ${current})`,
+        `将已预订调整为多少件（按${ref}换算）？（当前 ${current} 件）`
       )
     );
     if (input == null || input === "") return;
@@ -483,9 +484,7 @@ export default function StockPage() {
     if (!Number.isFinite(target) || target < 0) return;
     const delta = target - current;
     if (delta === 0) return;
-    callSharedAdjust(p, "reserved", delta).then((ok) => {
-      if (ok) callSharedAdjust(p, "available", -delta);
-    });
+    callSharedAdjust(p, "reserved", delta);
   }
 
   function adjustSharedDefective(p: DbProduct) {

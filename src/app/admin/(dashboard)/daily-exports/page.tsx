@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Plus, Trash2, FileDown, FileSearch, Search, Loader2, Boxes, ListChecks, Wallet, RefreshCw, ImageOff, X } from "lucide-react";
@@ -267,66 +267,74 @@ function StockGridPickerDialog({
                 </div>
                 <div className="flex flex-wrap gap-1 px-2 pb-2">
                   {p.variants.map((v) => (
-                    <button
-                      key={v.variantId}
-                      type="button"
-                      disabled={v.available <= 0 && v.reserved <= 0}
-                      onClick={async () => {
-                        let deductField: "available" | "reserved" = "available";
-                        if (v.reserved > 0) {
-                          // Show exactly who/what makes up that reserved
-                          // number (not just the total) before asking —
-                          // same ledger the StockDEMO "รายการจอง" list reads.
-                          let breakdown = "";
-                          try {
-                            const res = await fetch(`/api/admin/stock/reservations?product_id=${p.productId}`);
-                            const data = await res.json();
-                            const rows = (res.ok ? data.reservations : []) as { variant_id: number | null; qty: number; note: string | null }[];
-                            const relevant = rows.filter((r) => p.sharedStock || r.variant_id === v.variantId);
-                            if (relevant.length) {
-                              breakdown = "\n" + relevant.map((r) => `• ${fmt(r.qty)} ${t("ตัว", "pcs", "件")}${r.note ? ` — ${r.note}` : ""}`).join("\n");
+                    <Fragment key={v.variantId}>
+                      <button
+                        type="button"
+                        disabled={v.available <= 0}
+                        onClick={() => {
+                          if (v.available <= 0) return;
+                          onPick({
+                            variantId: v.variantId,
+                            code: v.code || p.code,
+                            size_text: v.size_text,
+                            image_url: v.imageUrls[0] || p.image_url,
+                            available: v.available,
+                            deductField: "available",
+                          });
+                        }}
+                        title={v.available <= 0 ? t("หมด", "Out of stock", "缺货") : undefined}
+                        className={`text-[10px] px-1.5 py-1 rounded border font-mono transition-colors ${
+                          v.available > 0
+                            ? "border-[#E8E5E0] bg-[#FAF7F2] text-[#1A1A1A] hover:border-[#C8102E] hover:bg-white"
+                            : "border-[#F0EDE6] bg-[#F5F3EF] text-[#C8C5BE] line-through cursor-not-allowed"
+                        }`}
+                      >
+                        {v.code && v.code !== p.code && <span className="block">{v.code}</span>}
+                        {v.size_text || "-"} ({fmt(v.available)})
+                      </button>
+                      {v.reserved > 0 && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            // Show exactly who/what makes up that reserved
+                            // number before asking — same ledger the
+                            // StockDEMO "รายการจอง" list reads.
+                            let breakdown = "";
+                            try {
+                              const res = await fetch(`/api/admin/stock/reservations?product_id=${p.productId}`);
+                              const data = await res.json();
+                              const rows = (res.ok ? data.reservations : []) as { variant_id: number | null; qty: number; note: string | null }[];
+                              const relevant = rows.filter((r) => p.sharedStock || r.variant_id === v.variantId);
+                              if (relevant.length) {
+                                breakdown = "\n" + relevant.map((r) => `• ${fmt(r.qty)} ${t("ตัว", "pcs", "件")}${r.note ? ` — ${r.note}` : ""}`).join("\n");
+                              }
+                            } catch {
+                              // fall back to just the aggregate number below
                             }
-                          } catch {
-                            // fall back to just the aggregate number below
-                          }
-                          const fromReserved =
-                            v.available <= 0
-                              ? confirm(
-                                  t(
-                                    `พร้อมขายหมดแล้ว แต่มีจองอยู่ ${fmt(v.reserved)} ตัว${breakdown}\n\nส่งออกชุดนี้จากยอดจองเลยไหม?`,
-                                    `None available, but ${fmt(v.reserved)} is reserved${breakdown}\n\nExport this from the reserved amount?`,
-                                    `可售已为零，但有 ${fmt(v.reserved)} 件已预订${breakdown}\n\n是否从预订数量出库？`
-                                  )
-                                )
-                              : confirm(
-                                  t(
-                                    `สินค้านี้มีจองอยู่ ${fmt(v.reserved)} ตัว${breakdown}\n\nส่งออกชุดนี้เป็นการส่งของที่จองไว้ใช่ไหม?`,
-                                    `${fmt(v.reserved)} of this size is currently reserved${breakdown}\n\nIs this export fulfilling that reservation?`,
-                                    `此规格当前有 ${fmt(v.reserved)} 件已预订${breakdown}\n\n本次出库是否为履行该预订？`
-                                  )
-                                );
-                          if (fromReserved) deductField = "reserved";
-                        }
-                        if (deductField === "available" && v.available <= 0) return;
-                        onPick({
-                          variantId: v.variantId,
-                          code: v.code || p.code,
-                          size_text: v.size_text,
-                          image_url: v.imageUrls[0] || p.image_url,
-                          available: v.available,
-                          deductField,
-                        });
-                      }}
-                      title={v.available <= 0 && v.reserved <= 0 ? t("หมด", "Out of stock", "缺货") : undefined}
-                      className={`text-[10px] px-1.5 py-1 rounded border font-mono transition-colors ${
-                        v.available > 0 || v.reserved > 0
-                          ? "border-[#E8E5E0] bg-[#FAF7F2] text-[#1A1A1A] hover:border-[#C8102E] hover:bg-white"
-                          : "border-[#F0EDE6] bg-[#F5F3EF] text-[#C8C5BE] line-through cursor-not-allowed"
-                      }`}
-                    >
-                      {v.code && v.code !== p.code && <span className="block">{v.code}</span>}
-                      {v.size_text || "-"} ({fmt(v.available)}{v.reserved > 0 ? ` · ${t("จอง", "rsv.", "订")} ${fmt(v.reserved)}` : ""})
-                    </button>
+                            const ok = confirm(
+                              t(
+                                `ส่งออกจากยอดจอง ${fmt(v.reserved)} ตัว ของ "${v.size_text || p.code}"?${breakdown}`,
+                                `Export from the ${fmt(v.reserved)} reserved for "${v.size_text || p.code}"?${breakdown}`,
+                                `从"${v.size_text || p.code}"已预订的 ${fmt(v.reserved)} 件中出库？${breakdown}`
+                              )
+                            );
+                            if (!ok) return;
+                            onPick({
+                              variantId: v.variantId,
+                              code: v.code || p.code,
+                              size_text: v.size_text,
+                              image_url: v.imageUrls[0] || p.image_url,
+                              available: v.available,
+                              deductField: "reserved",
+                            });
+                          }}
+                          title={t("ส่งออกจากยอดจอง (ไม่แตะพร้อมขาย)", "Export from reserved (doesn't touch available)", "从已预订出库（不影响可售）")}
+                          className="text-[10px] px-1.5 py-1 rounded border border-amber-300 bg-amber-50 text-amber-700 font-mono hover:bg-amber-100 transition-colors"
+                        >
+                          {t("จอง", "rsv.", "订")} {fmt(v.reserved)}
+                        </button>
+                      )}
+                    </Fragment>
                   ))}
                 </div>
               </div>

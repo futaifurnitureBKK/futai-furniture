@@ -1561,6 +1561,30 @@ export default function StockPage() {
                     <Plus size={13} className="mr-1" /> {t("เพิ่มขนาด", "Add size", "添加规格")}
                   </Button>
                 </div>
+                {detail.shared_stock && (
+                  <div className="mb-2 text-xs text-blue-700 bg-blue-50 rounded-lg px-3 py-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-blue-600/80">
+                      <Database size={11} />
+                      {t(
+                        `สต็อกร่วม — ตัวเลขแต่ละไซซ์ล็อกไว้ ปรับได้จากปุ่มนี้เท่านั้น (เทียบเท่า ${sharedReferenceLabel(detail)})`,
+                        `Shared stock — each size's number is locked, adjust from these buttons only (in ${sharedReferenceLabel(detail)} equivalent)`,
+                        `共享库存 — 各规格数字已锁定，仅能从此处按钮调整（按${sharedReferenceLabel(detail)}换算）`
+                      )}
+                    </span>
+                    <button type="button" onClick={() => receiveSharedStock(detail)} className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
+                      {t("+รับเข้า", "+Receive", "+入库")}
+                    </button>
+                    <button type="button" onClick={() => reserveSharedStock(detail)} className="px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium">
+                      {t("จอง", "Reserve", "预订")}
+                    </button>
+                    <button type="button" onClick={() => adjustSharedAvailable(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
+                      {t("ปรับยอด", "Adjust", "调整")}
+                    </button>
+                    <button type="button" onClick={() => adjustSharedDefective(detail)} className="px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-medium">
+                      {t("ตำหนิ", "Defective", "次品")}
+                    </button>
+                  </div>
+                )}
                 <div className="overflow-x-auto border border-[#E8E5E0] rounded-lg">
                   <Table>
                     <TableHeader>

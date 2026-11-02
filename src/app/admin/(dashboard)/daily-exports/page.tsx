@@ -144,6 +144,9 @@ interface PickedVariant {
   image_url: string | null;
   available: number;
   deductField: "available" | "reserved";
+  // Omitted = 1 (every "available" pick is still one click = one piece).
+  // The reserved-export flow lets staff type an exact amount instead.
+  qty?: number;
 }
 
 // A wall of big photos — one card per MODEL (not per size, which used to
@@ -311,14 +314,36 @@ function StockGridPickerDialog({
                             } catch {
                               // fall back to just the aggregate number below
                             }
-                            const ok = confirm(
+                            // Shared-stock reserved is also a shared pool —
+                            // exporting from this one size's reservation
+                            // draws modules out of the same pool every
+                            // sibling size's "จอง" count reads from, so say
+                            // so up front instead of leaving it a surprise.
+                            const sharedNote = p.sharedStock
+                              ? t(
+                                  `\n(รุ่นนี้ใช้สต็อกจองร่วมกันทุกไซส์ — ตัวเลขจองของไซส์อื่นจะลดลงด้วย)`,
+                                  `\n(This model shares one reserved pool across sizes — other sizes' reserved count will drop too)`,
+                                  `\n（此型号各尺寸共用同一预订库存池——其他尺寸的预订数量也会随之减少）`
+                                )
+                              : "";
+                            const input = prompt(
                               t(
-                                `ส่งออกจากยอดจอง ${fmt(v.reserved)} ตัว ของ "${v.size_text || p.code}"?${breakdown}`,
-                                `Export from the ${fmt(v.reserved)} reserved for "${v.size_text || p.code}"?${breakdown}`,
-                                `从"${v.size_text || p.code}"已预订的 ${fmt(v.reserved)} 件中出库？${breakdown}`
-                              )
+                                `ของ "${v.size_text || p.code}" มีจองอยู่ ${fmt(v.reserved)} ตัว — จะส่งออกกี่ตัว?${breakdown}${sharedNote}`,
+                                `"${v.size_text || p.code}" has ${fmt(v.reserved)} reserved — how many to export?${breakdown}${sharedNote}`,
+                                `"${v.size_text || p.code}" 共预订 ${fmt(v.reserved)} 件 — 要出库几件？${breakdown}${sharedNote}`
+                              ),
+                              "1"
                             );
-                            if (!ok) return;
+                            if (input == null) return;
+                            const qty = Math.floor(Number(input));
+                            if (!Number.isFinite(qty) || qty <= 0) {
+                              toast.error(t("จำนวนไม่ถูกต้อง", "Invalid quantity", "数量无效"));
+                              return;
+                            }
+                            if (qty > v.reserved) {
+                              toast.error(t(`มีจองแค่ ${fmt(v.reserved)} ตัว`, `Only ${fmt(v.reserved)} reserved`, `仅预订了 ${fmt(v.reserved)} 件`));
+                              return;
+                            }
                             onPick({
                               variantId: v.variantId,
                               code: v.code || p.code,
@@ -326,6 +351,7 @@ function StockGridPickerDialog({
                               image_url: v.imageUrls[0] || p.image_url,
                               available: v.available,
                               deductField: "reserved",
+                              qty,
                             });
                           }}
                           title={t("ส่งออกจากยอดจอง (ไม่แตะพร้อมขาย)", "Export from reserved (doesn't touch available)", "从已预订出库（不影响可售）")}
@@ -1384,6 +1410,7 @@ export default function DailyExportsPage() {
   }, []);
 
   async function addRow(v: PickedVariant) {
+    const qty = v.qty ?? 1;
     setAdding(true);
     const res = await fetch("/api/admin/daily-exports", {
       method: "POST",
@@ -1394,7 +1421,7 @@ export default function DailyExportsPage() {
         sku: v.code,
         size_text: v.size_text,
         image_url: v.image_url,
-        qty: 1,
+        qty,
         salesperson: currentUser,
         stock_deducted_field: v.deductField,
       }),
@@ -1405,11 +1432,11 @@ export default function DailyExportsPage() {
       // Picking a size that's already a row for today tops that row up
       // instead of creating a duplicate — the server returns that same row.
       setRows((prev) => (prev.some((r) => r.id === data.row.id) ? prev.map((r) => (r.id === data.row.id ? data.row : r)) : [...prev, data.row]));
-      bumpSessionDelta(v.variantId, 1);
+      bumpSessionDelta(v.variantId, qty);
       toast.success(
         v.deductField === "reserved"
-          ? t(`ตัด ${v.code} แล้ว 1 ชิ้น (จากยอดจอง)`, `Deducted 1 of ${v.code} (from reserved)`, `已扣除 ${v.code} 1 件（来自预订）`)
-          : t(`ตัด ${v.code} แล้ว 1 ชิ้น`, `Deducted 1 of ${v.code}`, `已扣除 ${v.code} 1 件`)
+          ? t(`ตัด ${v.code} แล้ว ${qty} ชิ้น (จากยอดจอง)`, `Deducted ${qty} of ${v.code} (from reserved)`, `已扣除 ${v.code} ${qty} 件（来自预订）`)
+          : t(`ตัด ${v.code} แล้ว ${qty} ชิ้น`, `Deducted ${qty} of ${v.code}`, `已扣除 ${v.code} ${qty} 件`)
       );
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));

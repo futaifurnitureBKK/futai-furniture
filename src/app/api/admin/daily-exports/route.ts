@@ -81,7 +81,14 @@ export async function POST(req: NextRequest) {
   // pool so every sibling size's cached count updates together.
   const deduct = await adjustVariantField(db, stock_variant_id, stockField, -qty);
   if (!deduct.ok) {
-    return NextResponse.json({ error: `สต็อก ${sku || ""} ${size_text || ""} เหลือไม่พอ`.trim() }, { status: 409 });
+    // "insufficient_stock" is the only expected rejection (the atomic RPC's
+    // own guard) — anything else (missing function, RLS, a bad param type)
+    // would otherwise get mislabeled as "เหลือไม่พอ" and hide the real cause.
+    const message =
+      deduct.error === "insufficient_stock"
+        ? `สต็อก ${sku || ""} ${size_text || ""} เหลือไม่พอ`.trim()
+        : `ตัดสต็อกไม่สำเร็จ: ${deduct.error || "unknown error"}`;
+    return NextResponse.json({ error: message }, { status: 409 });
   }
 
   // Picking a size that's already a row for this date just tops up that

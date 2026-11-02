@@ -96,7 +96,7 @@ function fmtTime(iso: string) {
 }
 function fmtDateDisplay(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("th-TH-u-ca-buddhist", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("th-TH-u-ca-gregory", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 type RangeKey = "1d" | "7d" | "30d" | "month";

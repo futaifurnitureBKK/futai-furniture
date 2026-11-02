@@ -1295,33 +1295,79 @@ export default function DailyExportsPage() {
     setRefreshing(false);
   }
 
-  // Fetched once — the grid picker reuses this same list every time it opens.
+  // Pure fetch+transform, no state — kept separate so the effects below can
+  // guard their setState calls with their own cancellation flag.
+  async function fetchGroupedProducts(): Promise<GroupedProduct[] | null> {
+    const res = await fetch("/api/admin/stock?archived=false");
+    const data = await res.json();
+    if (!res.ok) return null;
+    const grouped: GroupedProduct[] = [];
+    for (const p of data.products as {
+      id: number; code: string; category: string; image_url: string | null; shared_stock: boolean; shared_available_modules: number;
+      stock_variants: { id: number; code: string; size_text: string; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
+    }[]) {
+      const variants = p.stock_variants
+        .filter((v) => !v.archived)
+        .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, available: v.available, reserved: v.reserved || 0, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
+      if (!variants.length) continue;
+      grouped.push({
+        productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
+        sharedStock: !!p.shared_stock, sharedAvailableModules: p.shared_available_modules || 0, variants,
+      });
+    }
+    return grouped;
+  }
+
+  // Pulls the latest stock snapshot and resets the session ledgers — any
+  // deduction made through this page up to now is already reflected in the
+  // fresh numbers, so carrying the old deltas forward would subtract twice.
+  // Only called from event handlers (never from inside an effect — see the
+  // two effects below for the guarded, cancellable version of this).
+  async function loadProducts() {
+    const grouped = await fetchGroupedProducts();
+    if (!grouped) return;
+    setProducts(grouped);
+    setSessionDelta({});
+    setSessionModuleDelta({});
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/stock?archived=false");
-      const data = await res.json();
-      if (cancelled || !res.ok) return;
-      const grouped: GroupedProduct[] = [];
-      for (const p of data.products as {
-        id: number; code: string; category: string; image_url: string | null; shared_stock: boolean; shared_available_modules: number;
-        stock_variants: { id: number; code: string; size_text: string; available: number; reserved: number; archived: boolean; unit_factor: number; image_urls: string[] | null }[];
-      }[]) {
-        const variants = p.stock_variants
-          .filter((v) => !v.archived)
-          .map((v) => ({ variantId: v.id, code: v.code, size_text: v.size_text, available: v.available, reserved: v.reserved || 0, unitFactor: v.unit_factor || 1, imageUrls: v.image_urls || [] }));
-        if (!variants.length) continue;
-        grouped.push({
-          productId: p.id, code: p.code, category: p.category, image_url: p.image_url,
-          sharedStock: !!p.shared_stock, sharedAvailableModules: p.shared_available_modules || 0, variants,
-        });
+      const grouped = await fetchGroupedProducts();
+      if (!cancelled && grouped) {
+        setProducts(grouped);
+        setSessionDelta({});
+        setSessionModuleDelta({});
       }
-      setProducts(grouped);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // The snapshot above is only ever taken once on mount otherwise, so a
+  // shared-stock model (several sizes drawing from one pool) can show a
+  // size as having plenty left in the picker while someone else's pick —
+  // on this same page in another tab, or from Quote Builder/StockDEMO —
+  // already used it up: the picker still shows the old number and every
+  // attempt to deduct it fails with "เหลือไม่พอ". Re-pulling stock right
+  // before the picker opens keeps what it shows honest.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    let cancelled = false;
+    (async () => {
+      const grouped = await fetchGroupedProducts();
+      if (!cancelled && grouped) {
+        setProducts(grouped);
+        setSessionDelta({});
+        setSessionModuleDelta({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOpen]);
 
   // Auto-fills "ผู้ดำเนินการ" with whoever is logged in — still changeable
   // per row from the dropdown if someone is entering on another's behalf.
@@ -1367,6 +1413,10 @@ export default function DailyExportsPage() {
       );
     } else {
       toast.error(data.error || t("เพิ่มไม่สำเร็จ", "Could not add", "添加失败"));
+      // The server's rejection means our snapshot was wrong (someone else
+      // already took that stock) — resync so the picker stops showing a
+      // number that just proved false and the next pick reflects reality.
+      loadProducts();
     }
   }
 

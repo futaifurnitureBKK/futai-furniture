@@ -89,12 +89,17 @@ export interface VariantStockMeta {
   productId: number;
   sharedStock: boolean;
   unitFactor: number;
+  // A variant can be bundled with another (e.g. HJ-111B's "มีหมอน" chair
+  // links to its headrest) — deducting/restoring this variant always
+  // deducts/restores componentQty times as much of componentVariantId too.
+  componentVariantId: number | null;
+  componentQty: number;
 }
 
 export async function getVariantStockMeta(db: SupabaseClient, variantId: number): Promise<VariantStockMeta | null> {
   const { data } = await db
     .from("stock_variants")
-    .select("product_id, unit_factor, stock_products(shared_stock)")
+    .select("product_id, unit_factor, component_variant_id, component_qty, stock_products(shared_stock)")
     .eq("id", variantId)
     .single();
   if (!data) return null;
@@ -103,13 +108,15 @@ export async function getVariantStockMeta(db: SupabaseClient, variantId: number)
     productId: (data as { product_id: number }).product_id,
     sharedStock: !!product?.shared_stock,
     unitFactor: (data as { unit_factor: number }).unit_factor || 1,
+    componentVariantId: (data as { component_variant_id: number | null }).component_variant_id ?? null,
+    componentQty: (data as { component_qty: number }).component_qty || 1,
   };
 }
 
 // Adjusts one variant's field by pieceDelta (positive = add back, negative
-// = deduct). Shared-stock variants route through the atomic module-pool
-// function (converting pieces to modules via unit_factor) so every sibling
-// size updates together; everything else behaves exactly as it always has.
+// = deduct), then — if it's bundled with a component — applies the same
+// move to that component too, rolling this variant back if the component
+// doesn't have enough so the two never drift out of sync.
 export async function adjustVariantField(
   db: SupabaseClient,
   variantId: number,
@@ -120,6 +127,32 @@ export async function adjustVariantField(
   const meta = await getVariantStockMeta(db, variantId);
   if (!meta) return { ok: false, error: "variant_not_found" };
 
+  const primary = await adjustOwnField(db, variantId, meta, field, pieceDelta);
+  if (!primary.ok) return primary;
+
+  if (meta.componentVariantId && meta.componentVariantId !== variantId) {
+    const component = await adjustVariantField(db, meta.componentVariantId, field, pieceDelta * meta.componentQty);
+    if (!component.ok) {
+      await adjustOwnField(db, variantId, meta, field, -pieceDelta);
+      return component;
+    }
+  }
+
+  return { ok: true };
+}
+
+// The actual per-variant move (shared-stock module pool, or the plain
+// RPC/read-write paths) — factored out of adjustVariantField so it can
+// apply this same logic to a variant's linked component without that
+// component's own component_variant_id (should it ever have one) looping
+// back through the bundle-rollback wrapper a second time.
+async function adjustOwnField(
+  db: SupabaseClient,
+  variantId: number,
+  meta: VariantStockMeta,
+  field: StockField,
+  pieceDelta: number
+): Promise<{ ok: boolean; error?: string }> {
   if (meta.sharedStock) {
     const moduleDelta = pieceDelta * meta.unitFactor;
     const { error } = await db.rpc("adjust_shared_stock_modules", {

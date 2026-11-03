@@ -39,6 +39,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ vi
     return NextResponse.json({ error: "สินค้านี้เป็นสต็อกร่วม ปรับยอดได้ที่ระดับรุ่นเท่านั้น" }, { status: 400 });
   }
 
+  // Archiving a variant another one's component_variant_id points at (e.g.
+  // HJ-111B-หมอน's row, linked from HJ-111B's "มีหมอน" chair) would hide it
+  // from every normal view (StockDEMO's default list, the Daily Export
+  // picker) while adjustVariantField keeps deducting/restoring it in the
+  // background — the chair would start failing with "เหลือไม่พอ" once it
+  // runs out, with nothing on screen explaining why. Block it instead.
+  if (body.archived === true) {
+    const { count } = await db
+      .from("stock_variants")
+      .select("id", { count: "exact", head: true })
+      .eq("component_variant_id", vid);
+    if (count && count > 0) {
+      return NextResponse.json(
+        { error: "แถวนี้ถูกพ่วงเป็นส่วนประกอบของสินค้าอื่นอยู่ (component) — เอาออกก่อนค่อยปิดการใช้งาน" },
+        { status: 400 }
+      );
+    }
+  }
+
   // touching any stock number means it's now being tracked
   if (TRACKED_MOVEMENT_FIELDS.some((f) => f in body)) update.tracked = true;
 

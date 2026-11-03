@@ -954,6 +954,12 @@ export default function StockPage() {
     const byCode = new Map<string, { available: number; sizes: number }>();
     products.forEach((p) =>
       activeVariants(p).forEach((v) => {
+        // A shared-stock product's sizes are cached copies of ONE pool
+        // (e.g. HJ-111B's "มีหมอน"/"ไม่มีหมอน" both read 151 from the same
+        // count) — summing every sibling here would multiply that single
+        // physical count by however many sizes the product has. Only the
+        // reference variant ("ตัวนับหลัก") carries a count worth adding.
+        if (p.shared_stock && !v.is_shared_reference) return;
         for (const c of new Set([canonCode(v.code), canonCode(p.code)])) {
           const cur = byCode.get(c) ?? { available: 0, sizes: 0 };
           cur.available += v.tracked ? v.available : 0;
@@ -972,9 +978,14 @@ export default function StockPage() {
         sizes++;
         if (!v.tracked) return;
         tracked++;
-        available += v.available;
-        reserved += v.reserved;
-        defective += v.defective;
+        // Same reasoning as bestSellers above — a shared-stock product's
+        // non-reference sizes would otherwise multiply its one real pool
+        // into the grand total once per sibling size.
+        if (!p.shared_stock || v.is_shared_reference) {
+          available += v.available;
+          reserved += v.reserved;
+          defective += v.defective;
+        }
         const st = statusOf(v);
         if (st === "low") low++;
         if (st === "out") out++;

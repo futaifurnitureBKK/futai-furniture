@@ -26,6 +26,7 @@ export interface DbProductLite {
   id: number;
   code: string;
   category: string;
+  shared_stock: boolean;
   stock_variants: DbVariantLite[];
 }
 
@@ -64,6 +65,11 @@ export interface Plan {
   newVariants: PlanNewVariant[];
   newProducts: PlanNewProduct[];
   overLocked: string[];
+  // Rows that matched a shared-stock product (YN-01-4, DZ2404, HJ-111B, …)
+  // — skipped rather than updated/added, since those models' available/
+  // reserved are a synced cache of one pool and must only ever change
+  // through adjust_shared_stock_modules(), never a raw per-variant write.
+  skippedSharedStock: string[];
 }
 
 const CAT_MAP: Record<string, string> = {
@@ -143,6 +149,7 @@ export function buildPlan(products: DbProductLite[], rows: SyncRow[]): Plan {
   const newVariants: PlanNewVariant[] = [];
   const newProductMap = new Map<string, PlanNewProduct>();
   const overLocked: string[] = [];
+  const skippedSharedStock: string[] = [];
 
   for (const r of rows) {
     const category = CAT_MAP[r.section] ?? "other";
@@ -164,6 +171,10 @@ export function buildPlan(products: DbProductLite[], rows: SyncRow[]): Plan {
     const hit = cands?.find((x) => sizeKey(x.v.size_text) === sk) ?? (cands && cands.length === 1 && !sk ? cands[0] : null);
 
     if (hit) {
+      if (hit.p.shared_stock) {
+        skippedSharedStock.push(`${hit.v.code || hit.p.code} ${hit.v.size_text}`.trim());
+        continue;
+      }
       const cur = target.get(hit.v.id);
       if (cur) {
         cur.available += actual;
@@ -173,6 +184,10 @@ export function buildPlan(products: DbProductLite[], rows: SyncRow[]): Plan {
         target.set(hit.v.id, { available: actual, reserved: locked, note, code: hit.v.code, size: hit.v.size_text, productId: hit.p.id });
       }
     } else if (cands && cands.length) {
+      if (cands[0].p.shared_stock) {
+        skippedSharedStock.push(`${cands[0].p.code} ${size}`.trim());
+        continue;
+      }
       newVariants.push({
         productId: cands[0].p.id,
         productCode: cands[0].p.code,
@@ -220,5 +235,6 @@ export function buildPlan(products: DbProductLite[], rows: SyncRow[]): Plan {
     newVariants,
     newProducts: [...newProductMap.values()],
     overLocked,
+    skippedSharedStock,
   };
 }

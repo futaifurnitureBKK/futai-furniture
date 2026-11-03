@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminRequest } from "@/lib/admin-auth";
-import { VARIANT_FIELDS, pick } from "@/lib/stock-fields";
+import { TRACKED_MOVEMENT_FIELDS, VARIANT_FIELDS, pick } from "@/lib/stock-fields";
 import { logActivity } from "@/lib/activity-log";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +11,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const body = await req.json();
   const db = supabaseAdmin();
+
+  // A new size under a shared-stock product has to be folded into the pool
+  // (unit_factor set, possibly is_shared_reference) before it carries real
+  // available/reserved/defective — a raw insert here can't do that, so
+  // reject rather than silently create a size whose numbers never sync
+  // with the rest of the model (same rule the variant PATCH route applies).
+  const { data: product } = await db.from("stock_products").select("shared_stock").eq("id", id).single();
+  if (product?.shared_stock && TRACKED_MOVEMENT_FIELDS.some((f) => f in body)) {
+    return NextResponse.json({ error: "สินค้านี้เป็นสต็อกร่วม ปรับยอดได้ที่ระดับรุ่นเท่านั้น" }, { status: 400 });
+  }
 
   const { data: last } = await db
     .from("stock_variants")

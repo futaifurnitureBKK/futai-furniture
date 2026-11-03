@@ -12,7 +12,7 @@ async function loadProducts() {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("stock_products")
-    .select("id, code, category, stock_variants(id, product_id, code, size_text, available, reserved, stock_note, archived, sort_order)")
+    .select("id, code, category, shared_stock, stock_variants(id, product_id, code, size_text, available, reserved, stock_note, archived, sort_order)")
     .eq("archived", false);
   return { db, data: data as unknown as DbProductLite[] | null, error };
 }

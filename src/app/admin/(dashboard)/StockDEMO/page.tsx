@@ -2051,6 +2051,17 @@ export default function StockPage() {
                     {t("ล็อกเกินของในโกดัง:", "Locked more than in stock:", "锁单超出库存：")} {syncPlan.plan.overLocked.join(", ")}
                   </p>
                 )}
+                {syncPlan.plan.skippedSharedStock.length > 0 && (
+                  <p className="text-xs text-blue-700 flex items-start gap-1">
+                    <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+                    {t(
+                      "ข้ามไป (เป็นสต็อกร่วม ต้องปรับที่ระดับรุ่นเท่านั้น):",
+                      "Skipped (shared stock — adjust at the model level only):",
+                      "已跳过（共享库存，仅能在型号层级调整）："
+                    )}{" "}
+                    {syncPlan.plan.skippedSharedStock.join(", ")}
+                  </p>
+                )}
                 <p className="text-[11px] text-[#9CA3AF]">
                   {t(
                     "ไฟล์เป็นตัวตั้ง: ตัวเลขพร้อมขาย/จอง/หมายเหตุในระบบจะถูกแทนที่ด้วยค่าจากไฟล์ (ตำแหน่ง ETA ล็อต ต้นทุนไม่ถูกแตะ) และการเปลี่ยนตัวเลขทุกรายการจะถูกบันทึกในประวัติ",

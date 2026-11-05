@@ -39,8 +39,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  // Filtered by lead_date, not converted_at — matches Sales Detail's own
+  // filter exactly (src/app/admin/(dashboard)/AdminFutai/sales-detail/page.tsx),
+  // which is the page this batch's numbers have to reconcile with. Using
+  // converted_at here (as this route originally did) pulled in leads whose
+  // conversion date fell in range but lead_date didn't, producing a bigger
+  // "eligible" total than what Sales Detail showed for the same owner/range.
   const leads = (leadsData as Lead[])
-    .filter((l) => !from || !to || (l.converted_at || l.lead_date).slice(0, 10) >= from && (l.converted_at || l.lead_date).slice(0, 10) <= to)
+    .filter((l) => !from || !to || (l.lead_date >= from && l.lead_date <= to))
     .filter((l) => owner === "all" || (owner === NO_OWNER ? !l.owner : l.owner === owner));
 
   if (!leads.length) {

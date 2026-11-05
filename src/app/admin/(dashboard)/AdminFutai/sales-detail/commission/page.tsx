@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Printer, Plus, Trash2, ArrowLeft } from "lucide-react";
+import { Loader2, Printer, Plus, Trash2, ArrowLeft, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { useLanguage } from "@/store/language";
 import { fmtMoney } from "@/lib/saved-quote-options";
 import { CHANNELS } from "@/lib/lead-options";
 import { calcCommission, nextTier, type CommissionMode, type CommissionBase } from "@/lib/commission";
+import { useQuoteBatchPdf, BATCH_PDF_CSS } from "@/hooks/useQuoteBatchPdf";
+import { QuoteDocument } from "@/components/admin/QuoteDocument";
 
 const NO_OWNER = "__none";
 
@@ -23,6 +25,7 @@ interface EligibleOrder {
   baseIsEstimate: boolean;
   eligible: boolean;
   reason: string | null;
+  sourceQuoteId: number | null;
 }
 
 interface CommissionItem {
@@ -35,6 +38,15 @@ interface CommissionItem {
   rate: number;
   commission: number;
   note: string;
+  // Joined through lead_id by the batch detail route — a "belongs to one"
+  // relation, but left typed loose since PostgREST's shape for it depends
+  // on how it resolves the FK; getItemSourceQuoteId() below normalizes it.
+  leads?: { source_quote_id: number | null } | { source_quote_id: number | null }[] | null;
+}
+
+function getItemSourceQuoteId(item: CommissionItem): number | null {
+  const l = Array.isArray(item.leads) ? item.leads[0] : item.leads;
+  return l?.source_quote_id ?? null;
 }
 
 interface CommissionSplit {
@@ -73,15 +85,20 @@ const STATUS_META: Record<CommissionBatch["status"], { th: string; en: string; z
   cancelled: { th: "ยกเลิก", en: "Cancelled", zh: "已取消", className: "bg-red-100 text-red-700" },
 };
 
+// Two mutually-exclusive print targets, same pattern as quote-builder's
+// batch PDF export: #print-area (this page's own batch summary) and
+// #batch-print-area (BATCH_PDF_CSS, for "download the underlying
+// quotations" instead) — a body class picks which one shows.
 const printCss = `
   @media print {
     @page { margin: 12mm; }
     body * { visibility: hidden; }
-    #print-area, #print-area * { visibility: visible; }
+    body:not(.batch-print) #print-area, body:not(.batch-print) #print-area * { visibility: visible; }
     #print-area { position: absolute; top: 0; left: 0; width: 100%; margin: 0; }
     .no-print { display: none !important; }
     #print-area tr { break-inside: avoid; page-break-inside: avoid; }
   }
+  ${BATCH_PDF_CSS}
 `;
 
 function CommissionInner() {
@@ -93,8 +110,12 @@ function CommissionInner() {
   const from = params.get("from") || "";
   const to = params.get("to") || "";
 
-  if (batchId) return <BatchViewer id={batchId} t={t} router={router} />;
-  return <BatchBuilder owner={owner} from={from} to={to} t={t} router={router} />;
+  return (
+    <>
+      <style>{printCss}</style>
+      {batchId ? <BatchViewer id={batchId} t={t} router={router} /> : <BatchBuilder owner={owner} from={from} to={to} t={t} router={router} />}
+    </>
+  );
 }
 
 function BatchBuilder({
@@ -122,6 +143,7 @@ function BatchBuilder({
   const [base, setBase] = useState<CommissionBase>("ex_vat");
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<CommissionBatch[] | null>(null);
+  const { batchQuotes, loading: pdfLoading, printQuoteIds } = useQuoteBatchPdf();
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +190,16 @@ function BatchBuilder({
   const upcoming = mode === "cumulative" ? nextTier(totalNet) : null;
 
   const ownerLabel = owner === "all" ? t("ทุกคน", "Everyone", "全部") : owner === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : owner;
+  const selectedQuoteIds = selectedOrders.map((o) => o.sourceQuoteId).filter((id): id is number => id != null);
+
+  async function downloadQuotations() {
+    if (!selectedQuoteIds.length) {
+      toast.error(t("ออเดอร์ที่เลือกไม่มีใบเสนอราคาอ้างอิงเลย", "None of the selected orders have a linked quotation", "所选订单均未关联报价单"));
+      return;
+    }
+    const result = await printQuoteIds(selectedQuoteIds);
+    if (!result.ok) toast.error(t("โหลดใบเสนอราคาไม่สำเร็จ", "Failed to load quotations", "加载报价单失败"));
+  }
 
   async function save() {
     if (!selectedOrders.length) return;
@@ -361,11 +393,25 @@ function BatchBuilder({
           <p className="text-xs text-[#9CA3AF]">{t("ค่าคอมรวม", "Total commission", "总提成")}</p>
           <p className="text-2xl font-bold text-[#C8102E]">฿{fmtMoney(totalCommission)}</p>
         </div>
+        <Button variant="outline" onClick={downloadQuotations} disabled={!selectedQuoteIds.length || pdfLoading}>
+          {pdfLoading ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : <FileDown size={15} className="mr-1.5" />}
+          {t(`ดาวน์โหลดใบเสนอราคา (${selectedQuoteIds.length}/${selectedOrders.length})`, `Download quotations (${selectedQuoteIds.length}/${selectedOrders.length})`, `下载报价单 (${selectedQuoteIds.length}/${selectedOrders.length})`)}
+        </Button>
         <Button onClick={save} disabled={!selectedOrders.length || saving}>
           {saving ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : null}
           {t("บันทึกเป็นร่าง", "Save as draft", "保存为草稿")}
         </Button>
       </div>
+
+      {batchQuotes && batchQuotes.length > 0 && (
+        <div id="batch-print-area">
+          {batchQuotes.map((q) => (
+            <div key={q.id} className="batch-print-page no-break">
+              <QuoteDocument quote={q} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {history && history.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -410,6 +456,7 @@ function BatchViewer({ id, t, router }: { id: string; t: (th: string, en: string
   const [batch, setBatch] = useState<CommissionBatch | null>(null);
   const [splits, setSplits] = useState<CommissionSplit[]>([]);
   const [busy, setBusy] = useState(false);
+  const { batchQuotes, loading: pdfLoading, printQuoteIds } = useQuoteBatchPdf();
 
   useEffect(() => {
     let cancelled = false;
@@ -476,9 +523,19 @@ function BatchViewer({ id, t, router }: { id: string; t: (th: string, en: string
 
   const splitSum = splits.reduce((s, x) => s + (Number(x.percent) || 0), 0);
 
+  const quoteIds = batch.commission_items.map(getItemSourceQuoteId).filter((id): id is number => id != null);
+
+  async function downloadQuotations() {
+    if (!quoteIds.length) {
+      toast.error(t("ออเดอร์ในรอบนี้ไม่มีใบเสนอราคาอ้างอิงเลย", "None of this batch's orders have a linked quotation", "本批次订单均未关联报价单"));
+      return;
+    }
+    const result = await printQuoteIds(quoteIds);
+    if (!result.ok) toast.error(t("โหลดใบเสนอราคาไม่สำเร็จ", "Failed to load quotations", "加载报价单失败"));
+  }
+
   return (
     <div className="space-y-4">
-      <style>{printCss}</style>
       <div className="flex items-center justify-between gap-3 no-print">
         <Button variant="outline" size="sm" onClick={() => router.push(`/admin/AdminFutai/sales-detail/commission?owner=${encodeURIComponent(batch.owner)}`)}>
           <ArrowLeft size={14} className="mr-1.5" /> {t("กลับไปเลือกออเดอร์", "Back to selector", "返回选单")}
@@ -499,6 +556,10 @@ function BatchViewer({ id, t, router }: { id: string; t: (th: string, en: string
               {t("บันทึกว่าจ่ายแล้ว", "Mark as paid", "标记为已发放")}
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={downloadQuotations} disabled={pdfLoading}>
+            {pdfLoading ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileDown size={14} className="mr-1.5" />}
+            {t(`ดาวน์โหลดใบเสนอราคา (${quoteIds.length})`, `Download quotations (${quoteIds.length})`, `下载报价单 (${quoteIds.length})`)}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => window.print()}>
             <Printer size={14} className="mr-1.5" /> {t("พิมพ์ / PDF", "Print / PDF", "打印/PDF")}
           </Button>
@@ -611,6 +672,16 @@ function BatchViewer({ id, t, router }: { id: string; t: (th: string, en: string
           </div>
         </div>
       </div>
+
+      {batchQuotes && batchQuotes.length > 0 && (
+        <div id="batch-print-area">
+          {batchQuotes.map((q) => (
+            <div key={q.id} className="batch-print-page no-break">
+              <QuoteDocument quote={q} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

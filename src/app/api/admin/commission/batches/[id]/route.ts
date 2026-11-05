@@ -13,9 +13,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
   const { id } = await params;
   const db = supabaseAdmin();
+  // commission_items(*, leads(source_quote_id)) rides the lead_id FK so the
+  // batch viewer's "download quotations" button knows, per item, which
+  // saved quotation (if any) backs it — without a second round trip.
   const { data, error } = await db
     .from("commission_batches")
-    .select("*, commission_items(*), commission_splits(*)")
+    .select("*, commission_items(*, leads(source_quote_id)), commission_splits(*)")
     .eq("id", id)
     .single();
   if (error || !data) {

@@ -16,6 +16,7 @@ export interface EligibleOrder {
   baseIsEstimate: boolean;
   eligible: boolean;
   reason: string | null;
+  sourceQuoteId: number | null;
 }
 
 // Converted leads for one owner + date range, each priced at the base the
@@ -129,6 +130,7 @@ export async function GET(req: NextRequest) {
       baseIsEstimate,
       eligible,
       reason,
+      sourceQuoteId: l.source_quote_id,
     };
   });
 

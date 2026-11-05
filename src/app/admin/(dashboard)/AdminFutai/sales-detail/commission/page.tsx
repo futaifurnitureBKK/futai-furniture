@@ -1,0 +1,599 @@
+"use client";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Printer, Plus, Trash2, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useLanguage } from "@/store/language";
+import { fmtMoney } from "@/lib/saved-quote-options";
+import { CHANNELS } from "@/lib/lead-options";
+import { calcCommission, nextTier, type CommissionMode, type CommissionBase } from "@/lib/commission";
+
+const NO_OWNER = "__none";
+
+interface EligibleOrder {
+  leadId: number;
+  customerName: string;
+  closedDate: string;
+  channel: string;
+  dealValue: number;
+  baseAmount: number;
+  baseIsEstimate: boolean;
+  eligible: boolean;
+  reason: string | null;
+}
+
+interface CommissionItem {
+  id: number;
+  lead_id: number;
+  customer_name: string;
+  closed_date: string | null;
+  base_amount: number;
+  deduction: number;
+  rate: number;
+  commission: number;
+  note: string;
+}
+
+interface CommissionSplit {
+  id?: number;
+  person: string;
+  percent: number;
+}
+
+interface CommissionBatch {
+  id: number;
+  owner: string;
+  period_from: string;
+  period_to: string;
+  mode: CommissionMode;
+  base: CommissionBase;
+  status: "draft" | "approved" | "paid" | "cancelled";
+  total_base: number;
+  total_commission: number;
+  approved_at: string | null;
+  approved_by: string | null;
+  paid_at: string | null;
+  created_at: string;
+  commission_items: CommissionItem[];
+  commission_splits: CommissionSplit[];
+}
+
+function channelLabel(channel: string, t: (th: string, en: string, zh: string) => string) {
+  const meta = CHANNELS.find((c) => c.value === channel);
+  return meta ? t(meta.th, meta.en, meta.zh) : channel;
+}
+
+const STATUS_META: Record<CommissionBatch["status"], { th: string; en: string; zh: string; className: string }> = {
+  draft: { th: "ร่าง", en: "Draft", zh: "草稿", className: "bg-[#F0EDE6] text-[#6B6B6B]" },
+  approved: { th: "อนุมัติแล้ว", en: "Approved", zh: "已批准", className: "bg-amber-100 text-amber-700" },
+  paid: { th: "จ่ายแล้ว", en: "Paid", zh: "已发放", className: "bg-emerald-100 text-emerald-700" },
+  cancelled: { th: "ยกเลิก", en: "Cancelled", zh: "已取消", className: "bg-red-100 text-red-700" },
+};
+
+const printCss = `
+  @media print {
+    @page { margin: 12mm; }
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { position: absolute; top: 0; left: 0; width: 100%; margin: 0; }
+    .no-print { display: none !important; }
+    #print-area tr { break-inside: avoid; page-break-inside: avoid; }
+  }
+`;
+
+function CommissionInner() {
+  const { t } = useLanguage();
+  const router = useRouter();
+  const params = useSearchParams();
+  const batchId = params.get("batch");
+  const owner = params.get("owner") || "all";
+  const from = params.get("from") || "";
+  const to = params.get("to") || "";
+
+  if (batchId) return <BatchViewer id={batchId} t={t} router={router} />;
+  return <BatchBuilder owner={owner} from={from} to={to} t={t} router={router} />;
+}
+
+function BatchBuilder({
+  owner,
+  from,
+  to,
+  t,
+  router,
+}: {
+  owner: string;
+  from: string;
+  to: string;
+  t: (th: string, en: string, zh: string) => string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [orders, setOrders] = useState<EligibleOrder[] | null>(null);
+  const [selected, setSelected] = useState<Record<number, boolean>>({});
+  const [deductions, setDeductions] = useState<Record<number, number>>({});
+  const [mode, setMode] = useState<CommissionMode>("cumulative");
+  const [base, setBase] = useState<CommissionBase>("ex_vat");
+  const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<CommissionBatch[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setOrders(null);
+      const res = await fetch(`/api/admin/commission/eligible?owner=${encodeURIComponent(owner)}&from=${from}&to=${to}&base=${base}`);
+      const data = await res.json();
+      if (cancelled || !res.ok) return;
+      setOrders(data.orders);
+      const nextSelected: Record<number, boolean> = {};
+      for (const o of data.orders as EligibleOrder[]) nextSelected[o.leadId] = o.eligible;
+      setSelected(nextSelected);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, from, to, base]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (owner === "all") return;
+      const res = await fetch(`/api/admin/commission/batches?owner=${encodeURIComponent(owner)}`);
+      const data = await res.json();
+      if (!cancelled && res.ok) setHistory(data.batches);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [owner]);
+
+  const selectedOrders = useMemo(() => (orders || []).filter((o) => selected[o.leadId]), [orders, selected]);
+  const netOrders = useMemo(
+    () => selectedOrders.map((o) => ({ id: o.leadId, amount: Math.max(0, o.baseAmount - (deductions[o.leadId] || 0)) })),
+    [selectedOrders, deductions]
+  );
+  const computed = useMemo(() => calcCommission(netOrders, mode), [netOrders, mode]);
+  const commissionByLead = useMemo(() => new Map(computed.map((c) => [c.id, c])), [computed]);
+
+  const totalNet = netOrders.reduce((s, o) => s + o.amount, 0);
+  const totalCommission = computed.reduce((s, c) => s + c.commission, 0);
+  const upcoming = mode === "cumulative" ? nextTier(totalNet) : null;
+
+  const ownerLabel = owner === "all" ? t("ทุกคน", "Everyone", "全部") : owner === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : owner;
+
+  async function save() {
+    if (!selectedOrders.length) return;
+    setSaving(true);
+    try {
+      const items = selectedOrders.map((o) => ({
+        leadId: o.leadId,
+        customerName: o.customerName,
+        closedDate: o.closedDate,
+        baseAmount: o.baseAmount,
+        deduction: deductions[o.leadId] || 0,
+      }));
+      const res = await fetch("/api/admin/commission/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner, periodFrom: from || selectedOrders[0].closedDate, periodTo: to || selectedOrders[0].closedDate, mode, base, items }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+        return;
+      }
+      toast.success(t("บันทึกรอบค่าคอมแล้ว", "Commission batch saved", "已保存提成批次"));
+      router.push(`/admin/AdminFutai/sales-detail/commission?batch=${data.batch.id}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (orders === null) {
+    return (
+      <div className="py-16 text-center text-sm text-[#6B6B6B]">
+        <Loader2 size={20} className="mx-auto mb-2 animate-spin" />
+        {t("กำลังโหลด...", "Loading...", "加载中...")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-[#1A1A1A]">{t("คิดค่าคอมมิชชั่น", "Calculate Commission", "计算提成")}</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">
+            {ownerLabel} · {from && to ? `${from} → ${to}` : t("ทั้งหมด", "All time", "全部时间")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+            {([
+              { key: "cumulative", label: t("รวมทั้งรอบ", "Cumulative", "累计") },
+              { key: "per_order", label: t("ต่อออเดอร์", "Per order", "按单") },
+            ] as { key: CommissionMode; label: string }[]).map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => setMode(b.key)}
+                className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  mode === b.key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
+            {([
+              { key: "ex_vat", label: t("ก่อน VAT", "Ex-VAT", "不含税") },
+              { key: "inc_vat", label: t("รวม VAT", "Inc-VAT", "含税") },
+            ] as { key: CommissionBase; label: string }[]).map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => setBase(b.key)}
+                className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  base === b.key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-[#9CA3AF]">
+        {t(
+          "ยอดฐาน \"ประมาณการ\" คือออเดอร์ที่ไม่มีใบเสนอราคาอ้างอิง เลยไม่มี VAT/ส่วนลดจริงให้ดึง ใช้มูลค่าดีลคาดคะเนแทน — แก้ไขได้ที่ช่อง \"หักเพิ่มเติม\" ต่อแถว",
+          "\"Estimated\" base = no linked quotation to read real VAT/discount from, so it's approximated from the deal value — adjust per row with \"extra deduction\" if needed.",
+          "\"估算\"基数表示没有关联报价单可读取真实的增值税/折扣，因此按成交金额估算 — 可在每行\"额外扣除\"栏调整"
+        )}
+      </p>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+        <table className="w-full text-sm min-w-[800px]">
+          <thead>
+            <tr className="bg-[#FAF7F2] text-left text-xs font-semibold text-[#6B6B6B]">
+              <th className="p-3 w-8" />
+              <th className="p-3">{t("วันที่ปิด", "Closed", "成交日")}</th>
+              <th className="p-3">{t("ลูกค้า", "Customer", "客户")}</th>
+              <th className="p-3">{t("ช่องทาง", "Channel", "渠道")}</th>
+              <th className="p-3 text-right">{t("ยอดฐาน", "Base", "基数")}</th>
+              <th className="p-3 text-right w-28">{t("หักเพิ่มเติม", "Deduction", "额外扣除")}</th>
+              <th className="p-3 text-right">{t("ยอดสุทธิ", "Net", "净额")}</th>
+              <th className="p-3 text-right">{t("เรท", "Rate", "费率")}</th>
+              <th className="p-3 text-right">{t("ค่าคอม", "Commission", "提成")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((o) => {
+              const net = Math.max(0, o.baseAmount - (deductions[o.leadId] || 0));
+              const c = commissionByLead.get(o.leadId);
+              return (
+                <tr key={o.leadId} className={`border-t border-[#F0EDE6] ${o.eligible ? "" : "bg-[#FAF7F2] text-[#9CA3AF]"}`}>
+                  <td className="p-3">
+                    <Checkbox
+                      checked={!!selected[o.leadId]}
+                      onCheckedChange={() => setSelected((s) => ({ ...s, [o.leadId]: !s[o.leadId] }))}
+                      aria-label={t("เลือกออเดอร์", "Select order", "选择订单")}
+                    />
+                  </td>
+                  <td className="p-3">{o.closedDate}</td>
+                  <td className="p-3">
+                    {o.customerName}
+                    {!o.eligible && o.reason && <div className="text-[10px] text-red-500 mt-0.5">{o.reason}</div>}
+                  </td>
+                  <td className="p-3">{channelLabel(o.channel, t)}</td>
+                  <td className="p-3 text-right tabular-nums">
+                    ฿{fmtMoney(o.baseAmount)}
+                    {o.baseIsEstimate && <span className="text-[10px] text-[#9CA3AF] ml-1">{t("(ประมาณการ)", "(est.)", "(估)")}</span>}
+                  </td>
+                  <td className="p-3 text-right">
+                    <Input
+                      type="number"
+                      className="w-24 h-8 text-right text-xs"
+                      value={deductions[o.leadId] || ""}
+                      placeholder="0"
+                      onChange={(e) => setDeductions((d) => ({ ...d, [o.leadId]: Number(e.target.value) || 0 }))}
+                    />
+                  </td>
+                  <td className="p-3 text-right tabular-nums">฿{fmtMoney(net)}</td>
+                  <td className="p-3 text-right tabular-nums">{selected[o.leadId] && c ? `${(c.rate * 100).toFixed(1)}%` : "-"}</td>
+                  <td className="p-3 text-right tabular-nums font-medium">{selected[o.leadId] && c ? `฿${fmtMoney(c.commission)}` : "-"}</td>
+                </tr>
+              );
+            })}
+            {orders.length === 0 && (
+              <tr>
+                <td colSpan={9} className="p-10 text-center text-sm text-[#9CA3AF]">
+                  {t("ไม่มีออเดอร์ในช่วงนี้", "No orders in this period", "该期间没有订单")}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs text-[#9CA3AF]">{t(`เลือกแล้ว ${selectedOrders.length} ออเดอร์ · ยอดสุทธิ`, `${selectedOrders.length} orders selected · net`, `已选 ${selectedOrders.length} 单 · 净额`)}</p>
+          <p className="text-lg font-bold text-[#1A1A1A]">฿{fmtMoney(totalNet)}</p>
+          {upcoming && (
+            <p className="text-xs text-amber-600 mt-1">
+              {t(
+                `อีก ฿${fmtMoney(upcoming.min - totalNet)} ถึงเรท ${(upcoming.rate * 100).toFixed(1)}%`,
+                `฿${fmtMoney(upcoming.min - totalNet)} more to reach ${(upcoming.rate * 100).toFixed(1)}%`,
+                `还差 ฿${fmtMoney(upcoming.min - totalNet)} 达到 ${(upcoming.rate * 100).toFixed(1)}%`
+              )}
+            </p>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-[#9CA3AF]">{t("ค่าคอมรวม", "Total commission", "总提成")}</p>
+          <p className="text-2xl font-bold text-[#C8102E]">฿{fmtMoney(totalCommission)}</p>
+        </div>
+        <Button onClick={save} disabled={!selectedOrders.length || saving}>
+          {saving ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : null}
+          {t("บันทึกเป็นร่าง", "Save as draft", "保存为草稿")}
+        </Button>
+      </div>
+
+      {history && history.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#E8E5E0] text-sm font-semibold text-[#1A1A1A]">
+            {t("ประวัติการคิดค่าคอม", "Commission history", "提成历史")}
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#FAF7F2] text-left text-xs font-semibold text-[#6B6B6B]">
+                <th className="p-3">{t("ช่วงวันที่", "Period", "期间")}</th>
+                <th className="p-3">{t("สถานะ", "Status", "状态")}</th>
+                <th className="p-3 text-right">{t("ค่าคอม", "Commission", "提成")}</th>
+                <th className="p-3 w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((b) => (
+                <tr
+                  key={b.id}
+                  className="border-t border-[#F0EDE6] cursor-pointer hover:bg-[#FAF7F2]"
+                  onClick={() => router.push(`/admin/AdminFutai/sales-detail/commission?batch=${b.id}`)}
+                >
+                  <td className="p-3">{b.period_from} → {b.period_to}</td>
+                  <td className="p-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_META[b.status].className}`}>
+                      {t(STATUS_META[b.status].th, STATUS_META[b.status].en, STATUS_META[b.status].zh)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right tabular-nums">฿{fmtMoney(b.total_commission)}</td>
+                  <td className="p-3 text-[#9CA3AF]">#{b.id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BatchViewer({ id, t, router }: { id: string; t: (th: string, en: string, zh: string) => string; router: ReturnType<typeof useRouter> }) {
+  const [batch, setBatch] = useState<CommissionBatch | null>(null);
+  const [splits, setSplits] = useState<CommissionSplit[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/admin/commission/batches/${id}`);
+      const data = await res.json();
+      if (!cancelled && res.ok) {
+        setBatch(data.batch);
+        setSplits(data.batch.commission_splits?.length ? data.batch.commission_splits : []);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  async function changeStatus(status: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/commission/batches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || t("ทำรายการไม่สำเร็จ", "Action failed", "操作失败"));
+        return;
+      }
+      setBatch(data.batch);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSplits() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/commission/batches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ splits }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+        return;
+      }
+      setBatch(data.batch);
+      toast.success(t("บันทึกสัดส่วนแล้ว", "Split saved", "已保存分成"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!batch) {
+    return (
+      <div className="py-16 text-center text-sm text-[#6B6B6B]">
+        <Loader2 size={20} className="mx-auto mb-2 animate-spin" />
+        {t("กำลังโหลด...", "Loading...", "加载中...")}
+      </div>
+    );
+  }
+
+  const splitSum = splits.reduce((s, x) => s + (Number(x.percent) || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      <style>{printCss}</style>
+      <div className="flex items-center justify-between gap-3 no-print">
+        <Button variant="outline" size="sm" onClick={() => router.push(`/admin/AdminFutai/sales-detail/commission?owner=${encodeURIComponent(batch.owner)}`)}>
+          <ArrowLeft size={14} className="mr-1.5" /> {t("กลับไปเลือกออเดอร์", "Back to selector", "返回选单")}
+        </Button>
+        <div className="flex items-center gap-2">
+          {batch.status === "draft" && (
+            <>
+              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => changeStatus("cancelled")} disabled={busy}>
+                {t("ยกเลิกรอบนี้", "Cancel batch", "取消批次")}
+              </Button>
+              <Button size="sm" onClick={() => changeStatus("approved")} disabled={busy}>
+                {t("อนุมัติ", "Approve", "批准")}
+              </Button>
+            </>
+          )}
+          {batch.status === "approved" && (
+            <Button size="sm" onClick={() => changeStatus("paid")} disabled={busy}>
+              {t("บันทึกว่าจ่ายแล้ว", "Mark as paid", "标记为已发放")}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => window.print()}>
+            <Printer size={14} className="mr-1.5" /> {t("พิมพ์ / PDF", "Print / PDF", "打印/PDF")}
+          </Button>
+        </div>
+      </div>
+
+      <div id="print-area" className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-[#1A1A1A]">{t("รอบคิดค่าคอมมิชชั่น", "Commission Batch", "提成批次")} #{batch.id}</h1>
+            <p className="text-sm text-[#6B6B6B]">
+              {batch.owner} · {batch.period_from} → {batch.period_to} ·{" "}
+              {t(batch.mode === "cumulative" ? "รวมทั้งรอบ" : "ต่อออเดอร์", batch.mode === "cumulative" ? "Cumulative" : "Per order", batch.mode === "cumulative" ? "累计" : "按单")}
+            </p>
+          </div>
+          <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium shrink-0 ${STATUS_META[batch.status].className}`}>
+            {t(STATUS_META[batch.status].th, STATUS_META[batch.status].en, STATUS_META[batch.status].zh)}
+          </span>
+        </div>
+
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-[#6B6B6B] border-b border-[#1A1A1A]">
+              <th className="py-1.5 pr-2 w-8">#</th>
+              <th className="py-1.5 pr-2">{t("วันที่ปิด", "Closed", "成交日")}</th>
+              <th className="py-1.5 pr-2">{t("ลูกค้า", "Customer", "客户")}</th>
+              <th className="py-1.5 pr-2 text-right">{t("ยอดฐาน", "Base", "基数")}</th>
+              <th className="py-1.5 pr-2 text-right">{t("หัก", "Deduct", "扣除")}</th>
+              <th className="py-1.5 pr-2 text-right">{t("เรท", "Rate", "费率")}</th>
+              <th className="py-1.5 pl-2 text-right">{t("ค่าคอม", "Commission", "提成")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {batch.commission_items.map((it, i) => (
+              <tr key={it.id} className="border-b border-[#F0EDE6]">
+                <td className="py-1.5 pr-2 text-[#9CA3AF]">{i + 1}</td>
+                <td className="py-1.5 pr-2">{it.closed_date}</td>
+                <td className="py-1.5 pr-2">{it.customer_name}</td>
+                <td className="py-1.5 pr-2 text-right">฿{fmtMoney(it.base_amount)}</td>
+                <td className="py-1.5 pr-2 text-right">{it.deduction ? `฿${fmtMoney(it.deduction)}` : "-"}</td>
+                <td className="py-1.5 pr-2 text-right">{(it.rate * 100).toFixed(1)}%</td>
+                <td className="py-1.5 pl-2 text-right font-medium">฿{fmtMoney(it.commission)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-bold border-t-2 border-[#1A1A1A]">
+              <td className="py-2" colSpan={6} />
+              <td className="py-2 pl-2 text-right">฿{fmtMoney(batch.total_commission)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {splits.length > 0 && (
+          <div className="pt-2 border-t border-[#F0EDE6]">
+            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">{t("แบ่งตามสัดส่วน", "Split by share", "按比例分成")}</p>
+            {splits.map((s, i) => (
+              <p key={i} className="text-xs text-[#1A1A1A]">
+                {s.person}: {s.percent}% = ฿{fmtMoney((batch.total_commission * s.percent) / 100)}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4 no-print">
+        <p className="text-sm font-semibold text-[#1A1A1A] mb-2">
+          {t('แบ่งค่าคอมของ "', 'Split commission for "', '分成 "')}{batch.owner}{t('"', '"', '"')}
+        </p>
+        <p className="text-xs text-[#9CA3AF] mb-3">
+          {t(
+            "ยังไม่บังคับใส่ — ถ้าไม่ใส่ ระบบจะเก็บค่าคอมรวมไว้ที่ชื่อนี้เฉยๆ โดยไม่หารแบ่งคน",
+            "Optional — leave empty to keep the total under this owner name without splitting it between people.",
+            "非必填 — 留空则总提成只记在此名下，不按人拆分"
+          )}
+        </p>
+        <div className="space-y-2">
+          {splits.map((s, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input
+                className="flex-1 h-9"
+                placeholder={t("ชื่อคน", "Person", "姓名")}
+                value={s.person}
+                onChange={(e) => setSplits((arr) => arr.map((x, idx) => (idx === i ? { ...x, person: e.target.value } : x)))}
+              />
+              <Input
+                type="number"
+                className="w-24 h-9"
+                placeholder="%"
+                value={s.percent || ""}
+                onChange={(e) => setSplits((arr) => arr.map((x, idx) => (idx === i ? { ...x, percent: Number(e.target.value) || 0 } : x)))}
+              />
+              <Button size="icon-sm" variant="outline" onClick={() => setSplits((arr) => arr.filter((_, idx) => idx !== i))}>
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between pt-1">
+            <Button size="sm" variant="outline" onClick={() => setSplits((arr) => [...arr, { person: "", percent: 0 }])}>
+              <Plus size={14} className="mr-1.5" /> {t("เพิ่มคน", "Add person", "添加")}
+            </Button>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs ${Math.abs(splitSum - 100) < 0.01 || !splits.length ? "text-[#9CA3AF]" : "text-red-500"}`}>
+                {t(`รวม ${splitSum}%`, `Sum ${splitSum}%`, `合计 ${splitSum}%`)}
+              </span>
+              <Button size="sm" onClick={saveSplits} disabled={busy}>
+                {t("บันทึกสัดส่วน", "Save split", "保存分成")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CommissionPage() {
+  return (
+    <Suspense fallback={null}>
+      <CommissionInner />
+    </Suspense>
+  );
+}

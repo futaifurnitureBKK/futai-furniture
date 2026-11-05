@@ -1,8 +1,9 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, Printer, Calculator } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useLanguage } from "@/store/language";
 import { CHANNELS } from "@/lib/lead-options";
 import { fmtMoney } from "@/lib/saved-quote-options";
@@ -77,9 +78,17 @@ function SalesDetailInner() {
           <h1 className="text-xl font-bold text-[#1A1A1A]">{t("รายละเอียดยอดขาย", "Sales Detail", "销售额明细")}</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">{ownerLabel} · {rangeLabel}</p>
         </div>
-        <Button onClick={() => window.print()}>
-          <Printer size={15} className="mr-1.5" /> {t("พิมพ์ / บันทึก PDF", "Print / Save as PDF", "打印/另存为PDF")}
-        </Button>
+        <div className="flex items-center gap-2 no-print">
+          <Link
+            href={`/admin/AdminFutai/sales-detail/commission?owner=${encodeURIComponent(owner)}&from=${from}&to=${to}`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <Calculator size={15} className="mr-1.5" /> {t("คิดค่าคอม", "Calculate commission", "计算提成")}
+          </Link>
+          <Button onClick={() => window.print()}>
+            <Printer size={15} className="mr-1.5" /> {t("พิมพ์ / บันทึก PDF", "Print / Save as PDF", "打印/另存为PDF")}
+          </Button>
+        </div>
       </div>
 
       <div id="print-area" className="bg-white rounded-xl shadow-sm p-6">

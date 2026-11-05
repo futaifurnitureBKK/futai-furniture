@@ -1004,8 +1004,8 @@ export default function KpiPage() {
               <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
                 {(
                   [
-                    ["1d", t("วันนี้", "Today", "今天")],
                     ["yesterday", t("เมื่อวาน", "Yesterday", "昨天")],
+                    ["1d", t("วันนี้", "Today", "今天")],
                     ["7d", t("7 วัน", "7 days", "7天")],
                     ["30d", t("30 วัน", "30 days", "30天")],
                     ["month", t("เดือนนี้", "This month", "本月")],

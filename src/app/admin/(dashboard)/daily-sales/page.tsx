@@ -804,16 +804,16 @@ export default function DailySalesPage() {
           <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
             {([
               {
-                key: "today",
-                label: t("วันนี้", "Today", "今天"),
-                active: rangeKey === "1d" && date === todayStr(),
-                onClick: () => { setRangeKey("1d"); setDate(todayStr()); },
-              },
-              {
                 key: "yesterday",
                 label: t("เมื่อวาน", "Yesterday", "昨天"),
                 active: rangeKey === "1d" && date === addDays(todayStr(), -1),
                 onClick: () => { setRangeKey("1d"); setDate(addDays(todayStr(), -1)); },
+              },
+              {
+                key: "today",
+                label: t("วันนี้", "Today", "今天"),
+                active: rangeKey === "1d" && date === todayStr(),
+                onClick: () => { setRangeKey("1d"); setDate(todayStr()); },
               },
               { key: "7d", label: t("7 วัน", "7 days", "7天"), active: rangeKey === "7d", onClick: () => setRangeKey("7d") },
               { key: "30d", label: t("30 วัน", "30 days", "30天"), active: rangeKey === "30d", onClick: () => setRangeKey("30d") },

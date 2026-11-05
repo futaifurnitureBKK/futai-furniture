@@ -33,6 +33,7 @@ import {
 } from "@/lib/saved-quote-options";
 import { embedRowImage, PICTURE_COL_WIDTH, DATA_ROW_HEIGHT } from "@/lib/daily-sheets-excel";
 import { QuoteDocument } from "@/components/admin/QuoteDocument";
+import { useQuoteBatchPdf } from "@/hooks/useQuoteBatchPdf";
 import type ExcelJS from "exceljs";
 
 type DocType = SavedQuoteDocType;
@@ -1173,8 +1174,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // to download together as one combined PDF — a separate set so it can
   // never interact with "pull" mode's own selection/combine flow.
   const [selectedExportIds, setSelectedExportIds] = useState<Set<number>>(new Set());
-  const [batchExportQuotes, setBatchExportQuotes] = useState<SavedQuote[] | null>(null);
-  const [exportingBatch, setExportingBatch] = useState(false);
+  const { batchQuotes: batchExportQuotes, loading: exportingBatch, printQuoteIds } = useQuoteBatchPdf();
   // Cleared whenever listMode changes — adjusted during render (React's
   // recommended way to reset state in response to a prop/flag change)
   // rather than in an effect.
@@ -1610,42 +1610,10 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // the print CSS shows that instead of the live single-document preview,
   // then triggers the OS print dialog once.
   async function downloadSelectedAsPdf() {
-    if (!selectedExportIds.size || exportingBatch) return;
-    setExportingBatch(true);
-    try {
-      const ids = [...selectedExportIds];
-      const results = await Promise.all(
-        ids.map((id) => fetch(`/api/admin/saved-quotes/${id}`).then((r) => r.json()))
-      );
-      const quotes = results
-        .map((r) => r.quote as SavedQuote | undefined)
-        .filter((q): q is SavedQuote => !!q)
-        .sort((a, b) => a.doc_date.localeCompare(b.doc_date) || a.id - b.id);
-      if (!quotes.length) {
-        toast.error(t("โหลดเอกสารที่เลือกไม่สำเร็จ", "Failed to load the selected documents", "加载所选文件失败"));
-        return;
-      }
-      setBatchExportQuotes(quotes);
-    } finally {
-      setExportingBatch(false);
-    }
+    if (!selectedExportIds.size) return;
+    const result = await printQuoteIds([...selectedExportIds]);
+    if (!result.ok) toast.error(t("โหลดเอกสารที่เลือกไม่สำเร็จ", "Failed to load the selected documents", "加载所选文件失败"));
   }
-
-  useEffect(() => {
-    if (!batchExportQuotes || !batchExportQuotes.length) return;
-    document.body.classList.add("batch-print");
-    const after = () => {
-      document.body.classList.remove("batch-print");
-      setBatchExportQuotes(null);
-    };
-    window.addEventListener("afterprint", after);
-    const id = requestAnimationFrame(() => window.print());
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("afterprint", after);
-      document.body.classList.remove("batch-print");
-    };
-  }, [batchExportQuotes]);
 
   function updateItem(id: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));

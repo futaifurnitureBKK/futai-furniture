@@ -115,7 +115,7 @@ export function QuoteDocument({ quote }: { quote: SavedQuote }) {
         <tbody>
           <tr>
             <td rowSpan={companyLines.length} className="w-[80px] align-top pt-1">
-              <Image src="/icon.png" alt="Futai" width={60} height={60} className="rounded" />
+              <Image src="/icon.png" alt="Futai" width={60} height={60} className="rounded" priority />
             </td>
             <td colSpan={8} className="text-center font-bold text-[13px] pt-1">{companyLines[0].text}</td>
           </tr>
@@ -207,7 +207,7 @@ export function QuoteDocument({ quote }: { quote: SavedQuote }) {
               <td className="border border-[#1A1A1A] p-1">
                 {it.image ? (
                   <div className="relative w-full h-16 mx-auto">
-                    <Image src={it.image} alt="" fill sizes="90px" className="object-contain" />
+                    <Image src={it.image} alt="" fill sizes="90px" className="object-contain" priority />
                   </div>
                 ) : (
                   <span className="text-[#C8C5BE]">-</span>
@@ -226,7 +226,7 @@ export function QuoteDocument({ quote }: { quote: SavedQuote }) {
                 {it.remark}
                 {it.remarkImage && (
                   <div className="relative w-full h-16 mt-1">
-                    <Image src={it.remarkImage} alt="" fill sizes="90px" className="object-contain" />
+                    <Image src={it.remarkImage} alt="" fill sizes="90px" className="object-contain" priority />
                   </div>
                 )}
               </td>

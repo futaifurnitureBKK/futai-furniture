@@ -26,12 +26,39 @@ export const BATCH_PDF_CSS = `
   }
 `;
 
+// #batch-print-area sits at `left: -99999px` so it stays invisible outside
+// print — which also means every <img> in it (the Futai logo, product
+// photos) is permanently outside the viewport, so a lazy-loaded one would
+// never ask the browser to fetch it at all. QuoteDocument marks all of its
+// <Image>s `priority` to force that fetch to start on mount regardless;
+// this still only STARTS the fetch, so printing has to wait for it to
+// finish or the dialog opens on half-loaded (or blank/broken) images —
+// exactly what happened before this existed. A hard cap keeps one stuck
+// image (bad URL, offline) from blocking the print indefinitely.
+function waitForImages(root: HTMLElement, timeoutMs = 4000): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll("img"));
+  const pending = imgs.filter((img) => !img.complete);
+  if (!pending.length) return Promise.resolve();
+  const whenLoaded = Promise.all(
+    pending.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+        })
+    )
+  ).then(() => {});
+  const whenTimedOut = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+  return Promise.race([whenLoaded, whenTimedOut]);
+}
+
 // Fetches full SavedQuote records for the given ids, mounts them (render
 // the returned `batchQuotes` into a `<div id="batch-print-area">`, one
 // `<QuoteDocument>` per quote wrapped in `.batch-print-page`), flips the
 // body into "batch-print" mode so BATCH_PDF_CSS's rules take over from the
-// page's normal print target, triggers the OS print dialog once, and
-// cleans up (unmounts, removes the body class) once it closes.
+// page's normal print target, waits for every image in it to actually load,
+// triggers the OS print dialog once, and cleans up (unmounts, removes the
+// body class) once it closes.
 export function useQuoteBatchPdf() {
   const [batchQuotes, setBatchQuotes] = useState<SavedQuote[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,9 +71,14 @@ export function useQuoteBatchPdf() {
       setBatchQuotes(null);
     };
     window.addEventListener("afterprint", after);
-    const raf = requestAnimationFrame(() => window.print());
+    let cancelled = false;
+    (async () => {
+      const container = document.getElementById("batch-print-area");
+      if (container) await waitForImages(container);
+      if (!cancelled) window.print();
+    })();
     return () => {
-      cancelAnimationFrame(raf);
+      cancelled = true;
       window.removeEventListener("afterprint", after);
       document.body.classList.remove("batch-print");
     };

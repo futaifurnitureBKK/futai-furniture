@@ -453,20 +453,31 @@ export default function ContentTrackingPage() {
           </div>
           <div className="flex items-center rounded-lg border border-[#E8E5E0] bg-white p-0.5 gap-0.5">
             {([
-              ["1d", t("วันนี้", "Today", "今天")],
-              ["7d", t("7 วัน", "7 days", "7天")],
-              ["30d", t("30 วัน", "30 days", "30天")],
-              ["month", t("เดือนนี้", "This month", "本月")],
-            ] as [RangeKey, string][]).map(([key, label]) => (
+              {
+                key: "today",
+                label: t("วันนี้", "Today", "今天"),
+                active: rangeKey === "1d" && date === todayStr(),
+                onClick: () => { setRangeKey("1d"); setDate(todayStr()); },
+              },
+              {
+                key: "yesterday",
+                label: t("เมื่อวาน", "Yesterday", "昨天"),
+                active: rangeKey === "1d" && date === addDays(todayStr(), -1),
+                onClick: () => { setRangeKey("1d"); setDate(addDays(todayStr(), -1)); },
+              },
+              { key: "7d", label: t("7 วัน", "7 days", "7天"), active: rangeKey === "7d", onClick: () => setRangeKey("7d") },
+              { key: "30d", label: t("30 วัน", "30 days", "30天"), active: rangeKey === "30d", onClick: () => setRangeKey("30d") },
+              { key: "month", label: t("เดือนนี้", "This month", "本月"), active: rangeKey === "month", onClick: () => setRangeKey("month") },
+            ]).map((btn) => (
               <button
-                key={key}
+                key={btn.key}
                 type="button"
-                onClick={() => setRangeKey(key)}
+                onClick={btn.onClick}
                 className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
-                  rangeKey === key ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
+                  btn.active ? "bg-[#C8102E] text-white font-medium" : "text-[#6B6B6B] hover:bg-[#FAF7F2]"
                 }`}
               >
-                {label}
+                {btn.label}
               </button>
             ))}
           </div>

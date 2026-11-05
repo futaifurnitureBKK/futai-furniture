@@ -69,11 +69,15 @@ const RANGES: { key: RangeKey; days: number | null }[] = [
   { key: "ALL", days: null },
 ];
 
-type QuickRangeKey = "1d" | "7d" | "30d" | "month";
+type QuickRangeKey = "1d" | "yesterday" | "7d" | "30d" | "month";
 function computeQuickRange(key: QuickRangeKey): { from: string; to: string } {
   const to = todayStr();
   const end = new Date();
   if (key === "1d") return { from: to, to };
+  if (key === "yesterday") {
+    const y = daysAgoStr(1);
+    return { from: y, to: y };
+  }
   if (key === "7d") {
     const start = new Date(end);
     start.setDate(start.getDate() - 6);
@@ -1001,6 +1005,7 @@ export default function KpiPage() {
                 {(
                   [
                     ["1d", t("วันนี้", "Today", "今天")],
+                    ["yesterday", t("เมื่อวาน", "Yesterday", "昨天")],
                     ["7d", t("7 วัน", "7 days", "7天")],
                     ["30d", t("30 วัน", "30 days", "30天")],
                     ["month", t("เดือนนี้", "This month", "本月")],

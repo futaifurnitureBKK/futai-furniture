@@ -113,6 +113,11 @@ function BatchBuilder({
   const [orders, setOrders] = useState<EligibleOrder[] | null>(null);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [deductions, setDeductions] = useState<Record<number, number>>({});
+  // Lets staff correct a row whose auto-detected base is wrong — e.g. a lead
+  // linked to the wrong (or a stale) saved quotation — by typing the real
+  // number directly, instead of only ever being able to subtract from it
+  // via "deduction". Keyed by leadId; absent = use the auto-detected value.
+  const [baseOverrides, setBaseOverrides] = useState<Record<number, number>>({});
   const [mode, setMode] = useState<CommissionMode>("cumulative");
   const [base, setBase] = useState<CommissionBase>("ex_vat");
   const [saving, setSaving] = useState(false);
@@ -149,9 +154,11 @@ function BatchBuilder({
   }, [owner]);
 
   const selectedOrders = useMemo(() => (orders || []).filter((o) => selected[o.leadId]), [orders, selected]);
+  const effectiveBase = (o: EligibleOrder) => baseOverrides[o.leadId] ?? o.baseAmount;
   const netOrders = useMemo(
-    () => selectedOrders.map((o) => ({ id: o.leadId, amount: Math.max(0, o.baseAmount - (deductions[o.leadId] || 0)) })),
-    [selectedOrders, deductions]
+    () => selectedOrders.map((o) => ({ id: o.leadId, amount: Math.max(0, effectiveBase(o) - (deductions[o.leadId] || 0)) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedOrders, deductions, baseOverrides]
   );
   const computed = useMemo(() => calcCommission(netOrders, mode), [netOrders, mode]);
   const commissionByLead = useMemo(() => new Map(computed.map((c) => [c.id, c])), [computed]);
@@ -170,7 +177,7 @@ function BatchBuilder({
         leadId: o.leadId,
         customerName: o.customerName,
         closedDate: o.closedDate,
-        baseAmount: o.baseAmount,
+        baseAmount: effectiveBase(o),
         deduction: deductions[o.leadId] || 0,
       }));
       const res = await fetch("/api/admin/commission/batches", {
@@ -248,9 +255,9 @@ function BatchBuilder({
 
       <p className="text-xs text-[#9CA3AF]">
         {t(
-          "ยอดฐาน \"ประมาณการ\" คือออเดอร์ที่ไม่มีใบเสนอราคาอ้างอิง เลยไม่มี VAT/ส่วนลดจริงให้ดึง ใช้มูลค่าดีลคาดคะเนแทน — แก้ไขได้ที่ช่อง \"หักเพิ่มเติม\" ต่อแถว",
-          "\"Estimated\" base = no linked quotation to read real VAT/discount from, so it's approximated from the deal value — adjust per row with \"extra deduction\" if needed.",
-          "\"估算\"基数表示没有关联报价单可读取真实的增值税/折扣，因此按成交金额估算 — 可在每行\"额外扣除\"栏调整"
+          "ยอดฐาน \"ประมาณการ\" คือออเดอร์ที่ไม่มีใบเสนอราคาอ้างอิง เลยไม่มี VAT/ส่วนลดจริงให้ดึง ใช้มูลค่าดีลคาดคะเนแทน — แก้ไขค่านี้ตรงๆ ได้เลยในช่อง \"ยอดฐาน\" ถ้าตัวเลขที่ระบบดึงมาไม่ถูกต้อง (เช่น ลิงก์กับใบเสนอราคาผิดใบ)",
+          "\"Estimated\" base = no linked quotation to read real VAT/discount from, so it's approximated from the deal value — edit the \"Base\" field directly on a row if the number is wrong (e.g. linked to the wrong quotation).",
+          "\"估算\"基数表示没有关联报价单可读取真实的增值税/折扣，因此按成交金额估算 — 如果数字不对（如关联错了报价单），可直接在\"基数\"栏修改"
         )}
       </p>
 
@@ -271,8 +278,10 @@ function BatchBuilder({
           </thead>
           <tbody>
             {orders.map((o) => {
-              const net = Math.max(0, o.baseAmount - (deductions[o.leadId] || 0));
+              const rowBase = effectiveBase(o);
+              const net = Math.max(0, rowBase - (deductions[o.leadId] || 0));
               const c = commissionByLead.get(o.leadId);
+              const overridden = baseOverrides[o.leadId] != null;
               return (
                 <tr key={o.leadId} className={`border-t border-[#F0EDE6] ${o.eligible ? "" : "bg-[#FAF7F2] text-[#9CA3AF]"}`}>
                   <td className="p-3">
@@ -288,9 +297,25 @@ function BatchBuilder({
                     {!o.eligible && o.reason && <div className="text-[10px] text-red-500 mt-0.5">{o.reason}</div>}
                   </td>
                   <td className="p-3">{channelLabel(o.channel, t)}</td>
-                  <td className="p-3 text-right tabular-nums">
-                    ฿{fmtMoney(o.baseAmount)}
-                    {o.baseIsEstimate && <span className="text-[10px] text-[#9CA3AF] ml-1">{t("(ประมาณการ)", "(est.)", "(估)")}</span>}
+                  <td className="p-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-[#6B6B6B]">฿</span>
+                      <Input
+                        type="number"
+                        className="w-28 h-8 text-right text-xs"
+                        value={baseOverrides[o.leadId] ?? o.baseAmount}
+                        onChange={(e) =>
+                          setBaseOverrides((b) => ({ ...b, [o.leadId]: e.target.value === "" ? o.baseAmount : Number(e.target.value) }))
+                        }
+                      />
+                    </div>
+                    <div className="text-[10px] text-[#9CA3AF] mt-0.5 text-right">
+                      {overridden
+                        ? t(`เดิม ฿${fmtMoney(o.baseAmount)}`, `was ฿${fmtMoney(o.baseAmount)}`, `原为 ฿${fmtMoney(o.baseAmount)}`)
+                        : o.baseIsEstimate
+                          ? t("(ประมาณการ)", "(est.)", "(估)")
+                          : ""}
+                    </div>
                   </td>
                   <td className="p-3 text-right">
                     <Input

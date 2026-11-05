@@ -22,7 +22,12 @@ export async function GET(req: NextRequest) {
 }
 
 interface CreateBatchItem {
-  leadId: number;
+  // Exactly one of the two must be set — a normal auto-detected order
+  // (converted lead) has leadId; one added by hand via the quotation
+  // search (no matching lead, or deliberately added regardless of its
+  // lead) has sourceQuoteId instead.
+  leadId?: number | null;
+  sourceQuoteId?: number | null;
   customerName: string;
   closedDate: string;
   baseAmount: number;
@@ -32,8 +37,8 @@ interface CreateBatchItem {
 
 // Saves a new draft batch with the items the staff ticked in the preview
 // screen. Re-validates against commission_items itself (not just trusting
-// what the client sent) so a lead already claimed by another batch created
-// moments earlier can't be double-paid.
+// what the client sent) so an order already claimed by another batch
+// created moments earlier can't be double-paid.
 export async function POST(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,25 +54,40 @@ export async function POST(req: NextRequest) {
   if (!owner || !periodFrom || !periodTo || !items.length) {
     return NextResponse.json({ error: "owner, periodFrom, periodTo, items are required" }, { status: 400 });
   }
+  if (items.some((it) => it.leadId == null && it.sourceQuoteId == null)) {
+    return NextResponse.json({ error: "แต่ละรายการต้องมี leadId หรือ sourceQuoteId อย่างน้อยหนึ่งอย่าง" }, { status: 400 });
+  }
 
   const db = supabaseAdmin();
 
-  const leadIds = items.map((it) => it.leadId);
-  const { data: alreadyClaimed } = await db
-    .from("commission_items")
-    .select("lead_id, batch_id, commission_batches!inner(status)")
-    .in("lead_id", leadIds)
-    .neq("commission_batches.status", "cancelled");
-  if (alreadyClaimed?.length) {
+  const leadIds = items.map((it) => it.leadId).filter((v): v is number => v != null);
+  const quoteIds = items.map((it) => it.sourceQuoteId).filter((v): v is number => v != null);
+  const [leadClaims, quoteClaims] = await Promise.all([
+    leadIds.length
+      ? db.from("commission_items").select("lead_id, commission_batches!inner(status)").in("lead_id", leadIds).neq("commission_batches.status", "cancelled")
+      : Promise.resolve({ data: [] as unknown[] }),
+    quoteIds.length
+      ? db
+          .from("commission_items")
+          .select("source_quote_id, commission_batches!inner(status)")
+          .in("source_quote_id", quoteIds)
+          .neq("commission_batches.status", "cancelled")
+      : Promise.resolve({ data: [] as unknown[] }),
+  ]);
+  const claimedCount = (leadClaims.data?.length || 0) + (quoteClaims.data?.length || 0);
+  if (claimedCount) {
     return NextResponse.json(
-      { error: `ออเดอร์ ${alreadyClaimed.length} รายการถูกคิดค่าคอมไปแล้วในรอบอื่น กรุณารีเฟรชหน้านี้แล้วลองใหม่` },
+      { error: `ออเดอร์ ${claimedCount} รายการถูกคิดค่าคอมไปแล้วในรอบอื่น กรุณารีเฟรชหน้านี้แล้วลองใหม่` },
       { status: 409 }
     );
   }
 
-  const net = items.map((it) => ({ id: it.leadId, amount: Math.max(0, it.baseAmount - (it.deduction || 0)) }));
+  // calcCommission preserves order 1:1 with what's passed in, so `computed`
+  // lines up with `items` by array position — no id scheme needed to zip
+  // them back together, which matters now that an item might have neither
+  // a leadId nor be distinguishable by one alone.
+  const net = items.map((it, idx) => ({ id: idx, amount: Math.max(0, it.baseAmount - (it.deduction || 0)) }));
   const computed = calcCommission(net, mode);
-  const commissionByLead = new Map(computed.map((c) => [c.id, c]));
 
   const totalBase = items.reduce((s, it) => s + it.baseAmount, 0);
   const totalCommission = computed.reduce((s, c) => s + c.commission, 0);
@@ -91,11 +111,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: batchErr.message }, { status: 400 });
   }
 
-  const rows = items.map((it) => {
-    const c = commissionByLead.get(it.leadId)!;
+  const rows = items.map((it, idx) => {
+    const c = computed[idx];
     return {
       batch_id: batch.id,
-      lead_id: it.leadId,
+      lead_id: it.leadId ?? null,
+      source_quote_id: it.sourceQuoteId ?? null,
       customer_name: it.customerName,
       closed_date: it.closedDate,
       base_amount: it.baseAmount,

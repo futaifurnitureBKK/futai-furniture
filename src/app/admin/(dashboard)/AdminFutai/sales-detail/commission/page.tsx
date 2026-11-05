@@ -28,9 +28,37 @@ interface EligibleOrder {
   sourceQuoteId: number | null;
 }
 
+interface QuoteSearchResult {
+  quoteId: number;
+  docNo: string;
+  customerName: string;
+  closedDate: string;
+  channel: string;
+  baseAmount: number;
+  alreadyClaimed: boolean;
+  reason: string | null;
+}
+
+// A row added by hand through the quotation search, not auto-detected from
+// a converted lead — kept entirely separate from the EligibleOrder/selected/
+// deductions/baseOverrides state (all keyed by leadId) so this never risks
+// disturbing that already-working path; it carries its own editable fields
+// inline instead.
+interface ManualRow {
+  quoteId: number;
+  docNo: string;
+  customerName: string;
+  closedDate: string;
+  channel: string;
+  baseAmount: number;
+  deduction: number;
+  selected: boolean;
+}
+
 interface CommissionItem {
   id: number;
-  lead_id: number;
+  lead_id: number | null;
+  source_quote_id: number | null;
   customer_name: string;
   closed_date: string | null;
   base_amount: number;
@@ -45,6 +73,7 @@ interface CommissionItem {
 }
 
 function getItemSourceQuoteId(item: CommissionItem): number | null {
+  if (item.source_quote_id != null) return item.source_quote_id;
   const l = Array.isArray(item.leads) ? item.leads[0] : item.leads;
   return l?.source_quote_id ?? null;
 }
@@ -145,6 +174,49 @@ function BatchBuilder({
   const [history, setHistory] = useState<CommissionBatch[] | null>(null);
   const { batchQuotes, loading: pdfLoading, printQuoteIds } = useQuoteBatchPdf();
 
+  // "Add manually" — pulls in a quotation that the auto-detected list above
+  // (built only from converted leads) missed, or doesn't have one for.
+  const [manualRows, setManualRows] = useState<ManualRow[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<QuoteSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    // Below the 2-char threshold the dropdown is never shown (gated in the
+    // JSX below), so there's nothing to reset here — leaving stale results
+    // in state when hidden is harmless and avoids a setState call whose
+    // only job would be to derive UI visibility, which belongs in render.
+    // "searching" itself flips to true from the input's own onChange (a
+    // real user event), not here, so this effect never sets state outside
+    // the async callback that reacts to an external fetch finishing.
+    if (!searchOpen || searchQuery.trim().length < 2) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/admin/commission/quote-search?q=${encodeURIComponent(searchQuery.trim())}&base=${base}`);
+      const data = await res.json();
+      if (!cancelled) {
+        setSearchResults(res.ok ? data.results : []);
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchOpen, searchQuery, base]);
+
+  function addManualRow(r: QuoteSearchResult) {
+    if (manualRows.some((m) => m.quoteId === r.quoteId)) return;
+    setManualRows((rows) => [
+      ...rows,
+      { quoteId: r.quoteId, docNo: r.docNo, customerName: r.customerName, closedDate: r.closedDate, channel: r.channel, baseAmount: r.baseAmount, deduction: 0, selected: true },
+    ]);
+    setSearchQuery("");
+    setSearchResults(null);
+    setSearchOpen(false);
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -176,21 +248,32 @@ function BatchBuilder({
   }, [owner]);
 
   const selectedOrders = useMemo(() => (orders || []).filter((o) => selected[o.leadId]), [orders, selected]);
+  const selectedManualRows = useMemo(() => manualRows.filter((r) => r.selected), [manualRows]);
   const effectiveBase = (o: EligibleOrder) => baseOverrides[o.leadId] ?? o.baseAmount;
+  // Manual rows share the same tier pool as lead-based ones (cumulative mode
+  // sums everything before applying the rate), so both go into one
+  // calcCommission call. Negative ids for manual rows (quoteId is always
+  // positive) keep the two id spaces from ever colliding in commissionById.
   const netOrders = useMemo(
-    () => selectedOrders.map((o) => ({ id: o.leadId, amount: Math.max(0, effectiveBase(o) - (deductions[o.leadId] || 0)) })),
+    () => [
+      ...selectedOrders.map((o) => ({ id: o.leadId, amount: Math.max(0, effectiveBase(o) - (deductions[o.leadId] || 0)) })),
+      ...selectedManualRows.map((r) => ({ id: -r.quoteId, amount: Math.max(0, r.baseAmount - r.deduction) })),
+    ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedOrders, deductions, baseOverrides]
+    [selectedOrders, selectedManualRows, deductions, baseOverrides]
   );
   const computed = useMemo(() => calcCommission(netOrders, mode), [netOrders, mode]);
-  const commissionByLead = useMemo(() => new Map(computed.map((c) => [c.id, c])), [computed]);
+  const commissionById = useMemo(() => new Map(computed.map((c) => [c.id, c])), [computed]);
 
   const totalNet = netOrders.reduce((s, o) => s + o.amount, 0);
   const totalCommission = computed.reduce((s, c) => s + c.commission, 0);
   const upcoming = mode === "cumulative" ? nextTier(totalNet) : null;
 
   const ownerLabel = owner === "all" ? t("ทุกคน", "Everyone", "全部") : owner === NO_OWNER ? t("ยังไม่ระบุ", "Not set", "未设置") : owner;
-  const selectedQuoteIds = selectedOrders.map((o) => o.sourceQuoteId).filter((id): id is number => id != null);
+  const selectedQuoteIds = [
+    ...selectedOrders.map((o) => o.sourceQuoteId).filter((id): id is number => id != null),
+    ...selectedManualRows.map((r) => r.quoteId),
+  ];
 
   async function downloadQuotations() {
     if (!selectedQuoteIds.length) {
@@ -202,20 +285,30 @@ function BatchBuilder({
   }
 
   async function save() {
-    if (!selectedOrders.length) return;
+    if (!selectedOrders.length && !selectedManualRows.length) return;
     setSaving(true);
     try {
-      const items = selectedOrders.map((o) => ({
-        leadId: o.leadId,
-        customerName: o.customerName,
-        closedDate: o.closedDate,
-        baseAmount: effectiveBase(o),
-        deduction: deductions[o.leadId] || 0,
-      }));
+      const items = [
+        ...selectedOrders.map((o) => ({
+          leadId: o.leadId,
+          customerName: o.customerName,
+          closedDate: o.closedDate,
+          baseAmount: effectiveBase(o),
+          deduction: deductions[o.leadId] || 0,
+        })),
+        ...selectedManualRows.map((r) => ({
+          sourceQuoteId: r.quoteId,
+          customerName: r.customerName,
+          closedDate: r.closedDate,
+          baseAmount: r.baseAmount,
+          deduction: r.deduction,
+        })),
+      ];
+      const fallbackDate = items[0].closedDate;
       const res = await fetch("/api/admin/commission/batches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ owner, periodFrom: from || selectedOrders[0].closedDate, periodTo: to || selectedOrders[0].closedDate, mode, base, items }),
+        body: JSON.stringify({ owner, periodFrom: from || fallbackDate, periodTo: to || fallbackDate, mode, base, items }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -293,6 +386,84 @@ function BatchBuilder({
         )}
       </p>
 
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#1A1A1A]">{t("เพิ่มรายการเอง", "Add manually", "手动添加")}</p>
+            <p className="text-xs text-[#9CA3AF] mt-0.5">
+              {t(
+                "ใช้ตอนมีใบเสนอราคา/ออเดอร์ที่ควรนับในรอบนี้ แต่ไม่ขึ้นในตารางด้านล่าง เช่น ไม่มีลีดคอนเวิร์ตคู่กัน หรืออยู่คนละผู้ดูแล",
+                "Use this when a quotation/order should count toward this batch but isn't showing below — e.g. no matching converted lead, or filed under a different owner.",
+                "用于应计入本批次但未显示在下表中的报价单/订单 — 例如没有对应的已转化线索，或归在其他负责人名下"
+              )}
+            </p>
+          </div>
+          {!searchOpen && (
+            <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
+              <Plus size={14} className="mr-1.5" /> {t("ค้นหา", "Search", "搜索")}
+            </Button>
+          )}
+        </div>
+        {searchOpen && (
+          <div className="relative mt-3">
+            <Input
+              autoFocus
+              placeholder={t("ค้นหาเลขที่เอกสารหรือชื่อลูกค้า...", "Search doc no. or customer name...", "搜索单号或客户名称...")}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (e.target.value.trim().length >= 2) setSearching(true);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="absolute right-1 top-1 h-7"
+              onClick={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+                setSearchResults(null);
+              }}
+            >
+              {t("ปิด", "Close", "关闭")}
+            </Button>
+            {searchQuery.trim().length >= 2 && (
+              <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#E8E5E0] rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                {searching ? (
+                  <div className="p-3 text-center text-xs text-[#9CA3AF]">
+                    <Loader2 size={14} className="inline animate-spin mr-1.5" />
+                    {t("กำลังค้นหา...", "Searching...", "搜索中...")}
+                  </div>
+                ) : searchResults && searchResults.length ? (
+                  searchResults.map((r) => (
+                    <button
+                      key={r.quoteId}
+                      type="button"
+                      disabled={r.alreadyClaimed}
+                      onClick={() => addManualRow(r)}
+                      className={`w-full text-left px-3 py-2 text-xs border-b border-[#F0EDE6] last:border-0 ${
+                        r.alreadyClaimed ? "opacity-50 cursor-not-allowed" : "hover:bg-[#FAF7F2]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono">{r.docNo}</span>
+                        <span className="font-medium">฿{fmtMoney(r.baseAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[#6B6B6B] mt-0.5">
+                        <span>{r.customerName} · {r.closedDate}</span>
+                        {r.alreadyClaimed && <span className="text-red-500">{r.reason}</span>}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-3 text-center text-xs text-[#9CA3AF]">{t("ไม่พบ", "No results", "未找到结果")}</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full text-sm min-w-[800px]">
           <thead>
@@ -306,13 +477,14 @@ function BatchBuilder({
               <th className="p-3 text-right">{t("ยอดสุทธิ", "Net", "净额")}</th>
               <th className="p-3 text-right">{t("เรท", "Rate", "费率")}</th>
               <th className="p-3 text-right">{t("ค่าคอม", "Commission", "提成")}</th>
+              <th className="p-3 w-10" />
             </tr>
           </thead>
           <tbody>
             {orders.map((o) => {
               const rowBase = effectiveBase(o);
               const net = Math.max(0, rowBase - (deductions[o.leadId] || 0));
-              const c = commissionByLead.get(o.leadId);
+              const c = commissionById.get(o.leadId);
               const overridden = baseOverrides[o.leadId] != null;
               return (
                 <tr key={o.leadId} className={`border-t border-[#F0EDE6] ${o.eligible ? "" : "bg-[#FAF7F2] text-[#9CA3AF]"}`}>
@@ -361,12 +533,72 @@ function BatchBuilder({
                   <td className="p-3 text-right tabular-nums">฿{fmtMoney(net)}</td>
                   <td className="p-3 text-right tabular-nums">{selected[o.leadId] && c ? `${(c.rate * 100).toFixed(1)}%` : "-"}</td>
                   <td className="p-3 text-right tabular-nums font-medium">{selected[o.leadId] && c ? `฿${fmtMoney(c.commission)}` : "-"}</td>
+                  <td className="p-3" />
                 </tr>
               );
             })}
-            {orders.length === 0 && (
+            {manualRows.map((r) => {
+              const net = Math.max(0, r.baseAmount - r.deduction);
+              const c = commissionById.get(-r.quoteId);
+              return (
+                <tr key={`manual-${r.quoteId}`} className="border-t border-[#F0EDE6] bg-blue-50/40">
+                  <td className="p-3">
+                    <Checkbox
+                      checked={r.selected}
+                      onCheckedChange={() =>
+                        setManualRows((rows) => rows.map((x) => (x.quoteId === r.quoteId ? { ...x, selected: !x.selected } : x)))
+                      }
+                      aria-label={t("เลือกออเดอร์", "Select order", "选择订单")}
+                    />
+                  </td>
+                  <td className="p-3">{r.closedDate}</td>
+                  <td className="p-3">
+                    {r.customerName}
+                    <div className="text-[10px] text-blue-600 mt-0.5">{t(`เพิ่มเอง · ${r.docNo}`, `Added manually · ${r.docNo}`, `手动添加 · ${r.docNo}`)}</div>
+                  </td>
+                  <td className="p-3">{channelLabel(r.channel, t)}</td>
+                  <td className="p-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-[#6B6B6B]">฿</span>
+                      <Input
+                        type="number"
+                        className="w-28 h-8 text-right text-xs"
+                        value={r.baseAmount}
+                        onChange={(e) =>
+                          setManualRows((rows) =>
+                            rows.map((x) => (x.quoteId === r.quoteId ? { ...x, baseAmount: Number(e.target.value) || 0 } : x))
+                          )
+                        }
+                      />
+                    </div>
+                  </td>
+                  <td className="p-3 text-right">
+                    <Input
+                      type="number"
+                      className="w-24 h-8 text-right text-xs"
+                      value={r.deduction || ""}
+                      placeholder="0"
+                      onChange={(e) =>
+                        setManualRows((rows) =>
+                          rows.map((x) => (x.quoteId === r.quoteId ? { ...x, deduction: Number(e.target.value) || 0 } : x))
+                        )
+                      }
+                    />
+                  </td>
+                  <td className="p-3 text-right tabular-nums">฿{fmtMoney(net)}</td>
+                  <td className="p-3 text-right tabular-nums">{r.selected && c ? `${(c.rate * 100).toFixed(1)}%` : "-"}</td>
+                  <td className="p-3 text-right tabular-nums font-medium">{r.selected && c ? `฿${fmtMoney(c.commission)}` : "-"}</td>
+                  <td className="p-3 text-center">
+                    <Button size="icon-sm" variant="ghost" onClick={() => setManualRows((rows) => rows.filter((x) => x.quoteId !== r.quoteId))}>
+                      <Trash2 size={13} className="text-red-500" />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+            {orders.length === 0 && manualRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-10 text-center text-sm text-[#9CA3AF]">
+                <td colSpan={10} className="p-10 text-center text-sm text-[#9CA3AF]">
                   {t("ไม่มีออเดอร์ในช่วงนี้", "No orders in this period", "该期间没有订单")}
                 </td>
               </tr>
@@ -377,7 +609,13 @@ function BatchBuilder({
 
       <div className="bg-white rounded-xl shadow-sm p-4 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-[#9CA3AF]">{t(`เลือกแล้ว ${selectedOrders.length} ออเดอร์ · ยอดสุทธิ`, `${selectedOrders.length} orders selected · net`, `已选 ${selectedOrders.length} 单 · 净额`)}</p>
+          <p className="text-xs text-[#9CA3AF]">
+            {t(
+              `เลือกแล้ว ${selectedOrders.length + selectedManualRows.length} ออเดอร์ · ยอดสุทธิ`,
+              `${selectedOrders.length + selectedManualRows.length} orders selected · net`,
+              `已选 ${selectedOrders.length + selectedManualRows.length} 单 · 净额`
+            )}
+          </p>
           <p className="text-lg font-bold text-[#1A1A1A]">฿{fmtMoney(totalNet)}</p>
           {upcoming && (
             <p className="text-xs text-amber-600 mt-1">
@@ -397,7 +635,7 @@ function BatchBuilder({
           {pdfLoading ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : <FileDown size={15} className="mr-1.5" />}
           {t(`ดาวน์โหลดใบเสนอราคา (${selectedQuoteIds.length}/${selectedOrders.length})`, `Download quotations (${selectedQuoteIds.length}/${selectedOrders.length})`, `下载报价单 (${selectedQuoteIds.length}/${selectedOrders.length})`)}
         </Button>
-        <Button onClick={save} disabled={!selectedOrders.length || saving}>
+        <Button onClick={save} disabled={(!selectedOrders.length && !selectedManualRows.length) || saving}>
           {saving ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : null}
           {t("บันทึกเป็นร่าง", "Save as draft", "保存为草稿")}
         </Button>

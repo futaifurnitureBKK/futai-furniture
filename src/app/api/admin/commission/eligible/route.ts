@@ -84,6 +84,22 @@ export async function GET(req: NextRequest) {
     if (batch) claimedByLead.set(row.lead_id, { batchId: row.batch_id, periodFrom: batch.period_from, periodTo: batch.period_to });
   }
 
+  // A lead's underlying quotation can also have been pulled into a batch
+  // directly (by quote-search, source_quote_id — see quote-search/route.ts),
+  // bypassing lead_id entirely. Without this check that same sale could be
+  // claimed a second time here through its lead.
+  const claimedByQuoteBatch = new Map<number, number>();
+  if (quoteIds.length) {
+    const { data: quoteClaims } = await db
+      .from("commission_items")
+      .select("source_quote_id, batch_id, commission_batches!inner(status)")
+      .in("source_quote_id", quoteIds)
+      .neq("commission_batches.status", "cancelled");
+    for (const row of (quoteClaims || []) as { source_quote_id: number | null; batch_id: number }[]) {
+      if (row.source_quote_id != null) claimedByQuoteBatch.set(row.source_quote_id, row.batch_id);
+    }
+  }
+
   const orders: EligibleOrder[] = leads.map((l) => {
     const quote = l.source_quote_id != null ? quotesById.get(l.source_quote_id) : undefined;
     const dealValue = l.deal_value ?? 0;
@@ -105,9 +121,13 @@ export async function GET(req: NextRequest) {
     let reason: string | null = null;
 
     const claim = claimedByLead.get(l.id);
+    const quoteClaimBatch = l.source_quote_id != null ? claimedByQuoteBatch.get(l.source_quote_id) : undefined;
     if (claim) {
       eligible = false;
       reason = `คิดไปแล้วในรอบ ${claim.periodFrom} → ${claim.periodTo} (#${claim.batchId})`;
+    } else if (quoteClaimBatch != null) {
+      eligible = false;
+      reason = `ใบเสนอราคานี้ถูกเพิ่มเข้ารอบอื่นแล้ว (#${quoteClaimBatch})`;
     } else if (quote) {
       const total = computeGrandTotal(quote.items, quote.discount_pct, quote.vat_pct);
       const paid = paidByQuote.get(l.source_quote_id as number) ?? 0;

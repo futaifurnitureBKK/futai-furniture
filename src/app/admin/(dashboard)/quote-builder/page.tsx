@@ -32,6 +32,7 @@ import {
   computeGrandTotal,
 } from "@/lib/saved-quote-options";
 import { embedRowImage, PICTURE_COL_WIDTH, DATA_ROW_HEIGHT } from "@/lib/daily-sheets-excel";
+import { QuoteDocument } from "@/components/admin/QuoteDocument";
 import type ExcelJS from "exceljs";
 
 type DocType = SavedQuoteDocType;
@@ -1168,6 +1169,12 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // Lets picking several quotations at once combine all their items into
   // this one draft, instead of only ever replacing it from a single source.
   const [selectedPullIds, setSelectedPullIds] = useState<Set<number>>(new Set());
+  // Same idea as selectedPullIds, but for picking several saved documents
+  // to download together as one combined PDF — a separate set so it can
+  // never interact with "pull" mode's own selection/combine flow.
+  const [selectedExportIds, setSelectedExportIds] = useState<Set<number>>(new Set());
+  const [batchExportQuotes, setBatchExportQuotes] = useState<SavedQuote[] | null>(null);
+  const [exportingBatch, setExportingBatch] = useState(false);
   // Cleared whenever listMode changes — adjusted during render (React's
   // recommended way to reset state in response to a prop/flag change)
   // rather than in an effect.
@@ -1175,6 +1182,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   if (listMode !== prevListMode) {
     setPrevListMode(listMode);
     setSelectedPullIds(new Set());
+    setSelectedExportIds(new Set());
   }
   const [showArchived, setShowArchived] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
@@ -1593,6 +1601,52 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     }
   }
 
+  // Downloads several saved documents at once as ONE combined PDF (browsers
+  // can't silently save multiple PDF files without a "Save" dialog per
+  // file, so one file with every selected document on its own page is the
+  // only one-click option). Fetches each quote's full record — the list
+  // table only holds a partial projection — renders them all into the
+  // hidden #batch-print-area, flips the body into "batch-print" mode so
+  // the print CSS shows that instead of the live single-document preview,
+  // then triggers the OS print dialog once.
+  async function downloadSelectedAsPdf() {
+    if (!selectedExportIds.size || exportingBatch) return;
+    setExportingBatch(true);
+    try {
+      const ids = [...selectedExportIds];
+      const results = await Promise.all(
+        ids.map((id) => fetch(`/api/admin/saved-quotes/${id}`).then((r) => r.json()))
+      );
+      const quotes = results
+        .map((r) => r.quote as SavedQuote | undefined)
+        .filter((q): q is SavedQuote => !!q)
+        .sort((a, b) => a.doc_date.localeCompare(b.doc_date) || a.id - b.id);
+      if (!quotes.length) {
+        toast.error(t("โหลดเอกสารที่เลือกไม่สำเร็จ", "Failed to load the selected documents", "加载所选文件失败"));
+        return;
+      }
+      setBatchExportQuotes(quotes);
+    } finally {
+      setExportingBatch(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!batchExportQuotes || !batchExportQuotes.length) return;
+    document.body.classList.add("batch-print");
+    const after = () => {
+      document.body.classList.remove("batch-print");
+      setBatchExportQuotes(null);
+    };
+    window.addEventListener("afterprint", after);
+    const id = requestAnimationFrame(() => window.print());
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener("afterprint", after);
+      document.body.classList.remove("batch-print");
+    };
+  }, [batchExportQuotes]);
+
   function updateItem(id: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
@@ -1865,10 +1919,19 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   return (
     <div className="space-y-6">
       <style>{`
+        /* Off-screen at all times outside printing — it only ever exists to
+           be the print target right after downloadSelectedAsPdf() mounts it. */
+        #batch-print-area { visibility: hidden; position: fixed; left: -99999px; top: 0; }
         @media print {
           @page { margin: 10mm; }
           body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
+          /* Two mutually-exclusive print targets: the single live document
+             (#print-area, as before) and the multi-quote batch export
+             (#batch-print-area, added for "download selected as PDF" on the
+             saved-quotes list) — a body class picks which one shows, so the
+             two print paths never both become visible at once. */
+          body:not(.batch-print) #print-area, body:not(.batch-print) #print-area * { visibility: visible; }
+          body.batch-print #batch-print-area, body.batch-print #batch-print-area * { visibility: visible; }
           /* position:sticky on the wrapper (for on-screen scrolling) makes it
              a positioning context, same as position:relative would — without
              this override, #print-area's position:absolute below resolves
@@ -1880,13 +1943,13 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
              "left:0" set makes a block shrink-to-fit its content instead of
              keeping the 794px it had on screen, which silently reflows every
              auto-layout table below to different (wrong) column widths. */
-          #print-area { position: absolute; top: 0; left: 0; width: 794px; margin: 0; }
+          #print-area, #batch-print-area { position: absolute; top: 0; left: 0; width: 794px; margin: 0; }
           .no-print { display: none !important; }
           /* Chrome strips background colors on print by default (the
              peach header bar, yellow VAT row) unless the user manually
              checks "Background graphics" in More settings — force them
              to print regardless, matching the on-screen preview exactly. */
-          #print-area, #print-area * {
+          #print-area, #print-area *, #batch-print-area, #batch-print-area * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -1894,10 +1957,14 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
              page gets sliced in half instead of moving to the next page
              whole — force every table row and boxed section to jump to the
              next page as a unit instead. */
-          #print-area tr, #print-area .no-break {
+          #print-area tr, #print-area .no-break, #batch-print-area tr, #batch-print-area .no-break {
             break-inside: avoid;
             page-break-inside: avoid;
           }
+          /* One saved quote per page in the batch PDF, instead of letting
+             them run together wherever the content happens to end. */
+          .batch-print-page { break-after: page; page-break-after: always; }
+          .batch-print-page:last-child { break-after: auto; page-break-after: auto; }
           /* The phone number field is a plain <input> so it's editable
              on-screen — strip any browser input chrome so it prints as
              plain text, matching the rest of the letterhead. */
@@ -2080,22 +2147,40 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             </div>
           )}
 
+          {listMode === "saved" && selectedExportIds.size > 0 && (
+            <div className="flex items-center justify-between gap-2 mb-3 bg-[#FAF7F2] border border-[#E8E5E0] rounded-lg px-3 py-2">
+              <p className="text-xs text-[#6B6B6B]">
+                {t(`เลือกไว้ ${selectedExportIds.size} ใบ`, `${selectedExportIds.size} selected`, `已选 ${selectedExportIds.size} 份`)}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setSelectedExportIds(new Set())}>
+                  {t("ล้างที่เลือก", "Clear", "清除选择")}
+                </Button>
+                <Button size="sm" onClick={downloadSelectedAsPdf} disabled={exportingBatch}>
+                  {exportingBatch ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Download size={14} className="mr-1.5" />}
+                  {t(`ดาวน์โหลด PDF (${selectedExportIds.size} ใบ)`, `Download PDF (${selectedExportIds.size})`, `下载PDF (${selectedExportIds.size}份)`)}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow className="bg-[#FAF7F2]">
-                {listMode === "pull" && (
-                  <TableHead className="text-xs w-8">
-                    <Checkbox
-                      checked={filteredSavedList.length > 0 && selectedPullIds.size === filteredSavedList.length}
-                      onCheckedChange={() =>
-                        setSelectedPullIds((prev) =>
-                          prev.size === filteredSavedList.length ? new Set() : new Set(filteredSavedList.map((q) => q.id))
-                        )
-                      }
-                      aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
-                    />
-                  </TableHead>
-                )}
+                <TableHead className="text-xs w-8">
+                  <Checkbox
+                    checked={
+                      filteredSavedList.length > 0 &&
+                      (listMode === "pull" ? selectedPullIds : selectedExportIds).size === filteredSavedList.length
+                    }
+                    onCheckedChange={() =>
+                      (listMode === "pull" ? setSelectedPullIds : setSelectedExportIds)((prev) =>
+                        prev.size === filteredSavedList.length ? new Set() : new Set(filteredSavedList.map((q) => q.id))
+                      )
+                    }
+                    aria-label={t("เลือกทั้งหมด", "Select all", "全选")}
+                  />
+                </TableHead>
                 <TableHead className="text-xs">{t("เลขที่", "Doc No.", "单号")}</TableHead>
                 <TableHead className="text-xs">{t("ประเภท", "Type", "类型")}</TableHead>
                 <TableHead className="text-xs">{t("ลูกค้า", "Customer", "客户")}</TableHead>
@@ -2109,13 +2194,13 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             <TableBody>
               {loadingList ? (
                 <TableRow>
-                  <TableCell colSpan={listMode === "pull" ? 9 : 8} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={9} className="text-center py-8 text-[#6B6B6B]">
                     {t("กำลังโหลด...", "Loading...", "加载中...")}
                   </TableCell>
                 </TableRow>
               ) : filteredSavedList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={listMode === "pull" ? 9 : 8} className="text-center py-8 text-[#6B6B6B]">
+                  <TableCell colSpan={9} className="text-center py-8 text-[#6B6B6B]">
                     {savedList.length === 0
                       ? showArchived
                         ? t("ไม่มีเอกสารที่เก็บเข้าคลัง", "No archived documents", "没有已归档的文件")
@@ -2126,22 +2211,20 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
               ) : (
                 filteredSavedList.map((q) => (
                   <TableRow key={q.id} className="hover:bg-[#FAF7F2]/50">
-                    {listMode === "pull" && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedPullIds.has(q.id)}
-                          onCheckedChange={() =>
-                            setSelectedPullIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(q.id)) next.delete(q.id);
-                              else next.add(q.id);
-                              return next;
-                            })
-                          }
-                          aria-label={t("เลือก", "Select", "选择")}
-                        />
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      <Checkbox
+                        checked={(listMode === "pull" ? selectedPullIds : selectedExportIds).has(q.id)}
+                        onCheckedChange={() =>
+                          (listMode === "pull" ? setSelectedPullIds : setSelectedExportIds)((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(q.id)) next.delete(q.id);
+                            else next.add(q.id);
+                            return next;
+                          })
+                        }
+                        aria-label={t("เลือก", "Select", "选择")}
+                      />
+                    </TableCell>
                     <TableCell className="text-sm font-mono">{q.doc_no}</TableCell>
                     <TableCell className="text-xs">
                       {t(DOC_LABELS[q.doc_type].th, DOC_LABELS[q.doc_type].en, DOC_LABELS[q.doc_type].zh)}
@@ -3001,6 +3084,16 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           </div>
         </div>
       </div>
+
+      {batchExportQuotes && batchExportQuotes.length > 0 && (
+        <div id="batch-print-area">
+          {batchExportQuotes.map((q) => (
+            <div key={q.id} className="batch-print-page no-break">
+              <QuoteDocument quote={q} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -265,6 +265,8 @@ export default function StockPage() {
   const [newSizes, setNewSizes] = useState<NewSize[]>([{ size_text: "", price: "", note: "" }]);
   const [creating, setCreating] = useState(false);
 
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   const detail = useMemo(() => products.find((p) => p.id === detailId) ?? null, [products, detailId]);
   const reservationsProduct = useMemo(
     () => products.find((p) => p.id === reservationsForId) ?? null,
@@ -1769,11 +1771,18 @@ export default function StockPage() {
                           <TableCell>
                             <div className="flex items-center gap-1">
                               {v.image_urls.map((url, i) => (
-                                <div key={url + i} className="relative w-9 h-9 rounded border border-[#E8E5E0] overflow-hidden group shrink-0">
+                                <div
+                                  key={url + i}
+                                  onClick={() => setLightboxUrl(url)}
+                                  className="relative w-9 h-9 rounded border border-[#E8E5E0] overflow-hidden group shrink-0 cursor-pointer"
+                                >
                                   <Image src={url} alt="" fill sizes="36px" unoptimized className="object-contain" />
                                   <button
                                     type="button"
-                                    onClick={() => removeVariantPhoto(detail, v, url)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeVariantPhoto(detail, v, url);
+                                    }}
                                     className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px]"
                                   >
                                     ✕
@@ -2165,6 +2174,16 @@ export default function StockPage() {
               {creating ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("เพิ่มสินค้า", "Add product", "添加产品")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!lightboxUrl} onOpenChange={(o) => !o && setLightboxUrl(null)}>
+        <DialogContent className="max-w-2xl p-2">
+          {lightboxUrl && (
+            <div className="relative w-full aspect-square">
+              <Image src={lightboxUrl} alt="" fill sizes="672px" unoptimized className="object-contain" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -31,6 +31,7 @@ import {
   Wallet,
   BarChart3,
   Megaphone,
+  TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
   Bell,
@@ -108,6 +109,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/content-tracking", labelTh: "ติดตามโพสต์พนักงาน", labelEn: "Content Tracker", labelZh: "员工发帖跟踪", icon: Camera },
       { href: "/admin/kpi",              labelTh: "KPI ติดตามลูกค้า",   labelEn: "Lead Tracker",   labelZh: "客户跟进",   icon: Target },
+      { href: "/admin/facebook-data",    labelTh: "ข้อมูลโฆษณา Facebook", labelEn: "Facebook Ads Data", labelZh: "Facebook广告数据", icon: TrendingUp },
     ],
   },
   {

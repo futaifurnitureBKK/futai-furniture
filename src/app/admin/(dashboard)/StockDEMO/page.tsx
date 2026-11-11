@@ -1772,19 +1772,17 @@ export default function StockPage() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {(v.image_urls ?? []).map((url, i) => (
-                                <div
-                                  key={url + i}
-                                  onClick={() => setLightboxUrl(url)}
-                                  className="relative w-9 h-9 rounded border border-[#E8E5E0] overflow-hidden group shrink-0 cursor-pointer"
-                                >
-                                  <Image src={url} alt="" fill sizes="36px" unoptimized className="object-contain" />
+                                <div key={url + i} className="relative w-9 h-9 shrink-0">
+                                  <div
+                                    onClick={() => setLightboxUrl(url)}
+                                    className="relative w-9 h-9 rounded border border-[#E8E5E0] overflow-hidden cursor-pointer"
+                                  >
+                                    <Image src={url} alt="" fill sizes="36px" unoptimized className="object-contain" />
+                                  </div>
                                   <button
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removeVariantPhoto(detail, v, url);
-                                    }}
-                                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px]"
+                                    onClick={() => removeVariantPhoto(detail, v, url)}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] leading-none flex items-center justify-center shadow hover:bg-red-700"
                                   >
                                     ✕
                                   </button>

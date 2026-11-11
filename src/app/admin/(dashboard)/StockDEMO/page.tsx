@@ -616,6 +616,7 @@ export default function StockPage() {
   }
 
   function removeVariantPhoto(p: DbProduct, v: DbVariant, url: string) {
+    if (!confirm(t("ลบรูปนี้?", "Delete this photo?", "删除这张图片？"))) return;
     editVariant(p.id, v.id, { image_urls: (v.image_urls ?? []).filter((u) => u !== url) });
   }
 
@@ -1769,7 +1770,7 @@ export default function StockPage() {
                         <TableRow key={v.id}>
                           <TableCell><Input className="h-8 w-28 text-xs font-mono" value={v.code} onChange={(e) => editVariant(detail.id, v.id, { code: e.target.value })} /></TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2">
                               {(v.image_urls ?? []).map((url, i) => (
                                 <div
                                   key={url + i}

@@ -6,7 +6,10 @@ import {
 } from "recharts";
 import { useLanguage } from "@/store/language";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
-import type { MetaDailyInsight } from "@/lib/meta-ads";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { META_AD_ACCOUNTS, type MetaDailyInsight } from "@/lib/meta-ads";
 
 function toLocalDateStr(d: Date) {
   const y = d.getFullYear();
@@ -55,12 +58,13 @@ export default function FacebookDataPage() {
   const initial = computeQuickRange("7d");
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
+  const [accountId, setAccountId] = useState<string>(META_AD_ACCOUNTS[0].id);
   const [rows, setRows] = useState<MetaDailyInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load(signal: { cancelled: boolean }) {
-    const res = await fetch(`/api/admin/facebook-ads?from=${from}&to=${to}`);
+    const res = await fetch(`/api/admin/facebook-ads?from=${from}&to=${to}&account=${accountId}`);
     const data = await res.json();
     if (signal.cancelled) return;
     if (!res.ok) throw new Error(data.error || "โหลดข้อมูลไม่สำเร็จ");
@@ -87,7 +91,7 @@ export default function FacebookDataPage() {
       signal.cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to]);
+  }, [from, to, accountId]);
 
   const totals = useMemo(() => {
     const spend = rows.reduce((s, r) => s + r.spend, 0);
@@ -132,25 +136,42 @@ export default function FacebookDataPage() {
             {t("ดึงข้อมูลสดจาก Meta Marketing API (Spend, Impressions, Reach, CPM, Link Clicks, CTR, CPC)", "Live data from the Meta Marketing API", "来自 Meta Marketing API 的实时数据")}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={async () => {
-            setLoading(true);
-            setError(null);
-            try {
-              await load({ cancelled: false });
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
-              setRows([]);
-            } finally {
-              setLoading(false);
-            }
-          }}
-          disabled={loading}
-          className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#E8E5E0] bg-white px-3 text-xs text-[#1A1A1A] hover:border-[#C8102E]/40 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> {t("รีเฟรช", "Refresh", "刷新")}
-        </button>
+        <div className="flex items-center gap-2">
+          <Select value={accountId} onValueChange={(v) => setAccountId(v ?? META_AD_ACCOUNTS[0].id)}>
+            <SelectTrigger className="h-8 w-[260px] text-xs">
+              <SelectValue>
+                {(v: string) => {
+                  const acc = META_AD_ACCOUNTS.find((a) => a.id === v);
+                  return acc ? t(acc.labelTh, acc.labelEn, acc.labelEn) : v;
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {META_AD_ACCOUNTS.map((a) => (
+                <SelectItem key={a.id} value={a.id}>{t(a.labelTh, a.labelEn, a.labelEn)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            onClick={async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                await load({ cancelled: false });
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
+                setRows([]);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#E8E5E0] bg-white px-3 text-xs text-[#1A1A1A] hover:border-[#C8102E]/40 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> {t("รีเฟรช", "Refresh", "刷新")}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

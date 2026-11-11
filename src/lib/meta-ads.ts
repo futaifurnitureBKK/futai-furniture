@@ -1,5 +1,16 @@
 const GRAPH_VERSION = "v21.0";
 
+// Ad accounts the dashboard can show. Add a row here (and grant the System
+// User access to that ad account in Meta Business Settings) whenever a new
+// account should be selectable — no other code changes needed.
+export const META_AD_ACCOUNTS = [
+  {
+    id: "act_289289761660739",
+    labelTh: "Futai Furniture Official (บัญชีหลัก)",
+    labelEn: "Futai Furniture Official (main acc)",
+  },
+] as const;
+
 export interface MetaDailyInsight {
   date: string;
   spend: number;
@@ -15,9 +26,9 @@ export interface MetaDailyInsight {
 // Pulls one row per calendar day from the Meta Marketing API for the given
 // range. Requires META_ACCESS_TOKEN (a System User token with ads_read) and
 // META_AD_ACCOUNT_ID (format act_XXXXXXXXXXX) as server-only env vars.
-export async function fetchMetaDailyInsights(from: string, to: string): Promise<MetaDailyInsight[]> {
+export async function fetchMetaDailyInsights(from: string, to: string, accountId?: string): Promise<MetaDailyInsight[]> {
   const token = process.env.META_ACCESS_TOKEN;
-  const account = process.env.META_AD_ACCOUNT_ID;
+  const account = accountId || process.env.META_AD_ACCOUNT_ID;
   if (!token || !account) {
     throw new Error("Meta Ads API ยังไม่ได้ตั้งค่า (ขาด META_ACCESS_TOKEN หรือ META_AD_ACCOUNT_ID)");
   }

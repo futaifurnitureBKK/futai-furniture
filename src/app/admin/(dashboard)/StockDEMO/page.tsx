@@ -609,14 +609,14 @@ export default function StockPage() {
   async function addVariantPhoto(p: DbProduct, v: DbVariant, file: File) {
     try {
       const url = await uploadImage(file);
-      editVariant(p.id, v.id, { image_urls: [...v.image_urls, url] });
+      editVariant(p.id, v.id, { image_urls: [...(v.image_urls ?? []), url] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("อัปโหลดรูปไม่สำเร็จ", "Upload failed", "上传失败"));
     }
   }
 
   function removeVariantPhoto(p: DbProduct, v: DbVariant, url: string) {
-    editVariant(p.id, v.id, { image_urls: v.image_urls.filter((u) => u !== url) });
+    editVariant(p.id, v.id, { image_urls: (v.image_urls ?? []).filter((u) => u !== url) });
   }
 
   async function archiveVariant(pid: number, vid: number) {
@@ -1770,7 +1770,7 @@ export default function StockPage() {
                           <TableCell><Input className="h-8 w-28 text-xs font-mono" value={v.code} onChange={(e) => editVariant(detail.id, v.id, { code: e.target.value })} /></TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              {v.image_urls.map((url, i) => (
+                              {(v.image_urls ?? []).map((url, i) => (
                                 <div
                                   key={url + i}
                                   onClick={() => setLightboxUrl(url)}
@@ -1789,12 +1789,12 @@ export default function StockPage() {
                                   </button>
                                 </div>
                               ))}
-                              {v.image_urls.length < 3 && (
+                              {(v.image_urls ?? []).length < 3 && (
                                 <label
                                   title={t("ใช้เมื่อขนาดนี้หน้าตาต่างจากรูปหลักของรุ่น", "Use when this size looks different from the model's main photo", "当此规格与主图不同时使用")}
-                                  className="w-9 h-9 rounded border border-dashed border-[#E8E5E0] flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] text-[#9CA3AF] shrink-0"
+                                  className="w-9 h-9 rounded border-2 border-dashed border-[#C8102E]/40 flex items-center justify-center cursor-pointer bg-white hover:bg-[#F0EDE6] hover:border-[#C8102E] text-[#C8102E] shrink-0"
                                 >
-                                  <Plus size={12} />
+                                  <Plus size={16} strokeWidth={2.5} />
                                   <input
                                     type="file"
                                     accept="image/*"

@@ -9,7 +9,7 @@ import { DateRangePicker } from "@/components/admin/date-range-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { META_AD_ACCOUNTS, type MetaDailyInsight } from "@/lib/meta-ads";
+import { META_AD_ACCOUNTS, type MetaDailyInsight, type MetaCampaignInsight } from "@/lib/meta-ads";
 
 function toLocalDateStr(d: Date) {
   const y = d.getFullYear();
@@ -60,6 +60,7 @@ export default function FacebookDataPage() {
   const [to, setTo] = useState(initial.to);
   const [accountId, setAccountId] = useState<string>(META_AD_ACCOUNTS[0].id);
   const [rows, setRows] = useState<MetaDailyInsight[]>([]);
+  const [campaigns, setCampaigns] = useState<MetaCampaignInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +70,7 @@ export default function FacebookDataPage() {
     if (signal.cancelled) return;
     if (!res.ok) throw new Error(data.error || "โหลดข้อมูลไม่สำเร็จ");
     setRows(data.rows ?? []);
+    setCampaigns(data.campaigns ?? []);
   }
 
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function FacebookDataPage() {
         if (!signal.cancelled) {
           setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
           setRows([]);
+          setCampaigns([]);
         }
       } finally {
         if (!signal.cancelled) setLoading(false);
@@ -162,6 +165,7 @@ export default function FacebookDataPage() {
               } catch (err) {
                 setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
                 setRows([]);
+                setCampaigns([]);
               } finally {
                 setLoading(false);
               }
@@ -328,6 +332,48 @@ export default function FacebookDataPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          </div>
+        </div>
+      )}
+
+      {campaigns.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-4">
+            {t("ค่าใช้จ่ายแยกตามแคมเปญ", "Spend by Campaign", "按广告系列划分的花费")}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#E8E5E0] text-left text-xs text-[#6B6B6B]">
+                  <th className="py-2 pr-3 font-medium">{t("แคมเปญ", "Campaign", "广告系列")}</th>
+                  <th className="py-2 px-3 font-medium text-right">{t("ค่าใช้จ่าย", "Spend", "花费")}</th>
+                  <th className="py-2 px-3 font-medium text-right">% {t("ของยอดรวม", "of total", "占总额")}</th>
+                  <th className="py-2 px-3 font-medium text-right">CTR</th>
+                  <th className="py-2 pl-3 font-medium text-right">CPC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map((c) => {
+                  const pct = totals.spend > 0 ? (c.spend / totals.spend) * 100 : 0;
+                  return (
+                    <tr key={c.campaignName} className="border-b border-[#F0EDE6] last:border-0">
+                      <td className="py-2.5 pr-3 text-[#1A1A1A]">{c.campaignName}</td>
+                      <td className="py-2.5 px-3 text-right font-medium text-[#1A1A1A]">{baht(c.spend)}</td>
+                      <td className="py-2.5 px-3 text-right text-[#6B6B6B]">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="hidden sm:block w-16 h-1.5 rounded-full bg-[#F0EDE6] overflow-hidden">
+                            <span className="block h-full bg-[#C8102E] rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+                          </span>
+                          {pct.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-[#6B6B6B]">{c.ctr.toFixed(2)}%</td>
+                      <td className="py-2.5 pl-3 text-right text-[#6B6B6B]">{baht(c.cpc)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

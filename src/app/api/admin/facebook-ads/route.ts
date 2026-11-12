@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/admin-auth";
-import { fetchMetaDailyInsights } from "@/lib/meta-ads";
+import { fetchMetaDailyInsights, fetchMetaCampaignInsights } from "@/lib/meta-ads";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -13,8 +13,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "from and to are required" }, { status: 400 });
   }
   try {
-    const rows = await fetchMetaDailyInsights(from, to, account);
-    return NextResponse.json({ rows });
+    const [rows, campaigns] = await Promise.all([
+      fetchMetaDailyInsights(from, to, account),
+      fetchMetaCampaignInsights(from, to, account),
+    ]);
+    return NextResponse.json({ rows, campaigns });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Meta API error" }, { status: 502 });
   }

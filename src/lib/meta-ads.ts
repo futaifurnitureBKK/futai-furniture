@@ -11,6 +11,15 @@ export const META_AD_ACCOUNTS = [
   },
 ] as const;
 
+export interface MetaCampaignInsight {
+  campaignName: string;
+  spend: number;
+  impressions: number;
+  linkClicks: number;
+  ctr: number;
+  cpc: number;
+}
+
 export interface MetaDailyInsight {
   date: string;
   spend: number;
@@ -59,4 +68,50 @@ export async function fetchMetaDailyInsights(from: string, to: string, accountId
       cpc: Number(r.cpc ?? 0),
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Same range, broken down per campaign instead of per day — used for the
+// "which campaign is actually spending the budget" table.
+export async function fetchMetaCampaignInsights(from: string, to: string, accountId?: string): Promise<MetaCampaignInsight[]> {
+  const token = process.env.META_ACCESS_TOKEN;
+  const account = accountId || process.env.META_AD_ACCOUNT_ID;
+  if (!token || !account) {
+    throw new Error("Meta Ads API ยังไม่ได้ตั้งค่า (ขาด META_ACCESS_TOKEN หรือ META_AD_ACCOUNT_ID)");
+  }
+
+  const fields = "campaign_name,spend,impressions,inline_link_clicks";
+  const timeRange = encodeURIComponent(JSON.stringify({ since: from, until: to }));
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${account}/insights` +
+    `?fields=${fields}&time_range=${timeRange}&level=campaign&limit=500&access_token=${token}`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(json.error.message || "Meta API error");
+  }
+
+  // Aggregate in case the API ever returns more than one row per campaign
+  // for the range (e.g. pagination or a campaign renamed mid-range).
+  const byCampaign = new Map<string, { spend: number; impressions: number; linkClicks: number }>();
+  for (const r of (json.data ?? []) as Array<Record<string, string>>) {
+    const name = r.campaign_name || "(ไม่ทราบชื่อแคมเปญ)";
+    const prev = byCampaign.get(name) ?? { spend: 0, impressions: 0, linkClicks: 0 };
+    byCampaign.set(name, {
+      spend: prev.spend + Number(r.spend ?? 0),
+      impressions: prev.impressions + Number(r.impressions ?? 0),
+      linkClicks: prev.linkClicks + Number(r.inline_link_clicks ?? 0),
+    });
+  }
+
+  return Array.from(byCampaign.entries())
+    .map(([campaignName, v]) => ({
+      campaignName,
+      spend: v.spend,
+      impressions: v.impressions,
+      linkClicks: v.linkClicks,
+      ctr: v.impressions > 0 ? (v.linkClicks / v.impressions) * 100 : 0,
+      cpc: v.linkClicks > 0 ? v.spend / v.linkClicks : 0,
+    }))
+    .sort((a, b) => b.spend - a.spend);
 }

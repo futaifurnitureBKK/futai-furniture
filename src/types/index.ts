@@ -102,6 +102,10 @@ export interface SavedQuoteItem {
 export interface SavedQuote {
   id: number;
   doc_type: SavedQuoteDocType;
+  // Set once at creation and never changed afterward — lets the quotation
+  // (or delivery-note) list still show a document that got converted to a
+  // different doc_type later, instead of it silently disappearing.
+  original_doc_type: SavedQuoteDocType;
   doc_no: string;
   status: SavedQuoteStatus;
   archived: boolean;

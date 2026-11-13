@@ -71,7 +71,7 @@ function computeSeatPrice(baseUnitPrice: number, seats: number): number {
 
 type SavedListRow = Pick<
   SavedQuote,
-  "id" | "doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "archived" | "channel" | "items" | "discount_pct" | "vat_pct"
+  "id" | "doc_type" | "original_doc_type" | "doc_no" | "customer_name" | "doc_date" | "updated_at" | "status" | "archived" | "channel" | "items" | "discount_pct" | "vat_pct"
 >;
 
 const DOC_LABELS: Record<DocType, TriText & { prefix: string }> = {
@@ -1199,20 +1199,26 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // regular quote-builder page saves/shows quotations and invoices
   // together (it toggles between those two doc types) but never a
   // delivery note, which belongs to its own separate list.
+  // Keyed off original_doc_type (not the current doc_type) so a document
+  // converted to a different type later — e.g. quotation -> delivery note —
+  // still shows up in the list it was originally created from, instead of
+  // silently disappearing from it.
   const ownSavedList = useMemo(
     () =>
-      savedList.filter((row) =>
-        defaultDocType === "delivery_note" ? row.doc_type === "delivery_note" : row.doc_type !== "delivery_note"
-      ),
+      savedList.filter((row) => {
+        const homeType = row.original_doc_type ?? row.doc_type;
+        return defaultDocType === "delivery_note" ? homeType === "delivery_note" : homeType !== "delivery_note";
+      }),
     [savedList, defaultDocType]
   );
 
   const filteredSavedList = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     return savedList.filter((row) => {
+      const homeType = row.original_doc_type ?? row.doc_type;
       if (listMode === "pull" && row.doc_type !== "quotation") return false;
-      if (listMode === "saved" && defaultDocType === "delivery_note" && row.doc_type !== "delivery_note") return false;
-      if (listMode === "saved" && defaultDocType !== "delivery_note" && row.doc_type === "delivery_note") return false;
+      if (listMode === "saved" && defaultDocType === "delivery_note" && homeType !== "delivery_note") return false;
+      if (listMode === "saved" && defaultDocType !== "delivery_note" && homeType === "delivery_note") return false;
       if (q && !row.customer_name.toLowerCase().includes(q) && !row.doc_no.toLowerCase().includes(q)) return false;
       if (listDateFrom && row.doc_date < listDateFrom) return false;
       if (listDateTo && row.doc_date > listDateTo) return false;
@@ -2196,6 +2202,14 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     <TableCell className="text-sm font-mono">{q.doc_no}</TableCell>
                     <TableCell className="text-xs">
                       {t(DOC_LABELS[q.doc_type].th, DOC_LABELS[q.doc_type].en, DOC_LABELS[q.doc_type].zh)}
+                      {q.original_doc_type && q.original_doc_type !== q.doc_type && (
+                        <p
+                          className="text-[10px] text-[#9CA3AF] mt-0.5"
+                          title={t("เอกสารนี้ถูกแปลงประเภทไปแล้ว", "This document was converted to a different type", "该文档已转换为其他类型")}
+                        >
+                          ({t("เดิมคือ", "was", "原为")} {t(DOC_LABELS[q.original_doc_type].th, DOC_LABELS[q.original_doc_type].en, DOC_LABELS[q.original_doc_type].zh)})
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">{q.customer_name || "-"}</TableCell>
                     <TableCell className="text-xs text-[#6B6B6B]">{q.doc_date}</TableCell>

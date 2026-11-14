@@ -997,8 +997,21 @@ export default function StockPage() {
     return { available, reserved, defective, low, out, tracked, sizes };
   }, [products]);
 
-  function exportExcel() {
-    import("xlsx").then((XLSX) => {
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  async function exportExcel() {
+    setExportingExcel(true);
+    try {
+      const historyRes = await fetch("/api/admin/stock/activity");
+      const historyData = await historyRes.json();
+      const history: { created_at: string; actor: string | null; action: string; summary: string }[] = historyRes.ok
+        ? historyData.rows ?? []
+        : [];
+      if (!historyRes.ok) {
+        toast.error(t("โหลดประวัติการแก้ไขไม่สำเร็จ (จะ export แค่ยอดสต็อกปัจจุบัน)", "Failed to load edit history (exporting current stock only)", "加载修改历史失败（仅导出当前库存）"));
+      }
+
+      const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(
         wb,
@@ -1041,8 +1054,22 @@ export default function StockPage() {
         ),
         "Sizes & Stock"
       );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          history.map((h) => ({
+            "วัน-เวลา": new Date(h.created_at).toLocaleString("th-TH"),
+            "ผู้แก้ไข": h.actor ?? "-",
+            "การกระทำ": h.action,
+            "รายละเอียด": h.summary,
+          }))
+        ),
+        "History"
+      );
       XLSX.writeFile(wb, `futai-stock-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    });
+    } finally {
+      setExportingExcel(false);
+    }
   }
 
   const showCodePerRow = (p: DbProduct) => new Set(activeVariants(p).map((v) => v.code)).size > 1;
@@ -1079,8 +1106,8 @@ export default function StockPage() {
               {t("นำเข้ารูปจากใบเสนอราคา", "Import photos from quotations", "从报价单导入图片")}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={exportExcel} disabled={!products.length}>
-            <Download size={14} className="mr-1.5" /> {t("Export Excel", "Export Excel", "导出Excel")}
+          <Button size="sm" variant="outline" onClick={exportExcel} disabled={!products.length || exportingExcel}>
+            <Download size={14} className="mr-1.5" /> {exportingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
           <Button size="sm" variant="outline" onClick={() => { setArchivedView((v) => !v); setCat("all"); setLimit(PAGE); }}>
             {archivedView ? (

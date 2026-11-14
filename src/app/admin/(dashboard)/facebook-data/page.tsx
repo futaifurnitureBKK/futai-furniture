@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, TrendingUp } from "lucide-react";
+import { RefreshCw, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
 } from "recharts";
@@ -23,6 +24,11 @@ function todayStr() {
 function daysAgoStr(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
+  return toLocalDateStr(d);
+}
+function addDays(dateStr: string, delta: number) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + delta);
   return toLocalDateStr(d);
 }
 
@@ -113,10 +119,10 @@ export default function FacebookDataPage() {
     { label: t("การแสดงผล", "Impressions", "展示"), value: num(totals.impressions) },
     { label: t("การเข้าถึง (รวมรายวัน)", "Reach (summed daily)", "覆盖（每日累加）"), value: num(totals.reach) },
     { label: t("ความถี่เฉลี่ย", "Avg. Frequency", "平均频次"), value: totals.avgFrequency.toFixed(2) },
-    { label: "CPM", value: baht(totals.cpm) },
+    { label: t("CPM (ต้นทุนต่อการแสดงผล 1,000 ครั้ง)", "CPM (cost per 1,000 impressions)", "CPM（千次展示成本）"), value: baht(totals.cpm) },
     { label: t("คลิกลิงก์", "Link Clicks", "链接点击"), value: num(totals.linkClicks) },
-    { label: "CTR", value: `${totals.ctr.toFixed(2)}%` },
-    { label: "CPC", value: baht(totals.cpc) },
+    { label: t("CTR (อัตราการคลิก)", "CTR (click-through rate)", "CTR（点击率）"), value: `${totals.ctr.toFixed(2)}%` },
+    { label: t("CPC (ต้นทุนต่อคลิก)", "CPC (cost per click)", "CPC（单次点击成本）"), value: baht(totals.cpc) },
   ];
 
   const quickRanges: [QuickRangeKey, string][] = [
@@ -199,6 +205,24 @@ export default function FacebookDataPage() {
               </button>
             );
           })}
+        </div>
+        <div className="flex items-center gap-1 bg-white rounded-lg border border-[#E8E5E0] p-1">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={() => { setFrom((f) => addDays(f, -1)); setTo((tt) => addDays(tt, -1)); }}
+            aria-label={t("ย้อนกลับ 1 วัน", "Back 1 day", "后退1天")}
+          >
+            <ChevronLeft size={15} />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={() => { setFrom((f) => addDays(f, 1)); setTo((tt) => addDays(tt, 1)); }}
+            aria-label={t("ไปข้างหน้า 1 วัน", "Forward 1 day", "前进1天")}
+          >
+            <ChevronRight size={15} />
+          </Button>
         </div>
         <DateRangePicker from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
       </div>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -246,6 +247,7 @@ export default function StockPage() {
   const [showroomOnly, setShowroomOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [limit, setLimit] = useState(PAGE);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   // The "owner mode / show cost" toggle was removed from the toolbar — kept
   // as a constant (rather than deleting every showCost-gated branch) so the
   // landed-cost column/export field stay easy to bring back later.
@@ -914,6 +916,31 @@ export default function StockPage() {
     return out;
   }, [products, query, cat, statusFilter, archivedView, showroomOnly]);
 
+  const visibleRows = useMemo(() => rows.slice(0, limit), [rows, limit]);
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(({ p }) => selectedProductIds.has(p.id));
+
+  function toggleProductSelected(id: number) {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    setSelectedProductIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        for (const { p } of visibleRows) next.delete(p.id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const { p } of visibleRows) next.add(p.id);
+      return next;
+    });
+  }
+
   // Drag-to-reorder: moves the dragged product to sit where the drop target
   // is, within the currently filtered/visible list only. The sort_order
   // "slots" already used by this visible set are kept and just handed out in
@@ -1000,17 +1027,24 @@ export default function StockPage() {
 
   const [exportingExcel, setExportingExcel] = useState(false);
 
-  async function exportExcel() {
+  async function exportExcel(productsToExport: DbProduct[] = products, isSelection = false) {
     setExportingExcel(true);
     try {
       const historyRes = await fetch("/api/admin/stock/activity");
       const historyData = await historyRes.json();
-      const history: { created_at: string; actor: string | null; action: string; summary: string }[] = historyRes.ok
+      const historyAll: { created_at: string; actor: string | null; action: string; summary: string }[] = historyRes.ok
         ? historyData.rows ?? []
         : [];
       if (!historyRes.ok) {
         toast.error(t("โหลดประวัติการแก้ไขไม่สำเร็จ (จะ export แค่ยอดสต็อกปัจจุบัน)", "Failed to load edit history (exporting current stock only)", "加载修改历史失败（仅导出当前库存）"));
       }
+      // Exporting just a selection — keep only history rows that mention one
+      // of the selected products' codes (summary text already includes it,
+      // e.g. "ปรับสต็อก BJ-8407: ..."), so the history sheet matches the
+      // selection instead of dumping every product's history.
+      const history = isSelection
+        ? historyAll.filter((h) => productsToExport.some((p) => h.summary.includes(p.code)))
+        : historyAll;
 
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
@@ -1024,15 +1058,15 @@ export default function StockPage() {
       ];
       wsProducts.mergeCells("A1:I1");
       const productsTitle = wsProducts.getCell("A1");
-      productsTitle.value = `รายการสินค้า (รุ่น) — ${today}`;
+      productsTitle.value = `รายการสินค้า (รุ่น) — ${today}${isSelection ? " (เฉพาะที่เลือก)" : ""}`;
       productsTitle.alignment = { horizontal: "center", vertical: "middle" };
       productsTitle.font = { bold: true, size: 13 };
       wsProducts.getRow(1).height = TITLE_ROW_HEIGHT;
       styleHeaderRow(
         wsProducts.addRow(["ลำดับ", "รูปภาพ", "รหัสสินค้า", "หมวดหมู่", "จำนวนขนาด", "รายละเอียด", "สี", "วัสดุ", "กล่องต่อชิ้น"])
       );
-      for (let i = 0; i < products.length; i++) {
-        const p = products[i];
+      for (let i = 0; i < productsToExport.length; i++) {
+        const p = productsToExport[i];
         const row = wsProducts.addRow([
           i + 1, "", p.code, CATEGORIES.find((c) => c.key === p.category)?.th ?? p.category,
           activeVariants(p).length, p.description, p.color, p.material, p.boxes_per_item,
@@ -1056,12 +1090,12 @@ export default function StockPage() {
       ];
       wsStock.mergeCells(1, 1, 1, stockHeaders.length);
       const stockTitle = wsStock.getCell("A1");
-      stockTitle.value = `สต็อกสินค้าแยกตามขนาด — ${today}`;
+      stockTitle.value = `สต็อกสินค้าแยกตามขนาด — ${today}${isSelection ? " (เฉพาะที่เลือก)" : ""}`;
       stockTitle.alignment = { horizontal: "center", vertical: "middle" };
       stockTitle.font = { bold: true, size: 13 };
       wsStock.getRow(1).height = TITLE_ROW_HEIGHT;
       styleHeaderRow(wsStock.addRow(stockHeaders));
-      for (const p of products) {
+      for (const p of productsToExport) {
         for (const v of activeVariants(p)) {
           const row = wsStock.addRow([
             wsStock.rowCount - 1, "", p.code, v.code, sizeLabel(v), v.price ?? "", v.note,
@@ -1095,10 +1129,16 @@ export default function StockPage() {
         row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = { ...DATA_CELL_ALIGNMENT, horizontal: "left" }; });
       }
 
-      await downloadWorkbook(wb, `futai-stock-${today}.xlsx`);
+      await downloadWorkbook(wb, isSelection ? `futai-stock-selected-${today}.xlsx` : `futai-stock-${today}.xlsx`);
     } finally {
       setExportingExcel(false);
     }
+  }
+
+  async function exportSelectedExcel() {
+    const selected = products.filter((p) => selectedProductIds.has(p.id));
+    if (selected.length === 0) return;
+    await exportExcel(selected, true);
   }
 
   const showCodePerRow = (p: DbProduct) => new Set(activeVariants(p).map((v) => v.code)).size > 1;
@@ -1135,9 +1175,22 @@ export default function StockPage() {
               {t("นำเข้ารูปจากใบเสนอราคา", "Import photos from quotations", "从报价单导入图片")}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={exportExcel} disabled={!products.length || exportingExcel}>
+          <Button size="sm" variant="outline" onClick={() => exportExcel()} disabled={!products.length || exportingExcel}>
             <Download size={14} className="mr-1.5" /> {exportingExcel ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...") : t("Export Excel", "Export Excel", "导出Excel")}
           </Button>
+          {selectedProductIds.size > 0 && (
+            <Button size="sm" onClick={exportSelectedExcel} disabled={exportingExcel} className="bg-[#C8102E] hover:bg-[#A50D26]">
+              <Download size={14} className="mr-1.5" />
+              {exportingExcel
+                ? t("กำลังสร้างไฟล์...", "Generating...", "生成中...")
+                : t(`ดาวน์โหลดที่เลือก (${selectedProductIds.size})`, `Download selected (${selectedProductIds.size})`, `下载所选 (${selectedProductIds.size})`)}
+            </Button>
+          )}
+          {selectedProductIds.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setSelectedProductIds(new Set())} className="text-[#9CA3AF]">
+              {t("ล้างที่เลือก", "Clear selection", "清除所选")}
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => { setArchivedView((v) => !v); setCat("all"); setLimit(PAGE); }}>
             {archivedView ? (
               <><ArchiveRestore size={14} className="mr-1.5" /> {t("กลับไปรายการปกติ", "Back to active", "返回正常列表")}</>
@@ -1330,6 +1383,9 @@ export default function StockPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-[#FAF7F2]">
+                  <TableHead className="text-xs w-10 text-center">
+                    <Checkbox checked={allVisibleSelected} onCheckedChange={toggleSelectAllVisible} aria-label={t("เลือกทั้งหมด", "Select all", "全选")} />
+                  </TableHead>
                   <TableHead className="text-xs w-32 text-center">{t("รูป", "Photo", "图片")}</TableHead>
                   <TableHead className="text-xs">{t("รหัสสินค้า", "Code", "编号")}</TableHead>
                   <TableHead className="text-xs">{t("ขนาด (มม.) / ราคา ฿", "Size (mm) / Price ฿", "尺寸(mm) / 价格 ฿")}</TableHead>
@@ -1344,13 +1400,13 @@ export default function StockPage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-[#6B6B6B]">
+                    <TableCell colSpan={10} className="text-center py-12 text-[#6B6B6B]">
                       <PackageSearch size={28} className="mx-auto mb-2 opacity-40" />
                       {t("ไม่พบสินค้าที่ตรงกับตัวกรอง", "No products match your filters", "没有符合筛选条件的产品")}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.slice(0, limit).map(({ p, vs }) => {
+                  visibleRows.map(({ p, vs }) => {
                     const span = Math.max(vs.length, 1);
                     return (
                       <Fragment key={p.id}>
@@ -1381,6 +1437,15 @@ export default function StockPage() {
                                 dragOverProductId === p.id ? "bg-[#C8102E]/5 outline outline-2 outline-[#C8102E]/40 -outline-offset-2" : ""
                               } ${draggedProductId === p.id ? "opacity-50" : ""}`}
                             >
+                              {first && (
+                                <TableCell rowSpan={span} className="align-top text-center">
+                                  <Checkbox
+                                    checked={selectedProductIds.has(p.id)}
+                                    onCheckedChange={() => toggleProductSelected(p.id)}
+                                    aria-label={t(`เลือก ${p.code}`, `Select ${p.code}`, `选择 ${p.code}`)}
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell className="align-top text-center">
                                 {(() => {
                                   const photos = effectivePhotos(p, v, first);

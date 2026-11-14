@@ -21,6 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useLanguage } from "@/store/language";
+import { styleHeaderRow, embedRowImage, downloadWorkbook, THIN_BORDER, DATA_CELL_ALIGNMENT, PICTURE_COL_WIDTH, DATA_ROW_HEIGHT, TITLE_ROW_HEIGHT } from "@/lib/daily-sheets-excel";
 import raw from "@/data/stock-demo.json";
 import topSellersRaw from "@/data/top-sellers.json";
 
@@ -1011,62 +1012,90 @@ export default function StockPage() {
         toast.error(t("โหลดประวัติการแก้ไขไม่สำเร็จ (จะ export แค่ยอดสต็อกปัจจุบัน)", "Failed to load edit history (exporting current stock only)", "加载修改历史失败（仅导出当前库存）"));
       }
 
-      const XLSX = await import("xlsx");
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(
-          products.map((p) => ({
-            Code: p.code,
-            "Category (TH)": CATEGORIES.find((c) => c.key === p.category)?.th ?? p.category,
-            "Category (EN)": CATEGORIES.find((c) => c.key === p.category)?.en ?? "",
-            "Category (ZH)": CATEGORIES.find((c) => c.key === p.category)?.zh ?? "",
-            Sizes: activeVariants(p).length,
-            Description: p.description,
-            Color: p.color,
-            Material: p.material,
-            "Boxes per item": p.boxes_per_item,
-          }))
-        ),
-        "Products"
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const today = new Date().toISOString().slice(0, 10);
+
+      // ── Sheet 1: สินค้า (รุ่น) ──
+      const wsProducts = wb.addWorksheet("สินค้า");
+      wsProducts.columns = [
+        { width: 6 }, { width: PICTURE_COL_WIDTH }, { width: 16 }, { width: 18 },
+        { width: 10 }, { width: 28 }, { width: 14 }, { width: 14 }, { width: 12 },
+      ];
+      wsProducts.mergeCells("A1:I1");
+      const productsTitle = wsProducts.getCell("A1");
+      productsTitle.value = `รายการสินค้า (รุ่น) — ${today}`;
+      productsTitle.alignment = { horizontal: "center", vertical: "middle" };
+      productsTitle.font = { bold: true, size: 13 };
+      wsProducts.getRow(1).height = TITLE_ROW_HEIGHT;
+      styleHeaderRow(
+        wsProducts.addRow(["ลำดับ", "รูปภาพ", "รหัสสินค้า", "หมวดหมู่", "จำนวนขนาด", "รายละเอียด", "สี", "วัสดุ", "กล่องต่อชิ้น"])
       );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(
-          products.flatMap((p) =>
-            activeVariants(p).map((v) => ({
-              Model: p.code,
-              Code: v.code,
-              Size: sizeLabel(v),
-              Price: v.price ?? "",
-              Note: v.note,
-              Available: v.available,
-              Reserved: v.reserved,
-              Defective: v.defective,
-              "Reorder point": v.reorder_point,
-              Location: v.location,
-              ETA: v.eta ?? "",
-              "Batch / Lot": v.batch_no,
-              "Stock note": v.stock_note,
-              ...(showCost ? { "Landed cost": v.landed_cost ?? "" } : {}),
-            }))
-          )
-        ),
-        "Sizes & Stock"
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(
-          history.map((h) => ({
-            "วัน-เวลา": new Date(h.created_at).toLocaleString("th-TH"),
-            "ผู้แก้ไข": h.actor ?? "-",
-            "การกระทำ": h.action,
-            "รายละเอียด": h.summary,
-          }))
-        ),
-        "History"
-      );
-      XLSX.writeFile(wb, `futai-stock-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      for (let i = 0; i < products.length; i++) {
+        const p = products[i];
+        const row = wsProducts.addRow([
+          i + 1, "", p.code, CATEGORIES.find((c) => c.key === p.category)?.th ?? p.category,
+          activeVariants(p).length, p.description, p.color, p.material, p.boxes_per_item,
+        ]);
+        row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = DATA_CELL_ALIGNMENT; });
+        row.height = DATA_ROW_HEIGHT;
+        await embedRowImage(wb, wsProducts, row, p.image_url, 1);
+      }
+
+      // ── Sheet 2: ขนาดและสต็อก ──
+      const wsStock = wb.addWorksheet("ขนาดและสต็อก");
+      const stockHeaders = [
+        "ลำดับ", "รูปภาพ", "รุ่น", "รหัส", "ขนาด (มม.)", "ราคา ฿", "หมายเหตุ",
+        "พร้อมขาย", "จอง/รอส่ง", "มีตำหนิ/เคลม", "จุดสั่งซื้อ", "ตำแหน่งเก็บ", "กำหนดเข้า (ETA)", "ล็อต/ตู้", "หมายเหตุสต็อก",
+        ...(showCost ? ["ต้นทุน"] : []),
+      ];
+      wsStock.columns = [
+        { width: 6 }, { width: PICTURE_COL_WIDTH }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 10 }, { width: 20 },
+        { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 20 },
+        ...(showCost ? [{ width: 12 }] : []),
+      ];
+      wsStock.mergeCells(1, 1, 1, stockHeaders.length);
+      const stockTitle = wsStock.getCell("A1");
+      stockTitle.value = `สต็อกสินค้าแยกตามขนาด — ${today}`;
+      stockTitle.alignment = { horizontal: "center", vertical: "middle" };
+      stockTitle.font = { bold: true, size: 13 };
+      wsStock.getRow(1).height = TITLE_ROW_HEIGHT;
+      styleHeaderRow(wsStock.addRow(stockHeaders));
+      for (const p of products) {
+        for (const v of activeVariants(p)) {
+          const row = wsStock.addRow([
+            wsStock.rowCount - 1, "", p.code, v.code, sizeLabel(v), v.price ?? "", v.note,
+            v.available, v.reserved, v.defective, v.reorder_point, v.location, v.eta ?? "", v.batch_no, v.stock_note,
+            ...(showCost ? [v.landed_cost ?? ""] : []),
+          ]);
+          row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = DATA_CELL_ALIGNMENT; });
+          row.height = DATA_ROW_HEIGHT;
+          await embedRowImage(wb, wsStock, row, (v.image_urls ?? [])[0] ?? p.image_url, 1);
+        }
+      }
+
+      // ── Sheet 3: ประวัติการแก้ไข ──
+      const actionLabelsTh: Record<string, string> = {
+        create: "สร้างใหม่", update: "แก้ไข", delete: "ลบ", adjust: "ปรับสต็อก", login: "เข้าสู่ระบบ", other: "อื่นๆ",
+      };
+      const wsHistory = wb.addWorksheet("ประวัติการแก้ไข");
+      wsHistory.columns = [{ width: 6 }, { width: 20 }, { width: 16 }, { width: 14 }, { width: 60 }];
+      wsHistory.mergeCells("A1:E1");
+      const historyTitle = wsHistory.getCell("A1");
+      historyTitle.value = `ประวัติการแก้ไขสต็อก — ${today}`;
+      historyTitle.alignment = { horizontal: "center", vertical: "middle" };
+      historyTitle.font = { bold: true, size: 13 };
+      wsHistory.getRow(1).height = TITLE_ROW_HEIGHT;
+      styleHeaderRow(wsHistory.addRow(["ลำดับ", "วัน-เวลา", "ผู้แก้ไข", "การกระทำ", "รายละเอียด"]));
+      for (let i = 0; i < history.length; i++) {
+        const h = history[i];
+        const row = wsHistory.addRow([
+          i + 1, new Date(h.created_at).toLocaleString("th-TH"), h.actor ?? "-", actionLabelsTh[h.action] ?? h.action, h.summary,
+        ]);
+        row.eachCell((c) => { c.border = THIN_BORDER; c.alignment = { ...DATA_CELL_ALIGNMENT, horizontal: "left" }; });
+      }
+
+      await downloadWorkbook(wb, `futai-stock-${today}.xlsx`);
     } finally {
       setExportingExcel(false);
     }

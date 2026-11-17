@@ -21,6 +21,12 @@ function toStr(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+function fmtDisplay(dateStr: string | null, lang: "th" | "en" | "zh"): string {
+  const d = toDate(dateStr);
+  if (lang === "zh") return d.toLocaleDateString("zh-CN", { day: "numeric", month: "long", year: "numeric" });
+  if (lang === "en") return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("th-TH-u-ca-gregory", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 // A single popover calendar for picking a "from - to" range — click the
 // start day, then the end day (or drag across them); the range previews
@@ -68,7 +74,11 @@ export function DateRangePicker({
         )}
       >
         <CalendarDays size={13} className="text-[#6B6B6B]" />
-        {!from && !to ? placeholder ?? t("เลือกช่วงวันที่", "Pick a date range", "选择日期范围") : from === to ? from : `${from} → ${to}`}
+        {!from && !to
+          ? placeholder ?? t("เลือกช่วงวันที่", "Pick a date range", "选择日期范围")
+          : from === to
+          ? fmtDisplay(from, lang)
+          : `${fmtDisplay(from, lang)} → ${fmtDisplay(to, lang)}`}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="end">

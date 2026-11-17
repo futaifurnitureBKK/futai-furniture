@@ -66,8 +66,24 @@ function computeQuickRange(key: QuickRangeKey): { from: string; to: string } {
 const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const num = (n: number) => n.toLocaleString("th-TH", { maximumFractionDigits: 0 });
 
+type Lang = "th" | "en" | "zh";
+function fmtAxisDate(dateStr: string, lang: Lang): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  if (lang === "zh") return `${d.getMonth() + 1}月${d.getDate()}日`;
+  if (lang === "en") return `${month}/${day}`;
+  return `${day}/${month}`;
+}
+function fmtTooltipDate(dateStr: string, lang: Lang): string {
+  const d = new Date(dateStr + "T00:00:00");
+  if (lang === "zh") return d.toLocaleDateString("zh-CN", { day: "numeric", month: "long", year: "numeric" });
+  if (lang === "en") return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("th-TH-u-ca-gregory", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export default function FacebookDataPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const initial = computeQuickRange("7d");
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -346,7 +362,7 @@ export default function FacebookDataPage() {
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
+                    tickFormatter={(d: string) => fmtAxisDate(d, lang)}
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
@@ -360,7 +376,7 @@ export default function FacebookDataPage() {
                       const d = payload[0].payload as MetaDailyInsight;
                       return (
                         <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
-                          <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                          <p className="font-semibold text-[#1A1A1A]">{fmtTooltipDate(d.date, lang)}</p>
                           <p className="text-[#6B6B6B]">{t("ค่าใช้จ่าย", "Spend", "花费")}: {baht(d.spend)}</p>
                         </div>
                       );
@@ -382,7 +398,7 @@ export default function FacebookDataPage() {
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
+                    tickFormatter={(d: string) => fmtAxisDate(d, lang)}
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
@@ -396,7 +412,7 @@ export default function FacebookDataPage() {
                       const d = payload[0].payload as MetaDailyInsight;
                       return (
                         <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
-                          <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                          <p className="font-semibold text-[#1A1A1A]">{fmtTooltipDate(d.date, lang)}</p>
                           <p className="text-[#C8102E]">{t("การแสดงผล", "Impressions", "展示")}: {num(d.impressions)}</p>
                           <p className="text-[#6B6B6B]">{t("การเข้าถึง", "Reach", "覆盖")}: {num(d.reach)}</p>
                         </div>
@@ -418,7 +434,7 @@ export default function FacebookDataPage() {
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(d: string) => d.slice(5).split("-").reverse().join("/")}
+                    tickFormatter={(d: string) => fmtAxisDate(d, lang)}
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
@@ -432,7 +448,7 @@ export default function FacebookDataPage() {
                       const d = payload[0].payload as MetaDailyInsight;
                       return (
                         <div className="bg-white shadow-lg rounded-lg px-3 py-2 text-xs border border-[#E8E5E0]">
-                          <p className="font-semibold text-[#1A1A1A]">{d.date}</p>
+                          <p className="font-semibold text-[#1A1A1A]">{fmtTooltipDate(d.date, lang)}</p>
                           <p className="text-[#C8102E]">CTR: {d.ctr.toFixed(2)}%</p>
                           <p className="text-[#6B6B6B]">CPC: {baht(d.cpc)}</p>
                         </div>

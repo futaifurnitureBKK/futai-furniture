@@ -268,6 +268,12 @@ export default function FacebookDataPage() {
           >
             <ChevronLeft size={15} />
           </Button>
+          <DateRangePicker
+            from={from}
+            to={to}
+            onChange={(f, tt) => { setFrom(f); setTo(tt); }}
+            className="h-7 border-0 hover:border-0 px-1.5"
+          />
           <Button
             size="icon-sm"
             variant="ghost"
@@ -277,7 +283,6 @@ export default function FacebookDataPage() {
             <ChevronRight size={15} />
           </Button>
         </div>
-        <DateRangePicker from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
       </div>
 
       {error && (

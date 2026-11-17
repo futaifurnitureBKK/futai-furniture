@@ -1054,6 +1054,21 @@ export default function KpiPage() {
                 >
                   <ChevronLeft size={15} />
                 </Button>
+                <DateRangePicker
+                  from={scopeFrom}
+                  to={scopeTo}
+                  onChange={(f, tt) => {
+                    setSelectedDate(null);
+                    setCustomFrom(f);
+                    setCustomTo(tt);
+                  }}
+                  onClear={() => {
+                    setSelectedDate(null);
+                    setCustomFrom(null);
+                    setCustomTo(null);
+                  }}
+                  className="h-7 border-0 hover:border-0 px-1.5"
+                />
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -1063,20 +1078,6 @@ export default function KpiPage() {
                   <ChevronRight size={15} />
                 </Button>
               </div>
-              <DateRangePicker
-                from={scopeFrom}
-                to={scopeTo}
-                onChange={(f, tt) => {
-                  setSelectedDate(null);
-                  setCustomFrom(f);
-                  setCustomTo(tt);
-                }}
-                onClear={() => {
-                  setSelectedDate(null);
-                  setCustomFrom(null);
-                  setCustomTo(null);
-                }}
-              />
               <Button
                 size="icon-sm"
                 variant="outline"

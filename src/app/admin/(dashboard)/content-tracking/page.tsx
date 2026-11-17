@@ -94,8 +94,14 @@ function fmtTime(iso: string) {
     return "-";
   }
 }
-function fmtDateDisplay(dateStr: string) {
+function fmtDateDisplay(dateStr: string, lang: "th" | "en" | "zh" = "th") {
   const d = new Date(dateStr + "T00:00:00");
+  if (lang === "zh") {
+    return d.toLocaleDateString("zh-CN", { day: "numeric", month: "long", year: "numeric" });
+  }
+  if (lang === "en") {
+    return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
   return d.toLocaleDateString("th-TH-u-ca-gregory", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -150,7 +156,7 @@ function imageFromClipboard(e: { clipboardData: DataTransfer | null }): File | n
 type StatusFilter = "all" | "posted" | "pending" | "none";
 
 export default function ContentTrackingPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [date, setDate] = useState(todayStr());
   const [rangeKey, setRangeKey] = useState<RangeKey>("1d");
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -438,7 +444,7 @@ export default function ContentTrackingPage() {
             </Button>
             <span className="relative flex items-center gap-1.5 px-1">
               <CalendarDays size={13} className="text-[#9CA3AF]" />
-              <span className="text-sm font-medium tabular-nums">{fmtDateDisplay(date)}</span>
+              <span className="text-sm font-medium tabular-nums">{fmtDateDisplay(date, lang)}</span>
               <input
                 type="date"
                 aria-label={t("เลือกวันที่", "Pick a date", "选择日期")}

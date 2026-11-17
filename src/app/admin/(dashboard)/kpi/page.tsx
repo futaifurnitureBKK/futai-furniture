@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X, Eye, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Pencil, Download, Upload, Camera, Loader2, FolderOpen, Search, X, Eye, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, ResponsiveContainer,
 } from "recharts";
@@ -58,6 +58,11 @@ function toLocalDateStr(d: Date) {
 
 function todayStr() {
   return toLocalDateStr(new Date());
+}
+function addDays(dateStr: string, delta: number) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return toLocalDateStr(d);
 }
 
 type RangeKey = "1D" | "5D" | "1M" | "5M" | "ALL";
@@ -541,6 +546,15 @@ export default function KpiPage() {
   // the per-owner summary is computed from these.
   const scopeFrom = hasCustomRange ? (customFrom as string) : selectedDate ?? rangeStart;
   const scopeTo = hasCustomRange ? (customTo as string) : selectedDate ?? rangeEnd;
+
+  function shiftScope(delta: number) {
+    if (selectedDate) {
+      setSelectedDate(addDays(selectedDate, delta));
+      return;
+    }
+    setCustomFrom(addDays(scopeFrom, delta));
+    setCustomTo(addDays(scopeTo, delta));
+  }
 
   const rangeLeads = useMemo(
     () => leads.filter((l) => l.lead_date >= scopeFrom && l.lead_date <= scopeTo),
@@ -1030,6 +1044,24 @@ export default function KpiPage() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="flex items-center gap-1 bg-white rounded-lg border border-[#E8E5E0] p-1">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => shiftScope(-1)}
+                  aria-label={t("ย้อนกลับ 1 วัน", "Back 1 day", "后退1天")}
+                >
+                  <ChevronLeft size={15} />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => shiftScope(1)}
+                  aria-label={t("ไปข้างหน้า 1 วัน", "Forward 1 day", "前进1天")}
+                >
+                  <ChevronRight size={15} />
+                </Button>
               </div>
               <DateRangePicker
                 from={scopeFrom}

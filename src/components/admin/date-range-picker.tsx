@@ -78,7 +78,7 @@ export function DateRangePicker({
           ? placeholder ?? t("เลือกช่วงวันที่", "Pick a date range", "选择日期范围")
           : from === to
           ? fmtDisplay(from, lang)
-          : `${fmtDisplay(from, lang)} → ${fmtDisplay(to, lang)}`}
+          : `${fmtDisplay(to, lang)} → ${fmtDisplay(from, lang)}`}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="end">

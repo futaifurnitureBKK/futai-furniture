@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Trash2, FileDown, FolderOpen, ClipboardList, Search, Loader2, X, Camera } from "lucide-react";
+import { Plus, Trash2, FileDown, FolderOpen, ClipboardList, Search, Loader2, X, Camera, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,11 @@ type SavedListRow = {
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
+}
+function addDays(dateStr: string, delta: number) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function fmt(n: number) {
@@ -306,6 +311,24 @@ export default function DailyShippingPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-[#E8E5E0] p-1">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setDate((d) => addDays(d, -1))}
+              aria-label={t("ย้อนกลับ 1 วัน", "Back 1 day", "后退1天")}
+            >
+              <ChevronLeft size={15} />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setDate((d) => addDays(d, 1))}
+              aria-label={t("ไปข้างหน้า 1 วัน", "Forward 1 day", "前进1天")}
+            >
+              <ChevronRight size={15} />
+            </Button>
+          </div>
           <Input type="date" className="w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
           <Button size="sm" onClick={importFromSales} disabled={importingFromSales} title={t("ดึงรายการที่บันทึกไว้ใน Daily Sales ของวันนี้เข้ามาทั้งหมด", "Pulls in everything already logged in Daily Sales for this date", "导入当天Daily Sales中已记录的全部项目")}>
             {importingFromSales ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <ClipboardList size={14} className="mr-1.5" />}

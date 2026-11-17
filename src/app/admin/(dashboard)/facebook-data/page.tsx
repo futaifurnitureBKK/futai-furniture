@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/select";
 import { META_AD_ACCOUNTS, type MetaDailyInsight, type MetaCampaignInsight } from "@/lib/meta-ads";
 
+interface AdSpendRow {
+  date: string;
+  owner: string;
+  platform: string;
+  amount: number;
+}
+
 function toLocalDateStr(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -67,16 +74,24 @@ export default function FacebookDataPage() {
   const [accountId, setAccountId] = useState<string>(META_AD_ACCOUNTS[0].id);
   const [rows, setRows] = useState<MetaDailyInsight[]>([]);
   const [campaigns, setCampaigns] = useState<MetaCampaignInsight[]>([]);
+  const [adSpendRows, setAdSpendRows] = useState<AdSpendRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load(signal: { cancelled: boolean }) {
-    const res = await fetch(`/api/admin/facebook-ads?from=${from}&to=${to}&account=${accountId}`);
+    const [res, adSpendRes] = await Promise.all([
+      fetch(`/api/admin/facebook-ads?from=${from}&to=${to}&account=${accountId}`),
+      fetch(`/api/admin/ad-spend?from=${from}&to=${to}`),
+    ]);
     const data = await res.json();
     if (signal.cancelled) return;
     if (!res.ok) throw new Error(data.error || "โหลดข้อมูลไม่สำเร็จ");
     setRows(data.rows ?? []);
     setCampaigns(data.campaigns ?? []);
+    if (adSpendRes.ok) {
+      const adSpendData = await adSpendRes.json();
+      if (!signal.cancelled) setAdSpendRows(adSpendData.rows ?? []);
+    }
   }
 
   useEffect(() => {
@@ -91,6 +106,7 @@ export default function FacebookDataPage() {
           setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
           setRows([]);
           setCampaigns([]);
+          setAdSpendRows([]);
         }
       } finally {
         if (!signal.cancelled) setLoading(false);
@@ -113,6 +129,23 @@ export default function FacebookDataPage() {
     const cpc = linkClicks > 0 ? spend / linkClicks : 0;
     return { spend, impressions, reach, linkClicks, avgFrequency, cpm, ctr, cpc };
   }, [rows]);
+
+  // Manually-logged ad spend (ad_spend table, same data entered per-owner on
+  // the KPI page) — kept separate from totals.spend above, which is the real
+  // billed amount pulled live from Meta. Facebook only, since this page is
+  // specifically about Facebook ads.
+  const manualAdSpend = useMemo(() => {
+    const fbRows = adSpendRows.filter((r) => r.platform === "facebook");
+    const total = fbRows.reduce((s, r) => s + r.amount, 0);
+    const byOwner = new Map<string, number>();
+    for (const r of fbRows) {
+      byOwner.set(r.owner, (byOwner.get(r.owner) ?? 0) + r.amount);
+    }
+    return {
+      total,
+      byOwner: [...byOwner.entries()].sort((a, b) => b[1] - a[1]),
+    };
+  }, [adSpendRows]);
 
   const cards = [
     { label: t("ค่าใช้จ่าย", "Spend", "花费"), value: baht(totals.spend) },
@@ -172,6 +205,7 @@ export default function FacebookDataPage() {
                 setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
                 setRows([]);
                 setCampaigns([]);
+                setAdSpendRows([]);
               } finally {
                 setLoading(false);
               }
@@ -241,6 +275,36 @@ export default function FacebookDataPage() {
           </div>
         ))}
       </div>
+
+      {manualAdSpend.byOwner.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-1">
+            {t("ค่ายิง Ads ที่บันทึกเอง (แยกตามคน)", "Logged Ad Spend (by owner)", "手动记录的广告费（按负责人）")}
+          </p>
+          <p className="text-xs text-[#9CA3AF] mb-4">
+            {t(
+              "มาจากตารางค่ายิง Ads ในหน้า KPI ไม่ใช่ตัวเลขจาก Meta โดยตรง — ใช้เทียบ/ตรวจสอบกับค่าใช้จ่ายจริงด้านบน",
+              "From the Ad Spend table on the KPI page, not pulled from Meta directly — use it to cross-check against the real Spend figure above",
+              "来自 KPI 页面的广告费记录表，并非直接来自 Meta——可与上方的实际花费对照核对"
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {manualAdSpend.byOwner.map(([owner, amount]) => (
+              <span
+                key={owner}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#FAF7F2] border border-[#E8E5E0] px-3 py-1.5 text-xs"
+              >
+                <span className="text-[#6B6B6B]">{owner}</span>
+                <span className="font-semibold text-[#1A1A1A]">{baht(amount)}</span>
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1A1A1A] px-3 py-1.5 text-xs text-white">
+              <span>{t("รวม", "Total", "合计")}</span>
+              <span className="font-semibold">{baht(manualAdSpend.total)}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-5">

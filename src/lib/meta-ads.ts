@@ -20,6 +20,43 @@ export interface MetaCampaignInsight {
   cpc: number;
 }
 
+export interface MetaPageOverview {
+  pageName: string;
+  followers: number;
+  talkingAbout: number;
+}
+
+// Live snapshot of the Facebook Page itself (followers, people talking about
+// it) — separate from ad-account insights above. Meta has retired the
+// time-series Page Insights metrics (daily views/reach) from the Graph API,
+// so only this current-value snapshot is available, not a daily history.
+// Requires META_PAGE_ID and META_PAGE_ACCESS_TOKEN (a never-expiring Page
+// Access Token from a System User with pages_read_engagement) as server-only
+// env vars.
+export async function fetchMetaPageOverview(): Promise<MetaPageOverview> {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  const pageId = process.env.META_PAGE_ID;
+  if (!token || !pageId) {
+    throw new Error("Facebook Page API ยังไม่ได้ตั้งค่า (ขาด META_PAGE_ACCESS_TOKEN หรือ META_PAGE_ID)");
+  }
+
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}` +
+    `?fields=name,followers_count,talking_about_count&access_token=${token}`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(json.error.message || "Meta API error");
+  }
+
+  return {
+    pageName: json.name ?? "",
+    followers: Number(json.followers_count ?? 0),
+    talkingAbout: Number(json.talking_about_count ?? 0),
+  };
+}
+
 export interface MetaDailyInsight {
   date: string;
   spend: number;

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { RefreshCw, TrendingUp, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
@@ -10,7 +10,7 @@ import { DateRangePicker } from "@/components/admin/date-range-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { META_AD_ACCOUNTS, type MetaDailyInsight, type MetaCampaignInsight } from "@/lib/meta-ads";
+import { META_AD_ACCOUNTS, type MetaDailyInsight, type MetaCampaignInsight, type MetaPageOverview } from "@/lib/meta-ads";
 
 interface AdSpendRow {
   date: string;
@@ -93,6 +93,18 @@ export default function FacebookDataPage() {
   const [adSpendRows, setAdSpendRows] = useState<AdSpendRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pageOverview, setPageOverview] = useState<MetaPageOverview | null>(null);
+
+  // Page follower snapshot — independent of the date range above, so it
+  // loads once rather than refetching on every from/to/account change.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/facebook-page")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled && data) setPageOverview(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   async function load(signal: { cancelled: boolean }) {
     const [res, adSpendRes] = await Promise.all([
@@ -315,6 +327,32 @@ export default function FacebookDataPage() {
           </div>
         ))}
       </div>
+
+      {pageOverview && (
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-1 flex items-center gap-1.5">
+            <Users size={15} className="text-[#C8102E]" />
+            {t("ภาพรวมเพจ", "Page Overview", "主页概览")} — {pageOverview.pageName}
+          </p>
+          <p className="text-xs text-[#9CA3AF] mb-4">
+            {t(
+              "ตัวเลขปัจจุบัน ไม่ใช่รายวัน — Meta เลิกให้ดึงข้อมูลเชิงลึกของเพจแบบรายวัน (ยอดเข้าชม/การเข้าถึง) ผ่าน API แล้ว",
+              "Current snapshot, not a daily history — Meta has retired daily Page Insights (views/reach) from the API",
+              "当前快照数据，非每日趋势 — Meta 已从 API 中下线按日统计的主页洞察数据（浏览量/覆盖人数）"
+            )}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-lg bg-[#FAF7F2] border border-[#E8E5E0] px-4 py-2.5">
+              <p className="text-xs text-[#6B6B6B]">{t("ผู้ติดตาม", "Followers", "粉丝数")}</p>
+              <p className="text-lg font-bold text-[#1A1A1A]">{num(pageOverview.followers)}</p>
+            </div>
+            <div className="rounded-lg bg-[#FAF7F2] border border-[#E8E5E0] px-4 py-2.5">
+              <p className="text-xs text-[#6B6B6B]">{t("คนพูดถึง", "Talking About", "谈论人数")}</p>
+              <p className="text-lg font-bold text-[#1A1A1A]">{num(pageOverview.talkingAbout)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {manualAdSpend.byOwner.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-5">

@@ -130,6 +130,25 @@ export default function FacebookDataPage() {
     return { spend, impressions, reach, linkClicks, avgFrequency, cpm, ctr, cpc };
   }, [rows]);
 
+  // Meta omits a day entirely from the API response when it had zero
+  // delivery, instead of returning a zeroed row — without filling that gap
+  // back in, the chart's x-axis silently skips the date (e.g. 14/11 jumping
+  // straight to 16/11) and its rightmost label can read as a different day.
+  const chartRows = useMemo(() => {
+    const byDate = new Map(rows.map((r) => [r.date, r]));
+    const result: MetaDailyInsight[] = [];
+    const end = new Date(to + "T00:00:00");
+    for (let d = new Date(from + "T00:00:00"); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalDateStr(d);
+      result.push(
+        byDate.get(dateStr) ?? {
+          date: dateStr, spend: 0, impressions: 0, reach: 0, frequency: 0, cpm: 0, linkClicks: 0, ctr: 0, cpc: 0,
+        }
+      );
+    }
+    return result;
+  }, [rows, from, to]);
+
   // Manually-logged ad spend (ad_spend table, same data entered per-owner on
   // the KPI page) — kept separate from totals.spend above, which is the real
   // billed amount pulled live from Meta. Facebook only, since this page is
@@ -318,7 +337,7 @@ export default function FacebookDataPage() {
             <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("ค่าใช้จ่ายรายวัน", "Daily Spend", "每日花费")}</p>
             <div className="flex-1 min-h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
+                <BarChart data={chartRows} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
@@ -326,7 +345,7 @@ export default function FacebookDataPage() {
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
-                    interval={Math.max(0, Math.ceil(rows.length / 8) - 1)}
+                    interval={Math.max(0, Math.ceil(chartRows.length / 8) - 1)}
                   />
                   <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                   <Tooltip
@@ -343,7 +362,7 @@ export default function FacebookDataPage() {
                     }}
                   />
                   <Bar dataKey="spend" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                    {rows.map((d) => <Cell key={d.date} fill="#C8102E" />)}
+                    {chartRows.map((d) => <Cell key={d.date} fill="#C8102E" />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -354,7 +373,7 @@ export default function FacebookDataPage() {
             <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("การแสดงผล / การเข้าถึง รายวัน", "Daily Impressions / Reach", "每日展示/覆盖")}</p>
             <div className="flex-1 min-h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rows} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
+                <LineChart data={chartRows} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
@@ -362,7 +381,7 @@ export default function FacebookDataPage() {
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
-                    interval={Math.max(0, Math.ceil(rows.length / 8) - 1)}
+                    interval={Math.max(0, Math.ceil(chartRows.length / 8) - 1)}
                   />
                   <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                   <Tooltip
@@ -390,7 +409,7 @@ export default function FacebookDataPage() {
             <p className="text-sm font-semibold text-[#1A1A1A] mb-4">{t("CTR / CPC รายวัน", "Daily CTR / CPC", "每日点击率/单次点击成本")}</p>
             <div className="flex-1 min-h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rows} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
+                <LineChart data={chartRows} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#E8E5E0" />
                   <XAxis
                     dataKey="date"
@@ -398,7 +417,7 @@ export default function FacebookDataPage() {
                     tick={{ fontSize: 10, fill: "#6B6B6B" }}
                     axisLine={{ stroke: "#E8E5E0" }}
                     tickLine={false}
-                    interval={Math.max(0, Math.ceil(rows.length / 8) - 1)}
+                    interval={Math.max(0, Math.ceil(chartRows.length / 8) - 1)}
                   />
                   <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                   <Tooltip

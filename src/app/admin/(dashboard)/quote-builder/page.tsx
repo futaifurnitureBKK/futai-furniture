@@ -1598,8 +1598,8 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     }
   }, [docType]);
 
-  function printDeliveryNote() {
-    warnIfUnsaved();
+  async function printDeliveryNote() {
+    await ensureSaved();
     if (docType === "delivery_note") {
       window.print();
     } else {
@@ -1608,19 +1608,18 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     }
   }
 
-  // Downloading/printing before saving means the file won't show up later
-  // in "รายการที่บันทึกไว้" — not blocked (sometimes a quick preview print is
-  // all that's wanted), just flagged so it isn't mistaken for having saved.
-  function warnIfUnsaved() {
+  // Downloading/printing used to just warn if the document wasn't saved yet
+  // — now it saves automatically first, so there's no longer a separate
+  // manual "Save" step before a download, and the file always does show up
+  // afterwards in "รายการที่บันทึกไว้".
+  async function ensureSaved() {
     if (!savedId) {
-      toast.warning(
-        t("ยังไม่ได้บันทึก — กดบันทึกก่อน ไม่งั้นจะหาใบนี้ไม่เจอในรายการที่บันทึกไว้", "Not saved yet — save first, or this document won't show up in your Saved list", "尚未保存——请先点击保存，否则该文件不会出现在已保存列表中")
-      );
+      await saveQuote();
     }
   }
 
-  function downloadPdf() {
-    warnIfUnsaved();
+  async function downloadPdf() {
+    await ensureSaved();
     window.print();
   }
 
@@ -1706,7 +1705,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // package — SheetJS's free tier can't write cell fills/borders/fonts,
   // only exceljs supports full styling for free.
   async function downloadExcel() {
-    warnIfUnsaved();
+    await ensureSaved();
     setGeneratingExcel(true);
     try {
     const ExcelJSLib = (await import("exceljs")).default;

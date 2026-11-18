@@ -1599,12 +1599,29 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   }, [docType]);
 
   function printDeliveryNote() {
+    warnIfUnsaved();
     if (docType === "delivery_note") {
       window.print();
     } else {
       pendingDeliveryPrintRef.current = true;
       setDocTypeAndPrefix("delivery_note");
     }
+  }
+
+  // Downloading/printing before saving means the file won't show up later
+  // in "รายการที่บันทึกไว้" — not blocked (sometimes a quick preview print is
+  // all that's wanted), just flagged so it isn't mistaken for having saved.
+  function warnIfUnsaved() {
+    if (!savedId) {
+      toast.warning(
+        t("ยังไม่ได้บันทึก — กดบันทึกก่อน ไม่งั้นจะหาใบนี้ไม่เจอในรายการที่บันทึกไว้", "Not saved yet — save first, or this document won't show up in your Saved list", "尚未保存——请先点击保存，否则该文件不会出现在已保存列表中")
+      );
+    }
+  }
+
+  function downloadPdf() {
+    warnIfUnsaved();
+    window.print();
   }
 
   // Downloads several saved documents at once as ONE combined PDF (browsers
@@ -1689,6 +1706,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   // package — SheetJS's free tier can't write cell fills/borders/fonts,
   // only exceljs supports full styling for free.
   async function downloadExcel() {
+    warnIfUnsaved();
     setGeneratingExcel(true);
     try {
     const ExcelJSLib = (await import("exceljs")).default;
@@ -1919,6 +1937,10 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
              auto-layout table below to different (wrong) column widths. */
           #print-area, #batch-print-area { position: absolute; top: 0; left: 0; width: 794px; margin: 0; }
           .no-print { display: none !important; }
+          /* The amber highlight on the editable phone input (a screen-only
+             cue to change it from the default before saving) must not show
+             up in the actual printed/exported document. */
+          .no-print-bg { background: transparent !important; }
           /* Chrome strips background colors on print by default (the
              peach header bar, yellow VAT row) unless the user manually
              checks "Background graphics" in More settings — force them
@@ -2002,7 +2024,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                 {t("ดาวน์โหลด", "Download", "下载")}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => window.print()}>{t("PDF", "PDF", "PDF")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadPdf}>{t("PDF", "PDF", "PDF")}</DropdownMenuItem>
                 <DropdownMenuItem onClick={downloadExcel}>{t("Excel", "Excel", "Excel")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2038,7 +2060,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             <Button variant="outline" onClick={printDeliveryNote}>
               <Truck size={14} className="mr-1.5" /> {t("ปริ้นใบส่งของ", "Print Delivery Note", "打印送货单")}
             </Button>
-            <Button onClick={() => window.print()}>
+            <Button onClick={downloadPdf}>
               <Printer size={14} className="mr-1.5" /> {t("ดาวน์โหลด PDF", "Download PDF", "下载PDF")}
             </Button>
           </div>
@@ -2833,7 +2855,14 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             document and scrolls in the normal page flow alongside the
             left column, with no sticky/JS scroll-sync involved. */}
         <div className="preview-sticky-wrapper overflow-x-auto">
-          <p className="text-sm font-semibold text-[#1A1A1A] mb-2 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
+          <p className="text-sm font-semibold text-[#1A1A1A] mb-1 no-print">{t("ตัวอย่างเอกสาร (Preview)", "Preview", "预览")}</p>
+          <p className="text-xs text-amber-600 mb-2 no-print">
+            {t(
+              "เบอร์โทรด้านล่างเป็นค่าเริ่มต้น — อย่าลืมเปลี่ยนเป็นเบอร์ของตัวเองก่อนบันทึก",
+              "The phone number below is a default — don't forget to change it to your own before saving",
+              "下方电话号码为默认值——保存前请记得改成您自己的号码"
+            )}
+          </p>
           <div id="print-area" className="bg-white shadow-sm text-[11px] text-[#1A1A1A] leading-snug p-6 mx-auto" style={{ maxWidth: 794 }}>
             {/* Letterhead — matches FUTAI_Quotation_Template.xlsx rows 1-13 */}
             <table className="w-full border-collapse mb-0">
@@ -2857,7 +2886,12 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     <input
                       value={companyTel}
                       onChange={(e) => setCompanyTel(e.target.value)}
-                      className="company-tel-input w-full bg-transparent border-none p-0 text-[11px] leading-snug focus:outline-none focus:ring-1 focus:ring-[#C8102E]/40 rounded"
+                      title={t(
+                        "อย่าลืมเปลี่ยนเป็นเบอร์ของตัวเองก่อนบันทึก",
+                        "Don't forget to change this to your own number before saving",
+                        "保存前请记得改成您自己的号码"
+                      )}
+                      className="company-tel-input w-full bg-amber-50 border-none p-0 text-[11px] leading-snug focus:outline-none focus:ring-1 focus:ring-[#C8102E]/40 rounded no-print-bg"
                     />
                   </td>
                 </tr>

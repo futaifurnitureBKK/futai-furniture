@@ -1999,7 +1999,7 @@ export default function StockPage() {
                 {movements.length === 0 ? (
                   <p className="text-xs text-[#9CA3AF]">{t("ยังไม่มีประวัติ", "No history yet", "暂无记录")}</p>
                 ) : (
-                  <div className="max-h-44 overflow-y-auto border border-[#E8E5E0] rounded-lg divide-y divide-[#F0EDE6]">
+                  <div className="max-h-56 overflow-y-auto border border-[#E8E5E0] rounded-lg divide-y divide-[#F0EDE6]">
                     {movements.map((m) => {
                       const v = detail.stock_variants.find((x) => x.id === m.variant_id);
                       const fieldLabel: Record<string, string> = {
@@ -2007,16 +2007,22 @@ export default function StockPage() {
                         reserved: t("จอง/รอส่ง", "Reserved", "已预订"),
                         defective: t("ตำหนิ/เคลม", "Defective", "瑕疵"),
                       };
+                      const diff = (m.new_value ?? 0) - (m.old_value ?? 0);
                       return (
-                        <div key={m.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
-                          <span className="text-[#9CA3AF] w-36 shrink-0">{new Date(m.created_at).toLocaleString("th-TH")}</span>
-                          <span className="font-mono text-[#6B6B6B] w-40 truncate">{v ? `${v.code} ${sizeLabel(v)}` : "-"}</span>
-                          <span className="text-[#1A1A1A]">{fieldLabel[m.field] ?? m.field}</span>
-                          <span className="font-semibold shrink-0">{fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}</span>
-                          {m.note && <span className="text-[#9CA3AF] italic truncate">· {m.note}</span>}
-                          {m.actor && (
-                            <span className="text-[10px] text-blue-600/70 shrink-0 ml-auto pl-2">{t("โดย", "by", "由")} {m.actor}</span>
-                          )}
+                        <div key={m.id} className="px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[#1A1A1A] font-medium truncate">{v ? `${v.code} ${sizeLabel(v)}` : "-"}</span>
+                            <span className={`font-semibold shrink-0 ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-500" : "text-[#6B6B6B]"}`}>
+                              {fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}
+                              <span className="ml-1 text-xs">({diff > 0 ? "+" : ""}{fmt(diff)})</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-[#9CA3AF]">
+                            <span className="px-1.5 py-0.5 rounded bg-[#F5F3EF] text-[#6B6B6B]">{fieldLabel[m.field] ?? m.field}</span>
+                            <span>{new Date(m.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}</span>
+                            {m.actor && <span className="text-blue-600/70">· {t("โดย", "by", "由")} {m.actor}</span>}
+                            {m.note && <span className="italic truncate">· {m.note}</span>}
+                          </div>
                         </div>
                       );
                     })}

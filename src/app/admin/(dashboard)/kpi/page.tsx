@@ -25,6 +25,12 @@ import { CHANNELS, STATUSES, CONTACT_METHODS, SEGMENTS, LOST_REASONS, YES_NO_UNK
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS, computeGrandTotal } from "@/lib/saved-quote-options";
 import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
+import { META_AD_ACCOUNTS } from "@/lib/meta-ads";
+
+// "Kan & J" is currently the only salesperson whose Facebook ads run through
+// the main Futai ad account, so their Facebook platform row is filled from
+// Meta's real billed spend instead of being logged by hand.
+const META_AUTO_OWNER = "Kan & J";
 
 interface SavedQuoteListItem {
   id: number;
@@ -580,6 +586,29 @@ export default function KpiPage() {
   const isSingleDay = scopeFrom === scopeTo;
   const adSpendEditDate = isSingleDay ? scopeFrom : todayStr();
 
+  // Real daily spend on the main Futai Meta ad account, keyed by date — used
+  // to auto-fill Kan & J's Facebook platform row below instead of a manual
+  // ad_spend entry. Covers whichever is wider: the viewed range or the
+  // single-day edit date (they differ when a multi-day range is selected).
+  const [metaSpendByDate, setMetaSpendByDate] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const rangeFrom = scopeFrom < adSpendEditDate ? scopeFrom : adSpendEditDate;
+    const rangeTo = scopeTo > adSpendEditDate ? scopeTo : adSpendEditDate;
+    let cancelled = false;
+    fetch(`/api/admin/facebook-ads?from=${rangeFrom}&to=${rangeTo}&account=${META_AD_ACCOUNTS[0].id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.rows) return;
+        const map: Record<string, number> = {};
+        for (const r of data.rows as { date: string; spend: number }[]) map[r.date] = r.spend;
+        setMetaSpendByDate(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [scopeFrom, scopeTo, adSpendEditDate]);
+
   const ownerSummary = useMemo(() => {
     // owners that were removed from the roster (or renamed) but still sit on old leads keep their own row
     const legacy = [...new Set(leads.map((l) => l.owner).filter((o): o is string => !!o && !SALESPEOPLE.includes(o)))];
@@ -587,14 +616,31 @@ export default function KpiPage() {
     return names.map((name) => {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
-      const platforms = AD_PLATFORMS.map((p) => ({
-        key: p.key,
-        label: p.label,
-        editDayAmount: adSpendRows.find((r) => r.owner === name && r.date === adSpendEditDate && r.platform === p.key)?.amount ?? 0,
-        rangeAdAmount: adSpendRows
-          .filter((r) => r.owner === name && r.platform === p.key && r.date >= scopeFrom && r.date <= scopeTo)
-          .reduce((sum, r) => sum + r.amount, 0),
-      }));
+      const platforms = AD_PLATFORMS.map((p) => {
+        const auto = name === META_AUTO_OWNER && p.key === "facebook";
+        if (auto) {
+          let rangeAdAmount = 0;
+          for (let d = new Date(scopeFrom + "T00:00:00"); d <= new Date(scopeTo + "T00:00:00"); d.setDate(d.getDate() + 1)) {
+            rangeAdAmount += metaSpendByDate[toLocalDateStr(d)] ?? 0;
+          }
+          return {
+            key: p.key,
+            label: p.label,
+            editDayAmount: metaSpendByDate[adSpendEditDate] ?? 0,
+            rangeAdAmount,
+            auto: true,
+          };
+        }
+        return {
+          key: p.key,
+          label: p.label,
+          editDayAmount: adSpendRows.find((r) => r.owner === name && r.date === adSpendEditDate && r.platform === p.key)?.amount ?? 0,
+          rangeAdAmount: adSpendRows
+            .filter((r) => r.owner === name && r.platform === p.key && r.date >= scopeFrom && r.date <= scopeTo)
+            .reduce((sum, r) => sum + r.amount, 0),
+          auto: false,
+        };
+      });
       const editDayAmount = platforms.reduce((sum, p) => sum + p.editDayAmount, 0);
       const rangeAdAmount = platforms.reduce((sum, p) => sum + p.rangeAdAmount, 0);
       return {
@@ -607,7 +653,7 @@ export default function KpiPage() {
         platforms,
       };
     });
-  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo]);
+  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo, metaSpendByDate]);
 
   const adSpendScopeTotal = useMemo(
     () => ownerSummary.reduce((sum, o) => sum + (isSingleDay ? o.editDayAmount : o.rangeAdAmount), 0),
@@ -1182,8 +1228,21 @@ export default function KpiPage() {
                       if (!owner) return null;
                       return owner.platforms.map((p) => (
                         <div key={p.key} className="flex items-center justify-between gap-3">
-                          <span className="text-xs text-[#1A1A1A]">{t(p.label.th, p.label.en, p.label.zh)}</span>
-                          {isSingleDay ? (
+                          <span className="text-xs text-[#1A1A1A]">
+                            {t(p.label.th, p.label.en, p.label.zh)}
+                            {p.auto && (
+                              <span className="ml-1 text-[9px] text-[#9CA3AF]">
+                                ({t("อัตโนมัติจาก Meta", "auto from Meta", "来自Meta自动获取")})
+                              </span>
+                            )}
+                          </span>
+                          {p.auto ? (
+                            <span className="text-[11px] font-medium text-[#1A1A1A]">
+                              {(isSingleDay ? p.editDayAmount : p.rangeAdAmount)
+                                ? (isSingleDay ? p.editDayAmount : p.rangeAdAmount).toLocaleString("th-TH")
+                                : "-"}
+                            </span>
+                          ) : isSingleDay ? (
                             <AdSpendInput
                               key={`${adSpendEditDate}-${owner.name}-${p.key}`}
                               date={adSpendEditDate}

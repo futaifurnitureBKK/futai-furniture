@@ -263,10 +263,12 @@ export default function StockPage() {
   const [reservations, setReservations] = useState<StockReservation[]>([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
 
-  // Single modal for every normal (non-shared) stock movement — replaces the
-  // old scattered prompt()s so every action shares one qty field, one
-  // mandatory note, and one save path (never a plain overwrite).
-  const [adjustTarget, setAdjustTarget] = useState<{ product: DbProduct; variant: DbVariant } | null>(null);
+  // Single modal for every stock movement, shared-stock products included —
+  // replaces the old scattered prompt()s so every action shares one qty
+  // field, one mandatory note, and one save path (never a plain overwrite).
+  // variant is null for a shared-stock product: the pool is one number
+  // across every size, there's no single row to attach it to.
+  const [adjustTarget, setAdjustTarget] = useState<{ product: DbProduct; variant: DbVariant | null } | null>(null);
   const [adjustType, setAdjustType] = useState<"IN" | "RESERVE" | "OUT" | "DEFECT" | "ADJUST">("IN");
   const [adjustQty, setAdjustQty] = useState("1");
   const [adjustNote, setAdjustNote] = useState("");
@@ -326,15 +328,17 @@ export default function StockPage() {
     editVariant(pid, vid, { size_text: text, ...parseDims(text) });
   }
 
-  // Single entry point for every normal (non-shared) stock movement —
-  // replaces the old separate prompt()-based receive/reserve/adjust
-  // helpers with one modal, so qty + a mandatory note always travel
-  // together and every action (including a stocktake correction, which
-  // had no path at all once the number fields were locked) is covered.
-  function openAdjustModal(p: DbProduct, v: DbVariant, type: typeof adjustType = "IN") {
+  // Single entry point for every stock movement, shared-stock products
+  // included — one modal instead of a pile of separate prompt()s, so qty +
+  // a mandatory note always travel together, and a stocktake correction
+  // (which had no path at all once the number fields were locked) is
+  // covered everywhere. variant is null for shared stock: the pool lives
+  // on the product, not any one size's row.
+  function openAdjustModal(p: DbProduct, v: DbVariant | null, type: typeof adjustType = "IN") {
     setAdjustTarget({ product: p, variant: v });
     setAdjustType(type);
-    setAdjustQty(type === "ADJUST" ? String(v.available) : "1");
+    const currentAvailable = p.shared_stock ? sharedSetsAvailable(p) : v?.available ?? 0;
+    setAdjustQty(type === "ADJUST" ? String(currentAvailable) : "1");
     setAdjustNote("");
     setAdjustError("");
   }
@@ -343,7 +347,11 @@ export default function StockPage() {
   }
   function switchAdjustType(type: typeof adjustType) {
     setAdjustType(type);
-    if (adjustTarget) setAdjustQty(type === "ADJUST" ? String(adjustTarget.variant.available) : "1");
+    if (adjustTarget) {
+      const { product: p, variant: v } = adjustTarget;
+      const currentAvailable = p.shared_stock ? sharedSetsAvailable(p) : v?.available ?? 0;
+      setAdjustQty(type === "ADJUST" ? String(currentAvailable) : "1");
+    }
     setAdjustError("");
   }
 
@@ -360,6 +368,58 @@ export default function StockPage() {
       setAdjustError(t("กรุณากรอกหมายเหตุ/เลขที่เอกสารทุกครั้ง", "A note/reference is required every time", "每次都必须填写备注/单号"));
       return;
     }
+    const note = adjustNote.trim();
+
+    // Shared-stock pool: every action moves "sets" via the atomic
+    // shared-adjust endpoint instead of PATCHing one variant directly.
+    if (p.shared_stock) {
+      const currentAvailable = sharedSetsAvailable(p);
+      const notEnough = t(`พร้อมขายไม่พอ (เหลือ ${currentAvailable})`, `Not enough available (${currentAvailable} left)`, `可售不足（剩余 ${currentAvailable}）`);
+      setAdjustSaving(true);
+      let ok = true;
+      if (adjustType === "IN") {
+        ok = await callSharedAdjust(p, "available", qty, note);
+      } else if (adjustType === "RESERVE") {
+        if (qty > currentAvailable) {
+          setAdjustSaving(false);
+          setAdjustError(notEnough);
+          return;
+        }
+        ok = await callSharedAdjust(p, "available", -qty, note);
+        if (ok) ok = await callSharedAdjust(p, "reserved", qty, note);
+        if (ok) await createReservationEntry(p.id, null, qty, note);
+      } else if (adjustType === "OUT") {
+        if (qty > currentAvailable) {
+          setAdjustSaving(false);
+          setAdjustError(notEnough);
+          return;
+        }
+        ok = await callSharedAdjust(p, "available", -qty, note);
+      } else if (adjustType === "DEFECT") {
+        if (qty > currentAvailable) {
+          setAdjustSaving(false);
+          setAdjustError(notEnough);
+          return;
+        }
+        ok = await callSharedAdjust(p, "available", -qty, note);
+        if (ok) ok = await callSharedAdjust(p, "defective", qty, note);
+      } else if (adjustType === "ADJUST") {
+        const delta = qty - currentAvailable;
+        if (delta === 0) {
+          setAdjustSaving(false);
+          closeAdjustModal();
+          return;
+        }
+        ok = await callSharedAdjust(p, "available", delta, note);
+      }
+      setAdjustSaving(false);
+      if (!ok) return;
+      toast.success(t("อัปเดตสต็อกแล้ว", "Stock updated", "库存已更新"));
+      closeAdjustModal();
+      return;
+    }
+
+    if (!v) return;
     const notEnough = t(`พร้อมขายไม่พอ (เหลือ ${v.available})`, `Not enough available (${v.available} left)`, `可售不足（剩余 ${v.available}）`);
     let change: Record<string, number> = {};
     if (adjustType === "IN") {
@@ -382,7 +442,7 @@ export default function StockPage() {
     const res = await fetch(`/api/admin/stock/variants/${v.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...change, movement_note: adjustNote.trim() }),
+      body: JSON.stringify({ ...change, movement_note: note }),
     });
     const data = await res.json().catch(() => ({}));
     setAdjustSaving(false);
@@ -395,7 +455,7 @@ export default function StockPage() {
         pp.id !== p.id ? pp : { ...pp, stock_variants: pp.stock_variants.map((vv) => (vv.id === v.id ? { ...vv, ...data.variant } : vv)) }
       )
     );
-    if (adjustType === "RESERVE") await createReservationEntry(p.id, v.id, qty, adjustNote.trim());
+    if (adjustType === "RESERVE") await createReservationEntry(p.id, v.id, qty, note);
     toast.success(t("อัปเดตสต็อกแล้ว", "Stock updated", "库存已更新"));
     closeAdjustModal();
   }
@@ -523,113 +583,6 @@ export default function StockPage() {
       if (res.ok) setReservations((list) => list.map((x) => (x.id === r.id ? data.reservation : x)));
     }
     toast.success(t("ปล่อยคืนแล้ว", "Released", "已释放"));
-  }
-
-  function receiveSharedStock(p: DbProduct) {
-    const current = sharedSetsAvailable(p);
-    const ref = sharedReferenceLabel(p);
-    const input = prompt(
-      t(
-        `รับเข้าเพิ่มกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้พร้อมขาย ${current} ตัว)`,
-        `How many came in (in ${ref} equivalent pieces)? (currently ${current} available)`,
-        `入库多少件（按${ref}换算）？（当前可售 ${current} 件）`
-      )
-    );
-    if (!input) return;
-    const sets = Number(input);
-    if (!sets || sets <= 0) return;
-    callSharedAdjust(p, "available", sets);
-  }
-
-  async function reserveSharedStock(p: DbProduct) {
-    const current = sharedSetsAvailable(p);
-    const ref = sharedReferenceLabel(p);
-    const input = prompt(
-      t(
-        `ลูกค้าจองกี่ตัว (เทียบเท่า ${ref})? (พร้อมขายตอนนี้ ${current} ตัว)`,
-        `How many did the customer reserve (in ${ref} equivalent pieces)? (currently ${current} available)`,
-        `客户预订多少件（按${ref}换算）？（当前可售 ${current} 件）`
-      )
-    );
-    if (!input) return;
-    const sets = Number(input);
-    if (!sets || sets <= 0) return;
-    if (
-      sets > current &&
-      !confirm(
-        t(
-          `มีพร้อมขายแค่ ${current} ตัว จะจอง ${sets} ตัวเลยไหม (พร้อมขายจะติดลบ)?`,
-          `Only ${current} available — reserve ${sets} anyway (available will go negative)?`,
-          `仅剩 ${current} 件可售 —— 仍要预订 ${sets} 件吗？`
-        )
-      )
-    )
-      return;
-    const note = prompt(
-      t("จองให้ใคร/ออเดอร์ไหน (ไม่บังคับ)", "Who's it for / which order? (optional)", "预订给谁/哪个订单？（可选）")
-    );
-    const ok = await callSharedAdjust(p, "available", -sets, note);
-    if (!ok) return;
-    const reservedOk = await callSharedAdjust(p, "reserved", sets, note);
-    if (reservedOk) await createReservationEntry(p.id, null, sets, note);
-  }
-
-  function adjustSharedAvailable(p: DbProduct) {
-    const current = sharedSetsAvailable(p);
-    const ref = sharedReferenceLabel(p);
-    const input = prompt(
-      t(
-        `ปรับยอดพร้อมขายเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้ ${current} ตัว)`,
-        `Set available to how many (in ${ref} equivalent pieces)? (currently ${current})`,
-        `将可售调整为多少件（按${ref}换算）？（当前 ${current} 件）`
-      )
-    );
-    if (input == null || input === "") return;
-    const target = Number(input);
-    if (!Number.isFinite(target)) return;
-    const delta = target - current;
-    if (delta === 0) return;
-    callSharedAdjust(p, "available", delta);
-  }
-
-  // Corrects the "จอง/รอส่ง" number directly — on its own, same as
-  // adjustSharedAvailable/adjustSharedDefective below. Deliberately does NOT
-  // touch "available": a lower reserved count doesn't always mean those
-  // units go back on sale (e.g. the order shipped), so that's a separate,
-  // explicit step via the available-adjust button when that's actually what
-  // happened.
-  function adjustSharedReserved(p: DbProduct) {
-    const current = sharedSetsReserved(p);
-    const ref = sharedReferenceLabel(p);
-    const input = prompt(
-      t(
-        `ปรับยอดจองเป็นกี่ตัว (เทียบเท่า ${ref})? (ตอนนี้จอง ${current} ตัว)`,
-        `Set reserved to how many (in ${ref} equivalent pieces)? (currently ${current})`,
-        `将已预订调整为多少件（按${ref}换算）？（当前 ${current} 件）`
-      )
-    );
-    if (input == null || input === "") return;
-    const target = Number(input);
-    if (!Number.isFinite(target) || target < 0) return;
-    const delta = target - current;
-    if (delta === 0) return;
-    callSharedAdjust(p, "reserved", delta);
-  }
-
-  function adjustSharedDefective(p: DbProduct) {
-    const current = sharedSetsDefective(p);
-    const ref = sharedReferenceLabel(p);
-    const input = prompt(
-      t(
-        `มีตำหนิกี่ตัว (เทียบเท่า ${ref})? (ปัจจุบัน ${current} ตัว) ใส่ติดลบเพื่อลด`,
-        `How many defective (in ${ref} equivalent pieces)? (currently ${current}) negative to reduce`,
-        `次品多少件（按${ref}换算）？（当前 ${current} 件）输入负数以减少`
-      )
-    );
-    if (input == null || input === "") return;
-    const delta = Number(input);
-    if (!delta) return;
-    callSharedAdjust(p, "defective", delta);
   }
 
   // Attaches a photo to this one size/variant — once a variant has its own
@@ -1535,24 +1488,14 @@ export default function StockPage() {
                                         </p>
                                         {!archivedView && (
                                           <div className="flex flex-wrap gap-1 pt-0.5">
-                                            <button type="button" onClick={() => receiveSharedStock(p)} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-                                              {t("+รับเข้า", "+Receive", "+入库")}
+                                            <button type="button" onClick={() => openAdjustModal(p, null, "IN")} className="px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]">
+                                              {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
                                             </button>
-                                            <button type="button" onClick={() => reserveSharedStock(p)} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">
-                                              {t("จอง", "Reserve", "预订")}
-                                            </button>
-                                            <button type="button" onClick={() => openReservations(p)} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
-                                              <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
-                                            </button>
-                                            <button type="button" onClick={() => adjustSharedAvailable(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
-                                              {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
-                                            </button>
-                                            <button type="button" onClick={() => adjustSharedReserved(p)} className="px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
-                                              {t("ปรับยอดจอง", "Adjust reserved", "调整已预订")}
-                                            </button>
-                                            <button type="button" onClick={() => adjustSharedDefective(p)} className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100">
-                                              {t("ตำหนิ", "Defective", "次品")}
-                                            </button>
+                                            {sharedSetsReserved(p) > 0 && (
+                                              <button type="button" onClick={() => openReservations(p)} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                                <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
+                                              </button>
+                                            )}
                                           </div>
                                         )}
                                       </div>
@@ -1864,24 +1807,14 @@ export default function StockPage() {
                         `共享库存 — 各规格数字已锁定，仅能从此处按钮调整（按${sharedReferenceLabel(detail)}换算）`
                       )}
                     </span>
-                    <button type="button" onClick={() => receiveSharedStock(detail)} className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
-                      {t("+รับเข้า", "+Receive", "+入库")}
+                    <button type="button" onClick={() => openAdjustModal(detail, null, "IN")} className="px-2 py-1 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E] font-medium">
+                      {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
                     </button>
-                    <button type="button" onClick={() => reserveSharedStock(detail)} className="px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium">
-                      {t("จอง", "Reserve", "预订")}
-                    </button>
-                    <button type="button" onClick={() => openReservations(detail)} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">
-                      <ClipboardList size={11} /> {t("รายการจอง", "Reservations", "预订明细")}
-                    </button>
-                    <button type="button" onClick={() => adjustSharedAvailable(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
-                      {t("ปรับยอดพร้อมขาย", "Adjust available", "调整可售")}
-                    </button>
-                    <button type="button" onClick={() => adjustSharedReserved(detail)} className="px-2 py-1 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0] font-medium">
-                      {t("ปรับยอดจอง", "Adjust reserved", "调整已预订")}
-                    </button>
-                    <button type="button" onClick={() => adjustSharedDefective(detail)} className="px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-medium">
-                      {t("ตำหนิ", "Defective", "次品")}
-                    </button>
+                    {sharedSetsReserved(detail) > 0 && (
+                      <button type="button" onClick={() => openReservations(detail)} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">
+                        <ClipboardList size={11} /> {t("รายการจอง", "Reservations", "预订明细")}
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="overflow-x-auto border border-[#E8E5E0] rounded-lg">
@@ -2360,30 +2293,40 @@ export default function StockPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Single modal for every normal (non-shared) stock movement ── */}
+      {/* ── Single modal for every stock movement, shared-stock included ── */}
       <Dialog open={!!adjustTarget} onOpenChange={(o) => !o && closeAdjustModal()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("ปรับยอด / จองสินค้า", "Adjust / Reserve Stock", "调整/预订库存")}</DialogTitle>
           </DialogHeader>
-          {adjustTarget && (
+          {adjustTarget && (() => {
+            const { product: p, variant: v } = adjustTarget;
+            const shared = p.shared_stock;
+            const snapAvailable = shared ? sharedSetsAvailable(p) : v?.available ?? 0;
+            const snapReserved = shared ? sharedSetsReserved(p) : v?.reserved ?? 0;
+            const snapDefective = shared ? sharedSetsDefective(p) : v?.defective ?? 0;
+            const unitHint = shared ? ` (${t("เทียบเท่า", "≈", "按")} ${sharedReferenceLabel(p)})` : "";
+            return (
             <div className="space-y-4">
               <p className="text-xs text-[#6B6B6B] font-mono -mt-2">
-                {adjustTarget.product.code} • {sizeLabel(adjustTarget.variant) || t("ไม่ระบุขนาด", "no size", "无规格")}
+                {p.code} •{" "}
+                {shared
+                  ? t("สต็อกร่วมทุกไซส์", "shared pool, all sizes", "共享库存池，全尺寸")
+                  : (v ? sizeLabel(v) : "") || t("ไม่ระบุขนาด", "no size", "无规格")}
               </p>
 
               <div className="grid grid-cols-3 gap-2 bg-[#F5F3EF] rounded-xl p-3 border border-[#E8E5E0] text-center text-xs">
                 <div>
                   <div className="text-[#9CA3AF]">{t("พร้อมขาย", "Available", "可售")}</div>
-                  <div className="text-lg font-bold text-[#1A1A1A]">{fmt(adjustTarget.variant.available)}</div>
+                  <div className="text-lg font-bold text-[#1A1A1A]">{fmt(snapAvailable)}</div>
                 </div>
                 <div className="border-x border-[#E8E5E0]">
                   <div className="text-[#9CA3AF]">{t("จอง/รอส่ง", "Reserved", "已预订")}</div>
-                  <div className="text-lg font-bold text-amber-600">{fmt(adjustTarget.variant.reserved)}</div>
+                  <div className="text-lg font-bold text-amber-600">{fmt(snapReserved)}</div>
                 </div>
                 <div>
                   <div className="text-[#9CA3AF]">{t("ตำหนิ/เคลม", "Defective", "瑕疵")}</div>
-                  <div className="text-lg font-bold text-red-600">{fmt(adjustTarget.variant.defective)}</div>
+                  <div className="text-lg font-bold text-red-600">{fmt(snapDefective)}</div>
                 </div>
               </div>
 
@@ -2428,6 +2371,7 @@ export default function StockPage() {
                   {adjustType === "OUT" && t("จำนวนที่ตัดส่งออก (ชิ้น)", "Qty shipped out (pcs)", "出库数量（件）")}
                   {adjustType === "DEFECT" && t("จำนวนที่มีตำหนิ (ชิ้น)", "Qty defective (pcs)", "瑕疵数量（件）")}
                   {adjustType === "ADJUST" && t("ยอดพร้อมขายที่ถูกต้อง (ชิ้น)", "Correct available qty (pcs)", "正确的可售数量（件）")}
+                  {unitHint}
                 </Label>
                 <Input
                   type="number"
@@ -2467,7 +2411,8 @@ export default function StockPage() {
 
               {adjustError && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{adjustError}</div>}
             </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={closeAdjustModal}>{t("ยกเลิก", "Cancel", "取消")}</Button>
             <Button onClick={submitAdjust} disabled={adjustSaving}>

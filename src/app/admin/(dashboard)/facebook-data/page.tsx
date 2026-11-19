@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   RefreshCw, TrendingUp, ChevronLeft, ChevronRight, Users, Check,
   Wallet, Eye, Radio, Repeat, BarChart3, MousePointerClick, Percent, Coins,
@@ -19,13 +20,10 @@ interface AdSpendRow {
   amount: number;
 }
 
-// Per-account avatar styling for the profile-switcher cards — purely a
-// display concern, kept out of meta-ads.ts (which only holds real API
-// identifiers). Unstyled accounts fall back to a generic look below.
-const ACCOUNT_STYLE: Record<string, { initials: string; gradient: string }> = {
-  act_289289761660739: { initials: "FO", gradient: "from-[#C8102E] to-[#9E0B22]" },
-  act_1642538953997433: { initials: "FT", gradient: "from-[#1877F2] to-[#0C53B7]" },
-};
+// Both real Facebook Pages (Official and the secondary one) currently use
+// the same FUTAI circle logo as their profile picture — cropped straight
+// from a screenshot of each page's own header, not a generic placeholder.
+const FB_PAGE_LOGO = "/fb-logo-futai.png";
 
 function toLocalDateStr(d: Date) {
   const y = d.getFullYear();
@@ -274,7 +272,6 @@ export default function FacebookDataPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {META_AD_ACCOUNTS.map((a) => {
             const selected = a.id === accountId;
-            const style = ACCOUNT_STYLE[a.id] ?? { initials: a.labelEn.slice(0, 2).toUpperCase(), gradient: "from-[#6B6B6B] to-[#4B4B4B]" };
             return (
               <button
                 key={a.id}
@@ -287,8 +284,8 @@ export default function FacebookDataPage() {
                 }`}
               >
                 <div className="relative shrink-0">
-                  <div className={`h-11 w-11 rounded-full bg-gradient-to-br ${style.gradient} text-white font-bold text-sm flex items-center justify-center ring-2 ring-white shadow-xs`}>
-                    {style.initials}
+                  <div className="h-11 w-11 rounded-full overflow-hidden ring-2 ring-white shadow-xs">
+                    <Image src={FB_PAGE_LOGO} alt="" width={44} height={44} className="h-full w-full object-cover" />
                   </div>
                   <span className="absolute -bottom-0.5 -right-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1877F2] text-white ring-2 ring-white shadow-xs">
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-2.5 h-2.5"><path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.1H7.7v3h2.5V21h3.3z" /></svg>

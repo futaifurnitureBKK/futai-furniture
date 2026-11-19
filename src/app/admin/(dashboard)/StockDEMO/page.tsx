@@ -1631,7 +1631,7 @@ export default function StockPage() {
                                           placeholder={hideForSharedStock ? "–" : "0"}
                                         />
                                         {f === "available" && !archivedView && !p.shared_stock && (
-                                          <div className="flex justify-center items-center gap-1 mt-1">
+                                          <div className="flex justify-center mt-1">
                                             <button
                                               type="button"
                                               onClick={() => openAdjustModal(p, v, "IN")}
@@ -1639,14 +1639,6 @@ export default function StockPage() {
                                               className="text-[9px] px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]"
                                             >
                                               {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openStockCard(p, v)}
-                                              title={t("ดูประวัติ Stock Card", "View Stock Card history", "查看库存卡记录")}
-                                              className="p-1 rounded text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-[#F5F3EF] border border-transparent hover:border-[#E8E5E0]"
-                                            >
-                                              <History size={11} />
                                             </button>
                                           </div>
                                         )}
@@ -1675,9 +1667,21 @@ export default function StockPage() {
                                     />
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    <span className={`text-[11px] font-medium px-2 py-1 rounded whitespace-nowrap ${STATUS_STYLE[st]}`}>
-                                      {STATUS_LABEL[st]}
-                                    </span>
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <span className={`text-[11px] font-medium px-2 py-1 rounded whitespace-nowrap ${STATUS_STYLE[st]}`}>
+                                        {STATUS_LABEL[st]}
+                                      </span>
+                                      {!archivedView && !p.shared_stock && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openStockCard(p, v)}
+                                          title={t("ดูประวัติ Stock Card", "View Stock Card history", "查看库存卡记录")}
+                                          className="p-1 rounded text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-[#F5F3EF] border border-transparent hover:border-[#E8E5E0]"
+                                        >
+                                          <History size={13} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </TableCell>
                                 </>
                               ) : (

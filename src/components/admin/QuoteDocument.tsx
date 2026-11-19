@@ -265,7 +265,7 @@ export function QuoteDocument({ quote }: { quote: SavedQuote }) {
             {quote.deposit_pct > 0 && (
               <>
                 <tr>
-                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({quote.deposit_pct}%)</td>
+                  <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({fmtPct(quote.deposit_pct)}%)</td>
                   <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
                 </tr>
                 <tr>

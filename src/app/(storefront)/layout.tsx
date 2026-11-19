@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/storefront/Navbar";
 import { Footer } from "@/components/storefront/Footer";
 import { LineFloatingButton } from "@/components/storefront/LineFloatingButton";
+import { WeChatFloatingButton } from "@/components/storefront/WeChatFloatingButton";
 
 export default function StorefrontLayout({
   children,
@@ -12,6 +13,7 @@ export default function StorefrontLayout({
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <WeChatFloatingButton />
       <LineFloatingButton />
     </>
   );

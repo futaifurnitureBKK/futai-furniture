@@ -8,11 +8,13 @@ export const META_AD_ACCOUNTS = [
     id: "act_289289761660739",
     labelTh: "Futai Furniture Official (บัญชีหลัก)",
     labelEn: "Futai Furniture Official (main acc)",
+    pageId: "1108504589021959",
   },
   {
     id: "act_1642538953997433",
     labelTh: "Futai furniture (เพจรอง)",
     labelEn: "Futai furniture (secondary page)",
+    pageId: "1397023516836034",
   },
 ] as const;
 
@@ -35,18 +37,21 @@ export interface MetaPageOverview {
 // it) — separate from ad-account insights above. Meta has retired the
 // time-series Page Insights metrics (daily views/reach) from the Graph API,
 // so only this current-value snapshot is available, not a daily history.
-// Requires META_PAGE_ID and META_PAGE_ACCESS_TOKEN (a never-expiring Page
-// Access Token from a System User with pages_read_engagement) as server-only
-// env vars.
-export async function fetchMetaPageOverview(): Promise<MetaPageOverview> {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  const pageId = process.env.META_PAGE_ID;
-  if (!token || !pageId) {
-    throw new Error("Facebook Page API ยังไม่ได้ตั้งค่า (ขาด META_PAGE_ACCESS_TOKEN หรือ META_PAGE_ID)");
+//
+// Pass pageId to get a specific Page's numbers (any Page the FUTAI DATA
+// System User has pages_read_engagement on — same token as the ads calls
+// above, reused here since that System User already has both real Pages
+// assigned as assets, confirmed in Business Settings). Omit it to keep the
+// original single-Page behavior via META_PAGE_ID/META_PAGE_ACCESS_TOKEN.
+export async function fetchMetaPageOverview(pageId?: string): Promise<MetaPageOverview> {
+  const token = pageId ? process.env.META_ACCESS_TOKEN : process.env.META_PAGE_ACCESS_TOKEN;
+  const resolvedPageId = pageId || process.env.META_PAGE_ID;
+  if (!token || !resolvedPageId) {
+    throw new Error("Facebook Page API ยังไม่ได้ตั้งค่า (ขาด META_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN หรือ META_PAGE_ID)");
   }
 
   const url =
-    `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}` +
+    `https://graph.facebook.com/${GRAPH_VERSION}/${resolvedPageId}` +
     `?fields=name,followers_count,talking_about_count&access_token=${token}`;
 
   const res = await fetch(url, { cache: "no-store" });

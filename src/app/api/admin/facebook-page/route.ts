@@ -7,7 +7,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const overview = await fetchMetaPageOverview();
+    const pageId = req.nextUrl.searchParams.get("pageId") || undefined;
+    const overview = await fetchMetaPageOverview(pageId);
     return NextResponse.json(overview);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Meta API error" }, { status: 502 });

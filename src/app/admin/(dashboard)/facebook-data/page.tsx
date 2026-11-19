@@ -99,18 +99,32 @@ export default function FacebookDataPage() {
   const [adSpendRows, setAdSpendRows] = useState<AdSpendRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pageOverview, setPageOverview] = useState<MetaPageOverview | null>(null);
+  // Keyed by Page ID so every account's card can show its own real
+  // follower count at once, not just whichever one happens to be selected.
+  const [pageOverviews, setPageOverviews] = useState<Record<string, MetaPageOverview>>({});
 
-  // Page follower snapshot — independent of the date range above, so it
-  // loads once rather than refetching on every from/to/account change.
+  // Page follower snapshot for every connected Page — independent of the
+  // date range above, so it loads once rather than refetching on every
+  // from/to/account change.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/admin/facebook-page")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (!cancelled && data) setPageOverview(data); })
-      .catch(() => {});
+    Promise.all(
+      META_AD_ACCOUNTS.map((a) =>
+        fetch(`/api/admin/facebook-page?pageId=${a.pageId}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => (data ? ([a.pageId, data as MetaPageOverview] as const) : null))
+          .catch(() => null)
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Record<string, MetaPageOverview> = {};
+      for (const r of results) if (r) map[r[0]] = r[1];
+      setPageOverviews(map);
+    });
     return () => { cancelled = true; };
   }, []);
+
+  const pageOverview = pageOverviews[META_AD_ACCOUNTS.find((a) => a.id === accountId)?.pageId ?? ""] ?? null;
 
   async function load(signal: { cancelled: boolean }) {
     const [res, adSpendRes] = await Promise.all([
@@ -272,6 +286,7 @@ export default function FacebookDataPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {META_AD_ACCOUNTS.map((a) => {
             const selected = a.id === accountId;
+            const overview = pageOverviews[a.pageId];
             return (
               <button
                 key={a.id}
@@ -293,7 +308,16 @@ export default function FacebookDataPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-semibold truncate ${selected ? "text-[#C8102E]" : "text-[#1A1A1A]"}`}>{t(a.labelTh, a.labelEn, a.labelEn)}</p>
-                  <p className="text-[10px] font-mono text-[#9CA3AF] mt-0.5 truncate">{a.id}</p>
+                  <p className="text-[11px] text-[#6B6B6B] mt-0.5 truncate">
+                    {overview ? (
+                      <>
+                        <Users size={10} className="inline -mt-0.5 mr-0.5" />
+                        {t(`ผู้ติดตาม ${num(overview.followers)} คน`, `${num(overview.followers)} followers`, `${num(overview.followers)} 位粉丝`)}
+                      </>
+                    ) : (
+                      t("กำลังโหลดผู้ติดตาม...", "Loading followers...", "正在加载粉丝数...")
+                    )}
+                  </p>
                 </div>
                 <div
                   className={`shrink-0 h-5 w-5 rounded-full flex items-center justify-center transition-colors ${

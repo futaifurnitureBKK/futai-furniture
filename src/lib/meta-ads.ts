@@ -9,6 +9,11 @@ export const META_AD_ACCOUNTS = [
     labelTh: "Futai Furniture Official (บัญชีหลัก)",
     labelEn: "Futai Furniture Official (main acc)",
   },
+  {
+    id: "act_1642538953997433",
+    labelTh: "Futai furniture (เพจรอง)",
+    labelEn: "Futai furniture (secondary page)",
+  },
 ] as const;
 
 export interface MetaCampaignInsight {

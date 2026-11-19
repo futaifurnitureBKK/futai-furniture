@@ -449,10 +449,12 @@ export default function StockPage() {
     }
   }
 
-  // Releases (fully or partially) one specific reservation entry — reduces
-  // the scalar "reserved" count the same isolated way the "ปรับยอดจอง"
-  // button does (never touches "available"), then shrinks or removes the
-  // ledger row by the same amount so the two never drift apart.
+  // Releases (fully or partially) one specific reservation entry — the exact
+  // reverse of reserveStock/reserveSharedStock: moves the released qty from
+  // "reserved" back into "available" (unlike the generic "ปรับยอดจอง" button,
+  // this always refers to one specific customer's hold being let go, so
+  // putting it back on sale is never ambiguous here), then shrinks or
+  // removes the ledger row by the same amount so the two never drift apart.
   async function releaseReservation(p: DbProduct, r: StockReservation) {
     const input = prompt(
       t(`ปล่อยคืนกี่ตัว? (มีอยู่ ${r.qty})`, `How many to release? (currently ${r.qty})`, `释放多少件？（当前 ${r.qty}）`),
@@ -465,13 +467,14 @@ export default function StockPage() {
     if (p.shared_stock) {
       const ok = await callSharedAdjust(p, "reserved", -releaseQty);
       if (!ok) return;
+      await callSharedAdjust(p, "available", releaseQty);
     } else {
       const v = p.stock_variants.find((vv) => vv.id === r.variant_id);
       if (!v) return;
       const res = await fetch(`/api/admin/stock/variants/${v.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reserved: v.reserved - releaseQty }),
+        body: JSON.stringify({ reserved: v.reserved - releaseQty, available: v.available + releaseQty }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

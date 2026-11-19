@@ -23,7 +23,7 @@ interface AdSpendRow {
 // Both real Facebook Pages (Official and the secondary one) currently use
 // the same FUTAI circle logo as their profile picture — cropped straight
 // from a screenshot of each page's own header, not a generic placeholder.
-const FB_PAGE_LOGO = "/fb-logo-futai.png";
+const FB_PAGE_LOGO = "/fb-logo-futai-icon.png";
 
 function toLocalDateStr(d: Date) {
   const y = d.getFullYear();

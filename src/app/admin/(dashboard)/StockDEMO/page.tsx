@@ -246,6 +246,11 @@ export default function StockPage() {
   const [cat, setCat] = useState<string>("all");
   const [showroomOnly, setShowroomOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // A second, independent filter dimension the KPI cards need that
+  // StatusFilter can't express (a variant can be "ok" and still have some
+  // reserved/defective units) — mutually exclusive with statusFilter in the
+  // UI (picking one resets the other) but applied together in `rows`.
+  const [kpiExtra, setKpiExtra] = useState<"none" | "reserved" | "defective">("none");
   const [limit, setLimit] = useState(PAGE);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   // The "owner mode / show cost" toggle was removed from the toolbar — kept
@@ -256,6 +261,12 @@ export default function StockPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [draft, setDraft] = useState({ code: "", category: "", description: "", color: "", material: "", boxes_per_item: 1, image_url: "", image_urls: [] as string[] });
   const [movements, setMovements] = useState<Movement[]>([]);
+
+  // Lightweight per-variant "Stock Card" slide-over — a quick peek at one
+  // size's history without opening the full product-detail dialog.
+  const [stockCardTarget, setStockCardTarget] = useState<{ product: DbProduct; variant: DbVariant } | null>(null);
+  const [cardMovements, setCardMovements] = useState<Movement[]>([]);
+  const [cardMovementsLoading, setCardMovementsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
 
@@ -528,6 +539,19 @@ export default function StockPage() {
       if (res.ok) setReservations(data.reservations);
     } finally {
       setReservationsLoading(false);
+    }
+  }
+
+  async function openStockCard(p: DbProduct, v: DbVariant) {
+    setStockCardTarget({ product: p, variant: v });
+    setCardMovements([]);
+    setCardMovementsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/stock/${p.id}/movements`);
+      const data = await res.json();
+      if (res.ok) setCardMovements((data.movements as Movement[]).filter((m) => m.variant_id === v.id));
+    } finally {
+      setCardMovementsLoading(false);
     }
   }
 
@@ -888,11 +912,16 @@ export default function StockPage() {
           all.some((v) => v.code.toLowerCase().includes(q) || v.size_text.toLowerCase().includes(q));
         if (!hit) continue;
       }
-      const vs = all.filter((v) => statusFilter === "all" || statusOf(v) === statusFilter);
-      if (vs.length || (statusFilter === "all" && all.length === 0)) out.push({ p, vs });
+      const vs = all.filter((v) => {
+        if (statusFilter !== "all" && statusOf(v) !== statusFilter) return false;
+        if (kpiExtra === "reserved" && v.reserved <= 0) return false;
+        if (kpiExtra === "defective" && v.defective <= 0) return false;
+        return true;
+      });
+      if (vs.length || (statusFilter === "all" && kpiExtra === "none" && all.length === 0)) out.push({ p, vs });
     }
     return out;
-  }, [products, query, cat, statusFilter, archivedView, showroomOnly]);
+  }, [products, query, cat, statusFilter, kpiExtra, archivedView, showroomOnly]);
 
   const visibleRows = useMemo(() => rows.slice(0, limit), [rows, limit]);
   const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(({ p }) => selectedProductIds.has(p.id));
@@ -1222,27 +1251,50 @@ export default function StockPage() {
           {!archivedView && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
-                { label: t("สินค้า (รุ่น)", "Products", "产品数"), value: fmt(products.length), sub: `${fmt(totals.sizes)} ${t("ขนาด", "sizes", "规格")}` },
-                { label: t("พร้อมขาย", "Available", "可售"), value: fmt(totals.available), sub: t("ชิ้น (ทุกขนาดรวมกัน)", "pcs (all sizes)", "件（所有尺寸）") },
-                { label: t("จอง/รอส่ง", "Reserved", "已预订/待发"), value: fmt(totals.reserved), sub: t("ชิ้น", "pcs", "件") },
-                { label: t("มีตำหนิ/รอเคลม", "Defective", "瑕疵/待索赔"), value: fmt(totals.defective), sub: t("ชิ้น", "pcs", "件") },
-                { label: t("ขนาดที่ใกล้หมด", "Sizes low", "库存偏低规格"), value: fmt(totals.low), sub: t("ถึงจุดสั่งซื้อ — กดเพื่อดู", "at reorder point — click to view", "已到补货点 — 点击查看"), filter: "low" as StatusFilter },
-                { label: t("ขนาดที่หมดสต็อก", "Sizes out", "缺货规格"), value: fmt(totals.out), sub: t("กดเพื่อดูรายการที่หมด", "Click to view out-of-stock items", "点击查看缺货项目"), filter: "out" as StatusFilter },
+                {
+                  label: t("สินค้า (รุ่น)", "Products", "产品数"), value: fmt(products.length),
+                  sub: `${fmt(totals.sizes)} ${t("ขนาด — กดเพื่อล้างตัวกรอง", "sizes — click to clear filters", "规格 — 点击清除筛选")}`,
+                  onClick: () => { setStatusFilter("all"); setKpiExtra("none"); setQuery(""); setCat("all"); setLimit(PAGE); },
+                  isActive: () => statusFilter === "all" && kpiExtra === "none",
+                },
+                {
+                  label: t("พร้อมขาย", "Available", "可售"), value: fmt(totals.available),
+                  sub: t("ชิ้น (ทุกขนาดรวมกัน) — กดเพื่อกรอง", "pcs (all sizes) — click to filter", "件（所有尺寸）— 点击筛选"),
+                  onClick: () => { setStatusFilter((f) => (f === "ok" ? "all" : "ok")); setKpiExtra("none"); setLimit(PAGE); },
+                  isActive: () => statusFilter === "ok",
+                },
+                {
+                  label: t("จอง/รอส่ง", "Reserved", "已预订/待发"), value: fmt(totals.reserved),
+                  sub: t("ชิ้น — กดเพื่อดูเฉพาะที่มีจอง", "pcs — click to show only reserved", "件 — 点击只看已预订"),
+                  onClick: () => { setKpiExtra((k) => (k === "reserved" ? "none" : "reserved")); setStatusFilter("all"); setLimit(PAGE); },
+                  isActive: () => kpiExtra === "reserved",
+                },
+                {
+                  label: t("มีตำหนิ/รอเคลม", "Defective", "瑕疵/待索赔"), value: fmt(totals.defective),
+                  sub: t("ชิ้น — กดเพื่อดูเฉพาะที่มีตำหนิ", "pcs — click to show only defective", "件 — 点击只看瑕疵"),
+                  onClick: () => { setKpiExtra((k) => (k === "defective" ? "none" : "defective")); setStatusFilter("all"); setLimit(PAGE); },
+                  isActive: () => kpiExtra === "defective",
+                },
+                {
+                  label: t("ขนาดที่ใกล้หมด", "Sizes low", "库存偏低规格"), value: fmt(totals.low),
+                  sub: t("ถึงจุดสั่งซื้อ — กดเพื่อดู", "at reorder point — click to view", "已到补货点 — 点击查看"),
+                  onClick: () => { setStatusFilter((f) => (f === "low" ? "all" : "low")); setKpiExtra("none"); setCat("all"); setLimit(PAGE); },
+                  isActive: () => statusFilter === "low",
+                },
+                {
+                  label: t("ขนาดที่หมดสต็อก", "Sizes out", "缺货规格"), value: fmt(totals.out),
+                  sub: t("กดเพื่อดูรายการที่หมด", "Click to view out-of-stock items", "点击查看缺货项目"),
+                  onClick: () => { setStatusFilter((f) => (f === "out" ? "all" : "out")); setKpiExtra("none"); setCat("all"); setLimit(PAGE); },
+                  isActive: () => statusFilter === "out",
+                },
               ].map((c) => {
-                const clickable = "filter" in c;
-                const active = clickable && statusFilter === c.filter;
+                const active = c.isActive();
                 return (
                   <button
                     key={c.label}
                     type="button"
-                    disabled={!clickable}
-                    onClick={() => {
-                      if (!clickable) return;
-                      setStatusFilter((f) => (f === c.filter ? "all" : (c.filter as StatusFilter)));
-                      setCat("all");
-                      setLimit(PAGE);
-                    }}
-                    className={`bg-white rounded-xl shadow-sm p-4 text-left ${clickable ? "cursor-pointer hover:shadow-md transition-shadow" : ""} ${
+                    onClick={c.onClick}
+                    className={`bg-white rounded-xl shadow-sm p-4 text-left cursor-pointer hover:shadow-md transition-shadow ${
                       active ? "ring-2 ring-[#C8102E]" : ""
                     }`}
                   >
@@ -1271,7 +1323,7 @@ export default function StockPage() {
                     <button
                       key={b.code}
                       type="button"
-                      onClick={() => { setQuery(b.code); setCat("all"); setStatusFilter("all"); setLimit(PAGE); }}
+                      onClick={() => { setQuery(b.code); setCat("all"); setStatusFilter("all"); setKpiExtra("none"); setLimit(PAGE); }}
                       className={`shrink-0 text-left rounded-lg border px-3 py-2 min-w-[150px] hover:shadow-sm transition-shadow ${tone}`}
                     >
                       <p className="text-[10px] text-[#9CA3AF]">#{i + 1}</p>
@@ -1306,7 +1358,7 @@ export default function StockPage() {
                   placeholder={t("ค้นหารหัสสินค้า / หมวดหมู่ / ขนาด...", "Search code / category / size...", "搜索编号 / 分类 / 尺寸...")}
                 />
               </div>
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter((v ?? "all") as StatusFilter); setLimit(PAGE); }}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter((v ?? "all") as StatusFilter); setKpiExtra("none"); setLimit(PAGE); }}>
                 <SelectTrigger className="w-44">
                   <SelectValue>
                     {(v: StatusFilter) => (v === "all" ? t("ทุกสถานะ", "All statuses", "全部状态") : STATUS_LABEL[v])}
@@ -1491,6 +1543,11 @@ export default function StockPage() {
                                             <button type="button" onClick={() => openAdjustModal(p, null, "IN")} className="px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]">
                                               {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
                                             </button>
+                                            {sharedReferenceVariant(p) && (
+                                              <button type="button" onClick={() => openStockCard(p, sharedReferenceVariant(p)!)} title={t("ดูประวัติ Stock Card", "View Stock Card history", "查看库存卡记录")} className="p-1 rounded text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-white border border-transparent hover:border-[#E8E5E0]">
+                                                <History size={10} />
+                                              </button>
+                                            )}
                                             {sharedSetsReserved(p) > 0 && (
                                               <button type="button" onClick={() => openReservations(p)} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
                                                 <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
@@ -1574,7 +1631,7 @@ export default function StockPage() {
                                           placeholder={hideForSharedStock ? "–" : "0"}
                                         />
                                         {f === "available" && !archivedView && !p.shared_stock && (
-                                          <div className="flex justify-center mt-1">
+                                          <div className="flex justify-center items-center gap-1 mt-1">
                                             <button
                                               type="button"
                                               onClick={() => openAdjustModal(p, v, "IN")}
@@ -1582,6 +1639,14 @@ export default function StockPage() {
                                               className="text-[9px] px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]"
                                             >
                                               {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => openStockCard(p, v)}
+                                              title={t("ดูประวัติ Stock Card", "View Stock Card history", "查看库存卡记录")}
+                                              className="p-1 rounded text-[#9CA3AF] hover:text-[#1A1A1A] hover:bg-[#F5F3EF] border border-transparent hover:border-[#E8E5E0]"
+                                            >
+                                              <History size={11} />
                                             </button>
                                           </div>
                                         )}
@@ -2419,6 +2484,76 @@ export default function StockPage() {
               {adjustSaving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึกและอัปเดตสต็อก", "Save & update stock", "保存并更新库存")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Stock Card: quick per-variant history, slide-over from the right ── */}
+      <Dialog open={!!stockCardTarget} onOpenChange={(o) => !o && setStockCardTarget(null)}>
+        <DialogContent
+          showCloseButton
+          className="top-0 right-0 left-auto bottom-0 translate-x-0 translate-y-0 h-screen max-h-screen w-full sm:max-w-md rounded-none grid-rows-[auto_auto_1fr_auto] gap-0 p-0"
+        >
+          <DialogHeader className="px-5 py-4 border-b border-[#E8E5E0] bg-[#FAF7F2]">
+            <div className="flex items-center gap-2 pr-8">
+              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#1A1A1A] text-white shrink-0">Stock Card</span>
+              <DialogTitle className="text-sm font-bold text-[#1A1A1A] truncate">{stockCardTarget?.product.code}</DialogTitle>
+            </div>
+            <p className="text-xs text-[#6B6B6B]">{stockCardTarget ? sizeLabel(stockCardTarget.variant) : ""}</p>
+          </DialogHeader>
+
+          <div className="px-5 py-3 border-b border-[#F0EDE6] flex items-center justify-between text-xs">
+            <span className="text-[#6B6B6B] font-medium">{t("ยอดคงเหลือปัจจุบัน", "Current balance", "当前余额")}</span>
+            <div className="flex items-center gap-3 font-semibold">
+              <span className="text-emerald-700">{t("พร้อมขาย", "Avail.", "可售")}: {fmt(stockCardTarget?.variant.available ?? 0)}</span>
+              <span className="text-amber-600">{t("จอง", "Rsv.", "预订")}: {fmt(stockCardTarget?.variant.reserved ?? 0)}</span>
+              <span className="text-red-600">{t("ตำหนิ", "Def.", "瑕疵")}: {fmt(stockCardTarget?.variant.defective ?? 0)}</span>
+            </div>
+          </div>
+
+          <div className="overflow-y-auto p-5 space-y-3">
+            {cardMovementsLoading ? (
+              <p className="text-xs text-[#9CA3AF] text-center py-8">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>
+            ) : cardMovements.length === 0 ? (
+              <p className="text-xs text-[#9CA3AF] text-center py-8">{t("ยังไม่มีประวัติเคลื่อนไหวสำหรับไซส์นี้", "No history yet for this size", "该规格暂无记录")}</p>
+            ) : (
+              cardMovements.map((m) => {
+                const diff = (m.new_value ?? 0) - (m.old_value ?? 0);
+                const fieldLabel: Record<string, string> = {
+                  available: t("พร้อมขาย", "Available", "可售"),
+                  reserved: t("จอง/รอส่ง", "Reserved", "已预订"),
+                  defective: t("ตำหนิ/เคลม", "Defective", "瑕疵"),
+                };
+                return (
+                  <div key={m.id} className="bg-[#FAF7F2] border border-[#F0EDE6] rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-[#1A1A1A]">{fieldLabel[m.field] ?? m.field}</span>
+                      <span className={`text-xs font-bold shrink-0 ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-500" : "text-[#6B6B6B]"}`}>
+                        {fmt(m.old_value ?? 0)} → {fmt(m.new_value ?? 0)}
+                      </span>
+                    </div>
+                    {m.note && <p className="text-xs text-[#6B6B6B] mt-1">{m.note}</p>}
+                    <div className="flex items-center justify-between text-[10px] text-[#9CA3AF] mt-2 pt-2 border-t border-[#E8E5E0]">
+                      <span>{m.actor && `${t("โดย", "by", "由")} ${m.actor} • `}{new Date(m.created_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-[#E8E5E0] bg-[#FAF7F2] flex items-center justify-between gap-2">
+            <span className="text-[10px] text-[#9CA3AF]">{t("บันทึกอัตโนมัติทุกครั้งที่ปรับยอด", "Logged automatically on every change", "每次调整自动记录")}</span>
+            <Button
+              size="sm"
+              onClick={() => {
+                const target = stockCardTarget;
+                setStockCardTarget(null);
+                if (target) openAdjustModal(target.product, target.variant, "IN");
+              }}
+            >
+              {t("+ ปรับยอด / จอง", "+ Adjust / reserve", "+ 调整/预订")}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -378,6 +378,34 @@ export default function StockPage() {
     await createReservationEntry(p.id, v.id, qty, note);
   }
 
+  // Corrects "จอง/รอส่ง" when it isn't tied to one itemized customer
+  // reservation (e.g. a count that drifted, or stock reserved before this
+  // page tracked who it's for) — same "set to the exact number" prompt as
+  // adjustSharedReserved, just scoped to one normal (non-shared) variant.
+  function adjustVariantReserved(p: DbProduct, v: DbVariant) {
+    const input = prompt(
+      t(`ปรับยอดจองเป็นกี่ตัว? (ตอนนี้จอง ${v.reserved})`, `Set reserved to how many? (currently ${v.reserved})`, `将已预订调整为多少件？（当前 ${v.reserved}）`),
+      String(v.reserved)
+    );
+    if (input == null || input === "") return;
+    const target = Number(input);
+    if (!Number.isFinite(target) || target < 0 || target === v.reserved) return;
+    editVariant(p.id, v.id, { reserved: target });
+  }
+
+  // Records defective/claimed units directly on a normal variant — the
+  // non-shared-stock equivalent of adjustSharedDefective.
+  function adjustVariantDefective(p: DbProduct, v: DbVariant) {
+    const input = prompt(
+      t(`มีตำหนิ/เคลมกี่ตัว? (ปัจจุบัน ${v.defective})`, `How many defective/claimed? (currently ${v.defective})`, `次品/索赔多少件？（当前 ${v.defective}）`),
+      String(v.defective)
+    );
+    if (input == null || input === "") return;
+    const target = Number(input);
+    if (!Number.isFinite(target) || target < 0 || target === v.defective) return;
+    editVariant(p.id, v.id, { defective: target });
+  }
+
   // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
   // across every size, entered in sets at the product level instead of
   // pieces at the variant level — see src/lib/shared-stock.ts. ──
@@ -1601,12 +1629,12 @@ export default function StockPage() {
                                         <Input
                                           type="number"
                                           step="any"
-                                          disabled={archivedView || p.shared_stock}
-                                          title={p.shared_stock ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
-                                          className="h-8 w-20 text-xs mx-auto"
+                                          disabled
+                                          readOnly
+                                          title={t("แก้ตรงนี้ไม่ได้ — ใช้ปุ่มด้านล่างเพื่อปรับยอด จะได้เก็บประวัติการแก้ไขไว้ทุกครั้ง", "Can't type over this — use the button below so every change is logged", "此处无法直接编辑 — 请使用下方按钮调整，以保留每次修改记录")}
+                                          className="h-8 w-20 text-xs mx-auto bg-[#F5F3EF] cursor-not-allowed"
                                           value={hideForSharedStock ? "" : isReferenceRow ? sharedPreciseValue : v[f] || ""}
                                           placeholder={hideForSharedStock ? "–" : "0"}
-                                          onChange={(e) => editVariant(p.id, v.id, { [f]: num(e.target.value) })}
                                         />
                                         {f === "available" && !archivedView && !p.shared_stock && (
                                           <div className="flex justify-center gap-1 mt-1">
@@ -1626,6 +1654,18 @@ export default function StockPage() {
                                             >
                                               {t("จอง", "Reserve", "预订")}
                                             </button>
+                                          </div>
+                                        )}
+                                        {f === "reserved" && !archivedView && !p.shared_stock && (
+                                          <div className="flex justify-center gap-1 mt-1 flex-wrap">
+                                            <button
+                                              type="button"
+                                              onClick={() => adjustVariantReserved(p, v)}
+                                              title={t("แก้ยอดจอง (ไม่ผ่านรายการจองเป็นรายตัว)", "Correct the reserved count (not tied to one itemized reservation)", "修正已预订数量（不关联单笔预订明细）")}
+                                              className="text-[9px] px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
+                                            >
+                                              {t("ปรับยอด", "Adjust", "调整")}
+                                            </button>
                                             {v.reserved > 0 && (
                                               <button
                                                 type="button"
@@ -1636,6 +1676,18 @@ export default function StockPage() {
                                                 <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
                                               </button>
                                             )}
+                                          </div>
+                                        )}
+                                        {f === "defective" && !archivedView && !p.shared_stock && (
+                                          <div className="flex justify-center mt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => adjustVariantDefective(p, v)}
+                                              title={t("แจ้ง/แก้จำนวนตำหนิ-เคลม", "Record/correct defective or claimed units", "记录/修正次品-索赔数量")}
+                                              className="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100"
+                                            >
+                                              {t("ปรับยอด", "Adjust", "调整")}
+                                            </button>
                                           </div>
                                         )}
                                       </TableCell>
@@ -1950,8 +2002,22 @@ export default function StockPage() {
                           <TableCell><Input className="h-8 w-28 text-xs" value={v.note} onChange={(e) => editVariant(detail.id, v.id, { note: e.target.value })} /></TableCell>
                           {(["available", "reserved", "defective", "reorder_point"] as const).map((f) => {
                             const isMovementField = f === "available" || f === "reserved" || f === "defective";
-                            const isReferenceRow = detail.shared_stock && isMovementField && v.is_shared_reference;
-                            const hideForSharedStock = detail.shared_stock && isMovementField && !v.is_shared_reference;
+                            if (!isMovementField) {
+                              return (
+                                <TableCell key={f}>
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    className="h-8 w-20 text-xs"
+                                    value={v[f] || ""}
+                                    placeholder="0"
+                                    onChange={(e) => editVariant(detail.id, v.id, { [f]: num(e.target.value) })}
+                                  />
+                                </TableCell>
+                              );
+                            }
+                            const isReferenceRow = detail.shared_stock && v.is_shared_reference;
+                            const hideForSharedStock = detail.shared_stock && !v.is_shared_reference;
                             const sharedPreciseValue =
                               f === "available" ? sharedSetsAvailable(detail) : f === "reserved" ? sharedSetsReserved(detail) : sharedSetsDefective(detail);
                             return (
@@ -1959,13 +2025,44 @@ export default function StockPage() {
                                 <Input
                                   type="number"
                                   step="any"
-                                  disabled={detail.shared_stock && isMovementField}
-                                  title={detail.shared_stock && isMovementField ? t("สต็อกร่วม — ปรับยอดได้จากปุ่มที่ระดับรุ่นเท่านั้น", "Shared stock — adjust from the model-level buttons only", "共享库存 — 仅能从型号级别按钮调整") : undefined}
-                                  className="h-8 w-20 text-xs"
+                                  disabled
+                                  readOnly
+                                  title={t("แก้ตรงนี้ไม่ได้ — ใช้ปุ่มด้านล่างเพื่อปรับยอด จะได้เก็บประวัติการแก้ไขไว้ทุกครั้ง", "Can't type over this — use the button below so every change is logged", "此处无法直接编辑 — 请使用下方按钮调整，以保留每次修改记录")}
+                                  className="h-8 w-20 text-xs bg-[#F5F3EF] cursor-not-allowed"
                                   value={hideForSharedStock ? "" : isReferenceRow ? sharedPreciseValue : v[f] || ""}
                                   placeholder={hideForSharedStock ? "–" : "0"}
-                                  onChange={(e) => editVariant(detail.id, v.id, { [f]: num(e.target.value) })}
                                 />
+                                {!detail.shared_stock && (
+                                  <div className="flex gap-1 mt-1 flex-wrap">
+                                    {f === "available" && (
+                                      <>
+                                        <button type="button" onClick={() => receiveStock(detail, v)} title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")} className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                                          {t("+รับเข้า", "+Receive", "+入库")}
+                                        </button>
+                                        <button type="button" onClick={() => reserveStock(detail, v)} title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">
+                                          {t("จอง", "Reserve", "预订")}
+                                        </button>
+                                      </>
+                                    )}
+                                    {f === "reserved" && (
+                                      <>
+                                        <button type="button" onClick={() => adjustVariantReserved(detail, v)} title={t("แก้ยอดจอง (ไม่ผ่านรายการจองเป็นรายตัว)", "Correct the reserved count (not tied to one itemized reservation)", "修正已预订数量（不关联单笔预订明细）")} className="text-[9px] px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
+                                          {t("ปรับยอด", "Adjust", "调整")}
+                                        </button>
+                                        {v.reserved > 0 && (
+                                          <button type="button" onClick={() => openReservations(detail)} title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")} className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                            <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                    {f === "defective" && (
+                                      <button type="button" onClick={() => adjustVariantDefective(detail, v)} title={t("แจ้ง/แก้จำนวนตำหนิ-เคลม", "Record/correct defective or claimed units", "记录/修正次品-索赔数量")} className="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100">
+                                        {t("ปรับยอด", "Adjust", "调整")}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </TableCell>
                             );
                           })}

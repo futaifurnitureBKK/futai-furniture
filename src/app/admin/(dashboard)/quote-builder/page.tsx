@@ -1857,7 +1857,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
       totalRow(`${L(TXT.vatAmountLabel)} (${vatPct}%)`, vatAmount);
       totalRow(L(TXT.grandTotal), grandTotal, { bold: true });
       if (depositPct > 0) {
-        totalRow(`${L(TXT.depositAmount)} (${depositPct}%)`, depositAmount);
+        totalRow(`${L(TXT.depositAmount)} (${fmtPct(depositPct)}%)`, depositAmount);
         totalRow(L(TXT.balance), balanceAmount);
       }
       nextRow();
@@ -3055,7 +3055,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   {depositPct > 0 && (
                     <>
                       <tr>
-                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({depositPct}%)</td>
+                        <td colSpan={8} className="border border-[#1A1A1A] p-1 text-[#1A1A1A]">{L(TXT.depositAmount)} ({fmtPct(depositPct)}%)</td>
                         <td colSpan={2} className="border border-[#1A1A1A] p-1 text-right font-medium text-[#1A1A1A]">฿{fmtMoney(depositAmount)}</td>
                       </tr>
                       <tr>

@@ -2821,8 +2821,34 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                 <Input type="number" step="0.1" className="mt-1" value={vatPct} onChange={(e) => setVatPct(Number(e.target.value) || 0)} />
               </div>
               <div>
-                <Label>{t("มัดจำ %", "Deposit %", "定金 %")}</Label>
-                <Input type="number" step="0.1" className="mt-1" value={depositPct} onChange={(e) => setDepositPct(Number(e.target.value) || 0)} />
+                <Label>{t("มัดจำ", "Deposit", "定金")}</Label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      className="pr-6"
+                      value={depositPct}
+                      onChange={(e) => setDepositPct(Number(e.target.value) || 0)}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#9CA3AF]">%</span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="1"
+                      className="pr-6"
+                      value={grandTotal > 0 ? Math.round(depositAmount) : 0}
+                      disabled={grandTotal <= 0}
+                      title={grandTotal <= 0 ? t("เพิ่มรายการสินค้าก่อนถึงจะใส่มัดจำเป็นจำนวนเงินได้", "Add items first to set a baht deposit", "先添加产品项目才能按金额设置定金") : undefined}
+                      onChange={(e) => {
+                        const baht = Number(e.target.value) || 0;
+                        setDepositPct(grandTotal > 0 ? (baht / grandTotal) * 100 : 0);
+                      }}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#9CA3AF]">฿</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -2836,9 +2836,9 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   <div className="relative">
                     <Input
                       type="number"
-                      step="1"
+                      step="0.01"
                       className="pr-6"
-                      value={grandTotal > 0 ? Math.round(depositAmount) : 0}
+                      value={grandTotal > 0 ? Math.round(depositAmount * 100) / 100 : 0}
                       disabled={grandTotal <= 0}
                       title={grandTotal <= 0 ? t("เพิ่มรายการสินค้าก่อนถึงจะใส่มัดจำเป็นจำนวนเงินได้", "Add items first to set a baht deposit", "先添加产品项目才能按金额设置定金") : undefined}
                       onChange={(e) => {

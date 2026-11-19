@@ -263,6 +263,16 @@ export default function StockPage() {
   const [reservations, setReservations] = useState<StockReservation[]>([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
 
+  // Single modal for every normal (non-shared) stock movement — replaces the
+  // old scattered prompt()s so every action shares one qty field, one
+  // mandatory note, and one save path (never a plain overwrite).
+  const [adjustTarget, setAdjustTarget] = useState<{ product: DbProduct; variant: DbVariant } | null>(null);
+  const [adjustType, setAdjustType] = useState<"IN" | "RESERVE" | "OUT" | "DEFECT" | "ADJUST">("IN");
+  const [adjustQty, setAdjustQty] = useState("1");
+  const [adjustNote, setAdjustNote] = useState("");
+  const [adjustError, setAdjustError] = useState("");
+  const [adjustSaving, setAdjustSaving] = useState(false);
+
   const [addOpen, setAddOpen] = useState(false);
   const [newProd, setNewProd] = useState(emptyNew);
   const [newSizes, setNewSizes] = useState<NewSize[]>([{ size_text: "", price: "", note: "" }]);
@@ -316,58 +326,68 @@ export default function StockPage() {
     editVariant(pid, vid, { size_text: text, ...parseDims(text) });
   }
 
-  // Quick "+N came in" instead of having to retype the new total by hand —
-  // every container/batch arrival just adds to what's already there.
-  function receiveStock(p: DbProduct, v: DbVariant) {
-    if (p.shared_stock) return receiveSharedStock(p);
-    const input = prompt(
-      t(`รับเข้าเพิ่มกี่ชิ้น? (ตอนนี้พร้อมขาย ${v.available})`, `How many came in? (currently ${v.available} available)`, `入库多少件？（当前可售 ${v.available}）`)
-    );
-    if (!input) return;
-    const qty = Number(input);
-    if (!qty || qty <= 0) return;
-    editVariant(p.id, v.id, { available: v.available + qty });
+  // Single entry point for every normal (non-shared) stock movement —
+  // replaces the old separate prompt()-based receive/reserve/adjust
+  // helpers with one modal, so qty + a mandatory note always travel
+  // together and every action (including a stocktake correction, which
+  // had no path at all once the number fields were locked) is covered.
+  function openAdjustModal(p: DbProduct, v: DbVariant, type: typeof adjustType = "IN") {
+    setAdjustTarget({ product: p, variant: v });
+    setAdjustType(type);
+    setAdjustQty(type === "ADJUST" ? String(v.available) : "1");
+    setAdjustNote("");
+    setAdjustError("");
+  }
+  function closeAdjustModal() {
+    setAdjustTarget(null);
+  }
+  function switchAdjustType(type: typeof adjustType) {
+    setAdjustType(type);
+    if (adjustTarget) setAdjustQty(type === "ADJUST" ? String(adjustTarget.variant.available) : "1");
+    setAdjustError("");
   }
 
-  // Moves stock from "พร้อมขาย" to "จอง" as one step, so a reservation never
-  // has to be hand-calculated across two separate number fields.
-  async function reserveStock(p: DbProduct, v: DbVariant) {
-    if (p.shared_stock) return reserveSharedStock(p);
-    const input = prompt(
-      t(`ลูกค้าจองกี่ชิ้น? (พร้อมขายตอนนี้ ${v.available})`, `How many did the customer reserve? (currently ${v.available} available)`, `客户预订多少件？（当前可售 ${v.available}）`)
-    );
-    if (!input) return;
-    const qty = Number(input);
-    if (!qty || qty <= 0) return;
-    if (
-      qty > v.available &&
-      !confirm(
-        t(
-          `มีพร้อมขายแค่ ${v.available} ชิ้น จะจอง ${qty} ชิ้นเลยไหม (พร้อมขายจะติดลบ)?`,
-          `Only ${v.available} available — reserve ${qty} anyway (available will go negative)?`,
-          `仅剩 ${v.available} 件可售 —— 仍要预订 ${qty} 件吗？（可售将变为负数）`
-        )
-      )
-    )
+  async function submitAdjust() {
+    if (!adjustTarget) return;
+    const { product: p, variant: v } = adjustTarget;
+    const qty = Number(adjustQty);
+    const isAbsolute = adjustType === "ADJUST";
+    if (!Number.isFinite(qty) || (isAbsolute ? qty < 0 : qty <= 0)) {
+      setAdjustError(t("กรุณาระบุจำนวนให้ถูกต้อง", "Enter a valid quantity", "请输入正确的数量"));
       return;
-    const note = prompt(
-      t("จองให้ใคร/ออเดอร์ไหน (ไม่บังคับ)", "Who's it for / which order? (optional)", "预订给谁/哪个订单？（可选）")
-    );
-    // Bypasses the debounced autosave (scheduleVariantSave) — this is one
-    // discrete action, not a keystroke, and needs its own note attached to
-    // exactly the movement rows it produces.
+    }
+    if (!adjustNote.trim()) {
+      setAdjustError(t("กรุณากรอกหมายเหตุ/เลขที่เอกสารทุกครั้ง", "A note/reference is required every time", "每次都必须填写备注/单号"));
+      return;
+    }
+    const notEnough = t(`พร้อมขายไม่พอ (เหลือ ${v.available})`, `Not enough available (${v.available} left)`, `可售不足（剩余 ${v.available}）`);
+    let change: Record<string, number> = {};
+    if (adjustType === "IN") {
+      change = { available: v.available + qty };
+    } else if (adjustType === "RESERVE") {
+      if (qty > v.available) return setAdjustError(notEnough);
+      change = { available: v.available - qty, reserved: v.reserved + qty };
+    } else if (adjustType === "OUT") {
+      if (qty > v.available) return setAdjustError(notEnough);
+      change = { available: v.available - qty };
+    } else if (adjustType === "DEFECT") {
+      if (qty > v.available) return setAdjustError(notEnough);
+      change = { available: v.available - qty, defective: v.defective + qty };
+    } else if (adjustType === "ADJUST") {
+      if (qty === v.available) return closeAdjustModal();
+      change = { available: qty };
+    }
+
+    setAdjustSaving(true);
     const res = await fetch(`/api/admin/stock/variants/${v.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        available: v.available - qty,
-        reserved: v.reserved + qty,
-        movement_note: note?.trim() || null,
-      }),
+      body: JSON.stringify({ ...change, movement_note: adjustNote.trim() }),
     });
     const data = await res.json().catch(() => ({}));
+    setAdjustSaving(false);
     if (!res.ok) {
-      toast.error(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
+      setAdjustError(data.error || t("บันทึกไม่สำเร็จ", "Save failed", "保存失败"));
       return;
     }
     setProducts((list) =>
@@ -375,35 +395,9 @@ export default function StockPage() {
         pp.id !== p.id ? pp : { ...pp, stock_variants: pp.stock_variants.map((vv) => (vv.id === v.id ? { ...vv, ...data.variant } : vv)) }
       )
     );
-    await createReservationEntry(p.id, v.id, qty, note);
-  }
-
-  // Corrects "จอง/รอส่ง" when it isn't tied to one itemized customer
-  // reservation (e.g. a count that drifted, or stock reserved before this
-  // page tracked who it's for) — same "set to the exact number" prompt as
-  // adjustSharedReserved, just scoped to one normal (non-shared) variant.
-  function adjustVariantReserved(p: DbProduct, v: DbVariant) {
-    const input = prompt(
-      t(`ปรับยอดจองเป็นกี่ตัว? (ตอนนี้จอง ${v.reserved})`, `Set reserved to how many? (currently ${v.reserved})`, `将已预订调整为多少件？（当前 ${v.reserved}）`),
-      String(v.reserved)
-    );
-    if (input == null || input === "") return;
-    const target = Number(input);
-    if (!Number.isFinite(target) || target < 0 || target === v.reserved) return;
-    editVariant(p.id, v.id, { reserved: target });
-  }
-
-  // Records defective/claimed units directly on a normal variant — the
-  // non-shared-stock equivalent of adjustSharedDefective.
-  function adjustVariantDefective(p: DbProduct, v: DbVariant) {
-    const input = prompt(
-      t(`มีตำหนิ/เคลมกี่ตัว? (ปัจจุบัน ${v.defective})`, `How many defective/claimed? (currently ${v.defective})`, `次品/索赔多少件？（当前 ${v.defective}）`),
-      String(v.defective)
-    );
-    if (input == null || input === "") return;
-    const target = Number(input);
-    if (!Number.isFinite(target) || target < 0 || target === v.defective) return;
-    editVariant(p.id, v.id, { defective: target });
+    if (adjustType === "RESERVE") await createReservationEntry(p.id, v.id, qty, adjustNote.trim());
+    toast.success(t("อัปเดตสต็อกแล้ว", "Stock updated", "库存已更新"));
+    closeAdjustModal();
   }
 
   // ── Shared-stock (YN-01-4, QC-A2401, YN-05, DZ2404, DZ2802): one pool
@@ -1637,56 +1631,26 @@ export default function StockPage() {
                                           placeholder={hideForSharedStock ? "–" : "0"}
                                         />
                                         {f === "available" && !archivedView && !p.shared_stock && (
-                                          <div className="flex justify-center gap-1 mt-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => receiveStock(p, v)}
-                                              title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")}
-                                              className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                            >
-                                              {t("+รับเข้า", "+Receive", "+入库")}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => reserveStock(p, v)}
-                                              title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")}
-                                              className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                            >
-                                              {t("จอง", "Reserve", "预订")}
-                                            </button>
-                                          </div>
-                                        )}
-                                        {f === "reserved" && !archivedView && !p.shared_stock && (
-                                          <div className="flex justify-center gap-1 mt-1 flex-wrap">
-                                            <button
-                                              type="button"
-                                              onClick={() => adjustVariantReserved(p, v)}
-                                              title={t("แก้ยอดจอง (ไม่ผ่านรายการจองเป็นรายตัว)", "Correct the reserved count (not tied to one itemized reservation)", "修正已预订数量（不关联单笔预订明细）")}
-                                              className="text-[9px] px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]"
-                                            >
-                                              {t("ปรับยอด", "Adjust", "调整")}
-                                            </button>
-                                            {v.reserved > 0 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => openReservations(p)}
-                                                title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")}
-                                                className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                              >
-                                                <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
-                                        {f === "defective" && !archivedView && !p.shared_stock && (
                                           <div className="flex justify-center mt-1">
                                             <button
                                               type="button"
-                                              onClick={() => adjustVariantDefective(p, v)}
-                                              title={t("แจ้ง/แก้จำนวนตำหนิ-เคลม", "Record/correct defective or claimed units", "记录/修正次品-索赔数量")}
-                                              className="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100"
+                                              onClick={() => openAdjustModal(p, v, "IN")}
+                                              title={t("รับเข้า / จอง / ตัดส่งออก / ตำหนิ / ตรวจนับ", "Receive / reserve / ship / defect / stocktake", "入库/预订/出库/次品/盘点")}
+                                              className="text-[9px] px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]"
                                             >
-                                              {t("ปรับยอด", "Adjust", "调整")}
+                                              {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
+                                            </button>
+                                          </div>
+                                        )}
+                                        {f === "reserved" && v.reserved > 0 && (
+                                          <div className="flex justify-center mt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => openReservations(p)}
+                                              title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")}
+                                              className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                            >
+                                              <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
                                             </button>
                                           </div>
                                         )}
@@ -2035,30 +1999,13 @@ export default function StockPage() {
                                 {!detail.shared_stock && (
                                   <div className="flex gap-1 mt-1 flex-wrap">
                                     {f === "available" && (
-                                      <>
-                                        <button type="button" onClick={() => receiveStock(detail, v)} title={t("รับเข้า (เพิ่มจากตู้/รอบที่เข้ามา)", "Receive stock (add an incoming batch)", "入库（新到一批）")} className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-                                          {t("+รับเข้า", "+Receive", "+入库")}
-                                        </button>
-                                        <button type="button" onClick={() => reserveStock(detail, v)} title={t("ลูกค้าจอง (ย้ายจากพร้อมขายไปจอง)", "Customer reserves (moves from available to reserved)", "客户预订（从可售移到已预订）")} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">
-                                          {t("จอง", "Reserve", "预订")}
-                                        </button>
-                                      </>
+                                      <button type="button" onClick={() => openAdjustModal(detail, v, "IN")} title={t("รับเข้า / จอง / ตัดส่งออก / ตำหนิ / ตรวจนับ", "Receive / reserve / ship / defect / stocktake", "入库/预订/出库/次品/盘点")} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1A1A1A] text-white hover:bg-[#C8102E]">
+                                        {t("ปรับยอด / จอง", "Adjust / reserve", "调整/预订")}
+                                      </button>
                                     )}
-                                    {f === "reserved" && (
-                                      <>
-                                        <button type="button" onClick={() => adjustVariantReserved(detail, v)} title={t("แก้ยอดจอง (ไม่ผ่านรายการจองเป็นรายตัว)", "Correct the reserved count (not tied to one itemized reservation)", "修正已预订数量（不关联单笔预订明细）")} className="text-[9px] px-1.5 py-0.5 rounded bg-[#F0EDE6] text-[#6B6B6B] hover:bg-[#E8E5E0]">
-                                          {t("ปรับยอด", "Adjust", "调整")}
-                                        </button>
-                                        {v.reserved > 0 && (
-                                          <button type="button" onClick={() => openReservations(detail)} title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")} className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
-                                            <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
-                                          </button>
-                                        )}
-                                      </>
-                                    )}
-                                    {f === "defective" && (
-                                      <button type="button" onClick={() => adjustVariantDefective(detail, v)} title={t("แจ้ง/แก้จำนวนตำหนิ-เคลม", "Record/correct defective or claimed units", "记录/修正次品-索赔数量")} className="text-[9px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 hover:bg-red-100">
-                                        {t("ปรับยอด", "Adjust", "调整")}
+                                    {f === "reserved" && v.reserved > 0 && (
+                                      <button type="button" onClick={() => openReservations(detail)} title={t("ดูว่าจองให้ใครไว้บ้าง", "See who it's reserved for", "查看预订明细")} className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                        <ClipboardList size={9} /> {t("รายการจอง", "Reservations", "预订明细")}
                                       </button>
                                     )}
                                   </div>
@@ -2410,6 +2357,123 @@ export default function StockPage() {
               <Image src={lightboxUrl} alt="" fill sizes="672px" unoptimized className="object-contain" />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Single modal for every normal (non-shared) stock movement ── */}
+      <Dialog open={!!adjustTarget} onOpenChange={(o) => !o && closeAdjustModal()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("ปรับยอด / จองสินค้า", "Adjust / Reserve Stock", "调整/预订库存")}</DialogTitle>
+          </DialogHeader>
+          {adjustTarget && (
+            <div className="space-y-4">
+              <p className="text-xs text-[#6B6B6B] font-mono -mt-2">
+                {adjustTarget.product.code} • {sizeLabel(adjustTarget.variant) || t("ไม่ระบุขนาด", "no size", "无规格")}
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 bg-[#F5F3EF] rounded-xl p-3 border border-[#E8E5E0] text-center text-xs">
+                <div>
+                  <div className="text-[#9CA3AF]">{t("พร้อมขาย", "Available", "可售")}</div>
+                  <div className="text-lg font-bold text-[#1A1A1A]">{fmt(adjustTarget.variant.available)}</div>
+                </div>
+                <div className="border-x border-[#E8E5E0]">
+                  <div className="text-[#9CA3AF]">{t("จอง/รอส่ง", "Reserved", "已预订")}</div>
+                  <div className="text-lg font-bold text-amber-600">{fmt(adjustTarget.variant.reserved)}</div>
+                </div>
+                <div>
+                  <div className="text-[#9CA3AF]">{t("ตำหนิ/เคลม", "Defective", "瑕疵")}</div>
+                  <div className="text-lg font-bold text-red-600">{fmt(adjustTarget.variant.defective)}</div>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-[#1A1A1A] mb-1.5 block">{t("เลือกประเภทรายการ", "Action type", "选择操作类型")}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["IN", t("+ รับเข้าสต็อก", "+ Receive stock", "+ 入库"), "border-emerald-500 bg-emerald-50 text-emerald-700"],
+                      ["RESERVE", t("จองสินค้า / รอส่ง", "Reserve for customer", "客户预订"), "border-amber-500 bg-amber-50 text-amber-700"],
+                      ["OUT", t("ตัดส่งออก (ขาย)", "Ship out (sale)", "出库（销售）"), "border-sky-500 bg-sky-50 text-sky-700"],
+                      ["DEFECT", t("ย้ายไปตำหนิ / เคลม", "Move to defective", "移至瑕疵"), "border-rose-500 bg-rose-50 text-rose-700"],
+                    ] as const
+                  ).map(([val, label, activeClass]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => switchAdjustType(val)}
+                      className={`px-3 py-2.5 rounded-xl border text-xs font-medium text-center transition ${
+                        adjustType === val ? activeClass : "border-[#E8E5E0] text-[#6B6B6B] hover:bg-[#F5F3EF]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => switchAdjustType("ADJUST")}
+                    className={`col-span-2 px-3 py-2.5 rounded-xl border text-xs font-medium text-center transition ${
+                      adjustType === "ADJUST" ? "border-[#1A1A1A] bg-[#1A1A1A] text-white" : "border-[#E8E5E0] text-[#6B6B6B] hover:bg-[#F5F3EF]"
+                    }`}
+                  >
+                    {t("ปรับยอดตรวจนับ (ระบุยอดพร้อมขายใหม่)", "Stocktake correction (set exact available)", "盘点修正（设定可售实际数量）")}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-[#1A1A1A] mb-1.5 block">
+                  {adjustType === "IN" && t("จำนวนที่รับเข้า (ชิ้น)", "Qty received (pcs)", "入库数量（件）")}
+                  {adjustType === "RESERVE" && t("จำนวนที่จอง (ชิ้น)", "Qty reserved (pcs)", "预订数量（件）")}
+                  {adjustType === "OUT" && t("จำนวนที่ตัดส่งออก (ชิ้น)", "Qty shipped out (pcs)", "出库数量（件）")}
+                  {adjustType === "DEFECT" && t("จำนวนที่มีตำหนิ (ชิ้น)", "Qty defective (pcs)", "瑕疵数量（件）")}
+                  {adjustType === "ADJUST" && t("ยอดพร้อมขายที่ถูกต้อง (ชิ้น)", "Correct available qty (pcs)", "正确的可售数量（件）")}
+                </Label>
+                <Input
+                  type="number"
+                  min={adjustType === "ADJUST" ? 0 : 1}
+                  value={adjustQty}
+                  onChange={(e) => setAdjustQty(e.target.value)}
+                  className="font-bold"
+                />
+                <p className="text-[11px] text-[#9CA3AF] mt-1">
+                  {adjustType === "IN" && t('ระบบจะบวกเพิ่มเข้าช่อง "พร้อมขาย" อัตโนมัติ', 'Adds straight to "available"', '自动加入"可售"')}
+                  {adjustType === "RESERVE" && t('ระบบจะย้ายจาก "พร้อมขาย" ไปยัง "จอง"', 'Moves from "available" to "reserved"', '从"可售"移至"已预订"')}
+                  {adjustType === "OUT" &&
+                    t(
+                      'ระบบจะหักออกจาก "พร้อมขาย" ทันที (ไม่ผ่านรายงานการส่งออกรายวัน — ถ้าต้องผูกกับใบเสนอราคา/PO ให้ไปที่หน้า "การส่งออกรายวัน" แทน)',
+                      'Deducts "available" right away (does not go through the Daily Export report — use that page instead if this needs to tie to a quotation/PO)',
+                      '立即从"可售"扣除（不计入每日出库报表 — 若需关联报价单/PO请改用"每日出库"页面）'
+                    )}
+                  {adjustType === "DEFECT" && t('ระบบจะย้ายจาก "พร้อมขาย" ไปยัง "ตำหนิ/เคลม"', 'Moves from "available" to "defective"', '从"可售"移至"瑕疵"')}
+                  {adjustType === "ADJUST" && t("ระบุจำนวนคงเหลือจริงจากการตรวจนับ (ใส่ 0 ได้)", "Enter the real counted qty (0 is fine)", "输入实际盘点数量（可为0）")}
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-[#1A1A1A] mb-1.5 block">
+                  {t("หมายเหตุ / เลขที่เอกสารอ้างอิง", "Note / reference no.", "备注/单号")} <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={adjustNote}
+                  onChange={(e) => setAdjustNote(e.target.value)}
+                  placeholder={t(
+                    "เช่น รับตู้คอนเทนเนอร์ พ.ย., จองให้ บจก.กรีน #PO...",
+                    "e.g. Nov container arrival, reserved for Green Co. #PO...",
+                    "如：11月集装箱到货、为Green公司预订 #PO..."
+                  )}
+                />
+              </div>
+
+              {adjustError && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{adjustError}</div>}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAdjustModal}>{t("ยกเลิก", "Cancel", "取消")}</Button>
+            <Button onClick={submitAdjust} disabled={adjustSaving}>
+              {adjustSaving ? t("กำลังบันทึก...", "Saving...", "保存中...") : t("บันทึกและอัปเดตสต็อก", "Save & update stock", "保存并更新库存")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

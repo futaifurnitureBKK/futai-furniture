@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -23,7 +24,7 @@ import { useLanguage } from "@/store/language";
 import { PRICE_CATALOG, type PriceCatalogEntry } from "@/data/price-catalog";
 import { SALESPEOPLE, STATUS_META, STATUS_ORDER, DOC_LABELS } from "@/lib/saved-quote-options";
 import { SALES_HEADERS, buildDailySheetsWorkbook, downloadWorkbook, salesRowsToShippingRows } from "@/lib/daily-sheets-excel";
-import type { DailySalesRow, DailyShippingRow, DailyExportRow, SavedQuoteStatus } from "@/types";
+import type { DailySalesRow, DailyShippingRow, DailyExportRow, SavedQuote, SavedQuoteStatus } from "@/types";
 
 type SavedListRow = {
   id: number;
@@ -267,6 +268,14 @@ export default function DailySalesPage() {
   const [pickerStatus, setPickerStatus] = useState<SavedQuoteStatus | "all">("all");
   const [importingId, setImportingId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  // "เลือกรายการที่จะดึง" — same ship-today picker UX as the delivery note:
+  // check only the lines actually sold today and shrink a line's qty for a
+  // partial pull, instead of always copying every line at full qty.
+  const [itemPickerQuoteId, setItemPickerQuoteId] = useState<number | null>(null);
+  const [itemPickerQuote, setItemPickerQuote] = useState<SavedQuote | null>(null);
+  const [itemPickerLoading, setItemPickerLoading] = useState(false);
+  const [itemPickerSel, setItemPickerSel] = useState<Record<string, { checked: boolean; qty: number }>>({});
   const [uploadingImageId, setUploadingImageId] = useState<number | null>(null);
 
   const [gridPickerOpen, setGridPickerOpen] = useState(false);
@@ -497,18 +506,57 @@ export default function DailySalesPage() {
     }
   }
 
-  async function importQuote(quoteId: number) {
-    setImportingId(quoteId);
+  async function openItemPicker(id: number) {
+    setItemPickerQuoteId(id);
+    setItemPickerQuote(null);
+    setItemPickerLoading(true);
+    const res = await fetch(`/api/admin/saved-quotes/${id}`);
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(t("โหลดไม่สำเร็จ", "Load failed", "加载失败"));
+      setItemPickerQuoteId(null);
+      setItemPickerLoading(false);
+      return;
+    }
+    const quote = data.quote as SavedQuote;
+    const initSel: Record<string, { checked: boolean; qty: number }> = {};
+    quote.items.forEach((it, idx) => {
+      initSel[it.item_id || String(idx)] = { checked: true, qty: it.qty };
+    });
+    setItemPickerQuote(quote);
+    setItemPickerSel(initSel);
+    setItemPickerLoading(false);
+  }
+
+  function closeItemPicker() {
+    setItemPickerQuoteId(null);
+    setItemPickerQuote(null);
+    setItemPickerSel({});
+  }
+
+  async function confirmItemPicker() {
+    if (!itemPickerQuote || itemPickerQuoteId == null) return;
+    const quote = itemPickerQuote;
+    const selection = quote.items
+      .map((it, idx) => ({ key: it.item_id || String(idx), qty: it.qty }))
+      .filter(({ key }) => itemPickerSel[key]?.checked)
+      .map(({ key }) => ({ key, qty: itemPickerSel[key]?.qty ?? 0 }));
+    if (!selection.length) {
+      toast.error(t("เลือกอย่างน้อย 1 รายการ", "Select at least 1 item", "请至少选择1项"));
+      return;
+    }
+    setImportingId(itemPickerQuoteId);
     const res = await fetch("/api/admin/daily-sales/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sale_date: date, quote_id: quoteId }),
+      body: JSON.stringify({ sale_date: date, quote_id: itemPickerQuoteId, items: selection }),
     });
     const data = await res.json();
     setImportingId(null);
     if (res.ok) {
       setRows((prev) => [...prev, ...data.rows]);
       toast.success(t(`ดึงมาแล้ว ${data.rows.length} รายการ`, `Imported ${data.rows.length} item(s)`, `已导入 ${data.rows.length} 项`));
+      closeItemPicker();
       setPickerOpen(false);
     } else {
       toast.error(data.error || t("ดึงข้อมูลไม่สำเร็จ", "Import failed", "导入失败"));
@@ -1015,7 +1063,7 @@ export default function DailySalesPage() {
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${STATUS_META[s.status].color}`}>
                         {t(STATUS_META[s.status].th, STATUS_META[s.status].en, STATUS_META[s.status].zh)}
                       </span>
-                      <Button size="sm" onClick={() => importQuote(s.id)} disabled={importingId === s.id}>
+                      <Button size="sm" onClick={() => openItemPicker(s.id)} disabled={importingId === s.id}>
                         {importingId === s.id ? <Loader2 size={13} className="animate-spin" /> : t("นำเข้า", "Import", "导入")}
                       </Button>
                     </div>
@@ -1029,6 +1077,96 @@ export default function DailySalesPage() {
               <X size={13} className="mr-1" /> {t("ปิด", "Close", "关闭")}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={itemPickerQuoteId !== null} onOpenChange={(open) => { if (!open) closeItemPicker(); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t("เลือกรายการที่จะดึง", "Pick items to import", "选择要导入的项目")}</DialogTitle>
+          </DialogHeader>
+          {itemPickerLoading || !itemPickerQuote ? (
+            <p className="text-sm text-[#6B6B6B] py-8 text-center">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>
+          ) : (
+            <>
+              <p className="text-xs text-[#6B6B6B]">
+                {t(
+                  `จากใบเสนอราคา ${itemPickerQuote.doc_no} — ติ๊กเฉพาะสินค้าที่ขายวันนี้ และปรับจำนวนได้ถ้าขายไม่ครบ`,
+                  `From quotation ${itemPickerQuote.doc_no} — check only what sold today and adjust the qty for a partial amount`,
+                  `来自报价单 ${itemPickerQuote.doc_no} — 仅勾选今天售出的产品，数量可调整`
+                )}
+              </p>
+              <div className="bg-[#FAF7F2] border border-[#E8E5E0] rounded-lg px-3 py-2 text-xs space-y-0.5">
+                <p className="font-medium text-[#1A1A1A]">{itemPickerQuote.customer_name || "-"}</p>
+                {itemPickerQuote.shipping_address && (
+                  <p className="text-[#6B6B6B]">{itemPickerQuote.shipping_address}</p>
+                )}
+                {(itemPickerQuote.contact_person || itemPickerQuote.contact_phone) && (
+                  <p className="text-[#6B6B6B]">
+                    {[itemPickerQuote.contact_person, itemPickerQuote.contact_phone].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 -mx-1 px-1">
+                {itemPickerQuote.items.map((it, idx) => {
+                  const key = it.item_id || String(idx);
+                  const sel = itemPickerSel[key] ?? { checked: true, qty: it.qty };
+                  return (
+                    <div key={key} className="flex items-start gap-3 p-2.5 border border-[#E8E5E0] rounded-lg">
+                      <Checkbox
+                        className="mt-1"
+                        checked={sel.checked}
+                        onCheckedChange={() =>
+                          setItemPickerSel((prev) => ({ ...prev, [key]: { ...sel, checked: !sel.checked } }))
+                        }
+                      />
+                      <div className="relative w-12 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] flex items-center justify-center">
+                        {it.image ? (
+                          <Image src={it.image} alt="" fill sizes="48px" className="object-contain" />
+                        ) : (
+                          <ImageOff size={16} className="text-[#C9C5BE]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{it.name || "-"}</p>
+                        <p className="text-xs text-[#6B6B6B] truncate">
+                          {[it.sku, it.size].filter(Boolean).join(" · ")}
+                          {it.sku || it.size ? " · " : ""}
+                          {t("สั่งไว้", "Ordered", "订购")} {it.qty} {it.unit || ""}
+                        </p>
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <Label className="text-[10px] text-[#9CA3AF]">{t("ขายวันนี้", "Sold today", "今日售出")}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={it.qty}
+                          className="h-8 text-xs mt-0.5"
+                          disabled={!sel.checked}
+                          value={sel.qty}
+                          onChange={(e) =>
+                            setItemPickerSel((prev) => ({
+                              ...prev,
+                              [key]: { ...sel, qty: Math.min(it.qty, Math.max(0, Number(e.target.value) || 0)) },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={closeItemPicker}>
+                  {t("ยกเลิก", "Cancel", "取消")}
+                </Button>
+                <Button type="button" onClick={confirmItemPicker} disabled={importingId !== null}>
+                  {importingId !== null ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : null}
+                  {t("ยืนยัน", "Confirm", "确认")}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

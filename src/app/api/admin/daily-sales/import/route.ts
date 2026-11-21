@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json();
-  const { sale_date, quote_id } = body;
+  const { sale_date, quote_id, items: selection } = body;
   if (!sale_date || !quote_id) {
     return NextResponse.json({ error: "sale_date and quote_id are required" }, { status: 400 });
   }
@@ -30,6 +30,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ใบเสนอราคานี้ไม่มีรายการสินค้า" }, { status: 400 });
   }
 
+  // `items` lets the caller pick a subset of the quote (and shrink a line's
+  // qty) instead of always pulling every line at full qty — same picker UX
+  // as the delivery note's "ship today" flow. Falling back to every line
+  // keeps older callers working.
+  let sourceItems = quote.items;
+  if (Array.isArray(selection) && selection.length) {
+    const selMap = new Map<string, number>(selection.map((s: { key: string; qty: number }) => [String(s.key), s.qty]));
+    sourceItems = quote.items
+      .map((it, idx) => ({ it, key: it.item_id || String(idx) }))
+      .filter(({ key }) => selMap.has(key))
+      .map(({ it, key }) => ({ ...it, qty: selMap.get(key) ?? it.qty }));
+  }
+  if (!sourceItems.length) {
+    return NextResponse.json({ error: "เลือกอย่างน้อย 1 รายการ" }, { status: 400 });
+  }
+
   const { count } = await db
     .from("daily_sales_rows")
     .select("id", { count: "exact", head: true })
@@ -38,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   // Daily Sales no longer touches Stock — deducting is Daily Export's job
   // only, so this just copies the quote's line items over as-is.
-  const rows = quote.items.map((it, i) => ({
+  const rows = sourceItems.map((it, i) => ({
     sale_date,
     sort_order: startOrder + i,
     sku: it.sku || "",

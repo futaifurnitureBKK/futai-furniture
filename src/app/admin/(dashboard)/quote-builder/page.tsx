@@ -2419,6 +2419,17 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                   `来自报价单 ${itemPickerQuote.doc_no} — 仅勾选今天发货的产品，数量可调整为部分发货，其余仍保留在原报价单中`
                 )}
               </p>
+              <div className="bg-[#FAF7F2] border border-[#E8E5E0] rounded-lg px-3 py-2 text-xs space-y-0.5">
+                <p className="font-medium text-[#1A1A1A]">{itemPickerQuote.customer_name || "-"}</p>
+                {itemPickerQuote.shipping_address && (
+                  <p className="text-[#6B6B6B]">{itemPickerQuote.shipping_address}</p>
+                )}
+                {(itemPickerQuote.contact_person || itemPickerQuote.contact_phone) && (
+                  <p className="text-[#6B6B6B]">
+                    {[itemPickerQuote.contact_person, itemPickerQuote.contact_phone].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
               <div className="flex-1 overflow-y-auto space-y-2 -mx-1 px-1">
                 {itemPickerQuote.items.map((it, idx) => {
                   const key = it.item_id || String(idx);

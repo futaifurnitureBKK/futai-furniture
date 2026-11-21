@@ -1187,6 +1187,16 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
   const [showArchived, setShowArchived] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Delivery Note's "ใช้ใบนี้" opens this instead of pulling the whole
+  // quotation straight in — lets picking which lines (and how much of
+  // each) actually ship today, since a quotation is often only partly
+  // delivered in one trip. itemPickerQuote holds the fetched source quote
+  // while the dialog is open; itemPickerSel is keyed by item_id (falling
+  // back to index for older items saved before item_id existed).
+  const [itemPickerQuoteId, setItemPickerQuoteId] = useState<number | null>(null);
+  const [itemPickerQuote, setItemPickerQuote] = useState<SavedQuote | null>(null);
+  const [itemPickerLoading, setItemPickerLoading] = useState(false);
+  const [itemPickerSel, setItemPickerSel] = useState<Record<string, { checked: boolean; qty: number }>>({});
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const [listDateFrom, setListDateFrom] = useState("");
@@ -1392,6 +1402,34 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     setListOpen(false);
   }
 
+  // Shared by pullFromQuotations and the item-picker's confirm step below —
+  // copies every doc-level/customer/shipping field from a source quotation
+  // onto the draft. Always leaves savedId null, so the next Save creates a
+  // brand-new row rather than touching the source quotation.
+  function applyQuoteHeaderFields(q: SavedQuote) {
+    setSavedId(null);
+    setDocType(defaultDocType);
+    setLangMode(q.lang_mode);
+    setDocNo(`${DOC_LABELS[defaultDocType].prefix}${todayStr().replace(/-/g, "")}-01`);
+    setDocNoTouched(false);
+    setDocNoWarningAcked(false);
+    setChannel(q.channel ?? "other");
+    setDate(todayStr());
+    setCustomerName(q.customer_name);
+    setCustomerAddress(q.customer_address);
+    setCustomerTaxId(q.customer_tax_id);
+    setShippingAddress(q.shipping_address);
+    setShippingDate(q.shipping_date || "");
+    setCustomerContact(q.contact_person);
+    setCustomerPhone(q.contact_phone);
+    setSalesperson(q.salesperson || "");
+    setOrderNotes(q.notes || "");
+    setTermsText(q.terms_text || defaultTermsText(q.lang_mode));
+    setDiscountPct(q.discount_pct ?? 0);
+    setVatPct(q.vat_pct);
+    setDepositPct(q.deposit_pct);
+  }
+
   // Copies a quotation's details into a brand-new, independent document —
   // savedId stays null, so the next Save creates a new row rather than
   // touching the source quotation. Used for making a delivery note that
@@ -1418,27 +1456,7 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
     }
     const quotes = results.map((r) => r.quote);
     const first = quotes[0];
-    setSavedId(null);
-    setDocType(defaultDocType);
-    setLangMode(first.lang_mode);
-    setDocNo(`${DOC_LABELS[defaultDocType].prefix}${todayStr().replace(/-/g, "")}-01`);
-    setDocNoTouched(false);
-    setDocNoWarningAcked(false);
-    setChannel(first.channel ?? "other");
-    setDate(todayStr());
-    setCustomerName(first.customer_name);
-    setCustomerAddress(first.customer_address);
-    setCustomerTaxId(first.customer_tax_id);
-    setShippingAddress(first.shipping_address);
-    setShippingDate(first.shipping_date || "");
-    setCustomerContact(first.contact_person);
-    setCustomerPhone(first.contact_phone);
-    setSalesperson(first.salesperson || "");
-    setOrderNotes(first.notes || "");
-    setTermsText(first.terms_text || defaultTermsText(first.lang_mode));
-    setDiscountPct(first.discount_pct ?? 0);
-    setVatPct(first.vat_pct);
-    setDepositPct(first.deposit_pct);
+    applyQuoteHeaderFields(first);
     const mergedItems = quotes.flatMap((q) =>
       q.items.map((it) => ({
         ...it,
@@ -1465,6 +1483,77 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
             "Pulled from the quotation — this is a new document; removing or editing items here won't affect the original",
             "已从报价单导入 — 这是新文件，删除或编辑项目不会影响原报价单"
           )
+    );
+  }
+
+  // Delivery Note's "ใช้ใบนี้" opens this picker instead of pulling the
+  // whole quotation straight in, since a delivery often only covers part
+  // of what was quoted. Fetches the single source quote and seeds every
+  // line as checked with its full ordered qty — unchecking a line or
+  // lowering its qty just narrows what confirmItemPicker() below copies in.
+  async function openItemPicker(id: number) {
+    setItemPickerQuoteId(id);
+    setItemPickerQuote(null);
+    setItemPickerLoading(true);
+    const res = await fetch(`/api/admin/saved-quotes/${id}`);
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(t("โหลดไม่สำเร็จ", "Load failed", "加载失败"));
+      setItemPickerQuoteId(null);
+      setItemPickerLoading(false);
+      return;
+    }
+    const quote = data.quote as SavedQuote;
+    const initSel: Record<string, { checked: boolean; qty: number }> = {};
+    quote.items.forEach((it, idx) => {
+      initSel[it.item_id || String(idx)] = { checked: true, qty: it.qty };
+    });
+    setItemPickerQuote(quote);
+    setItemPickerSel(initSel);
+    setItemPickerLoading(false);
+  }
+
+  function closeItemPicker() {
+    setItemPickerQuoteId(null);
+    setItemPickerQuote(null);
+    setItemPickerSel({});
+  }
+
+  // Builds the new document from only the checked lines, at whatever qty
+  // was left in each one's "ส่งวันนี้" box — the rest of the quotation
+  // (unchecked lines, or the remainder of a partially-checked qty) is
+  // simply never copied in, so it stays on the original for a later trip.
+  function confirmItemPicker() {
+    if (!itemPickerQuote) return;
+    const quote = itemPickerQuote;
+    const selectedItems = quote.items
+      .map((it, idx) => ({ it, key: it.item_id || String(idx) }))
+      .filter(({ key }) => itemPickerSel[key]?.checked)
+      .map(({ it, key }) => ({
+        ...it,
+        id: Math.random().toString(36).slice(2),
+        qty: itemPickerSel[key]?.qty ?? it.qty,
+        seats: it.seats ?? 1,
+        baseUnitPrice: it.baseUnitPrice ?? it.unitPrice,
+        remarkImage: it.remarkImage ?? null,
+        stock_variant_id: it.stock_variant_id ?? null,
+        unit: it.unit ?? "",
+      }));
+    if (!selectedItems.length) {
+      toast.error(t("เลือกอย่างน้อย 1 รายการ", "Select at least 1 item", "请至少选择1项"));
+      return;
+    }
+    applyQuoteHeaderFields(quote);
+    setItems(selectedItems);
+    setListOpen(false);
+    setSelectedPullIds(new Set());
+    closeItemPicker();
+    toast.success(
+      t(
+        `ดึง ${selectedItems.length} รายการจากใบเสนอราคาแล้ว — นี่คือเอกสารใหม่ ไม่กระทบใบเสนอราคาต้นฉบับ`,
+        `Pulled ${selectedItems.length} item(s) from the quotation — this is a new document; the original is untouched`,
+        `已从报价单导入 ${selectedItems.length} 项 — 这是新文件，不影响原报价单`
+      )
     );
   }
 
@@ -2278,7 +2367,11 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                     <TableCell>
                       <div className="flex gap-2 justify-end">
                         {listMode === "pull" ? (
-                          <Button size="sm" variant="outline" onClick={() => pullFromQuotations([q.id])}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => (defaultDocType === "delivery_note" ? openItemPicker(q.id) : pullFromQuotations([q.id]))}
+                          >
                             {t("ใช้ใบนี้", "Use this", "使用此单")}
                           </Button>
                         ) : (
@@ -2309,6 +2402,77 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
           </Table>
         </div>
       )}
+
+      <Dialog open={itemPickerQuoteId !== null} onOpenChange={(open) => { if (!open) closeItemPicker(); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t("เลือกรายการที่จะส่งวันนี้", "Pick items to ship today", "选择今天要发货的项目")}</DialogTitle>
+          </DialogHeader>
+          {itemPickerLoading || !itemPickerQuote ? (
+            <p className="text-sm text-[#6B6B6B] py-8 text-center">{t("กำลังโหลด...", "Loading...", "加载中...")}</p>
+          ) : (
+            <>
+              <p className="text-xs text-[#6B6B6B]">
+                {t(
+                  `จากใบเสนอราคา ${itemPickerQuote.doc_no} — ติ๊กเฉพาะสินค้าที่ส่งวันนี้ และปรับจำนวนได้ถ้าส่งไม่ครบ ส่วนที่เหลือยังอยู่ในใบเสนอราคาเดิม`,
+                  `From quotation ${itemPickerQuote.doc_no} — check only what ships today and adjust the qty for a partial shipment; the rest stays on the original quotation`,
+                  `来自报价单 ${itemPickerQuote.doc_no} — 仅勾选今天发货的产品，数量可调整为部分发货，其余仍保留在原报价单中`
+                )}
+              </p>
+              <div className="flex-1 overflow-y-auto space-y-2 -mx-1 px-1">
+                {itemPickerQuote.items.map((it, idx) => {
+                  const key = it.item_id || String(idx);
+                  const sel = itemPickerSel[key] ?? { checked: true, qty: it.qty };
+                  return (
+                    <div key={key} className="flex items-start gap-3 p-2.5 border border-[#E8E5E0] rounded-lg">
+                      <Checkbox
+                        className="mt-1"
+                        checked={sel.checked}
+                        onCheckedChange={() =>
+                          setItemPickerSel((prev) => ({ ...prev, [key]: { ...sel, checked: !sel.checked } }))
+                        }
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{it.name || "-"}</p>
+                        <p className="text-xs text-[#6B6B6B] truncate">
+                          {[it.sku, it.size].filter(Boolean).join(" · ")}
+                          {it.sku || it.size ? " · " : ""}
+                          {t("สั่งไว้", "Ordered", "订购")} {it.qty} {it.unit || ""}
+                        </p>
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <Label className="text-[10px] text-[#9CA3AF]">{t("ส่งวันนี้", "Ship today", "今日发货")}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={it.qty}
+                          className="h-8 text-xs mt-0.5"
+                          disabled={!sel.checked}
+                          value={sel.qty}
+                          onChange={(e) =>
+                            setItemPickerSel((prev) => ({
+                              ...prev,
+                              [key]: { ...sel, qty: Math.min(it.qty, Math.max(0, Number(e.target.value) || 0)) },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={closeItemPicker}>
+                  {t("ยกเลิก", "Cancel", "取消")}
+                </Button>
+                <Button type="button" onClick={confirmItemPicker}>
+                  {t("ยืนยัน", "Confirm", "确认")}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Form ─────────────────────────────────────────────────── */}

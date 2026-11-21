@@ -2432,6 +2432,13 @@ export function QuoteBuilderInner({ defaultDocType = "quotation" }: { defaultDoc
                           setItemPickerSel((prev) => ({ ...prev, [key]: { ...sel, checked: !sel.checked } }))
                         }
                       />
+                      <div className="relative w-12 h-12 shrink-0 rounded bg-[#F5F3EF] overflow-hidden border border-[#E8E5E0] flex items-center justify-center">
+                        {it.image ? (
+                          <Image src={it.image} alt="" fill sizes="48px" className="object-contain" />
+                        ) : (
+                          <ImageOff size={16} className="text-[#C9C5BE]" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{it.name || "-"}</p>
                         <p className="text-xs text-[#6B6B6B] truncate">

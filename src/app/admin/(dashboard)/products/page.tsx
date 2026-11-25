@@ -22,6 +22,12 @@ const STOCK_COLOR: Record<string, string> = {
   on_order: "bg-yellow-100 text-yellow-700",
 };
 
+const NEW_BADGE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+function isNewProduct(product: Product): boolean {
+  if (!product.created_at) return false;
+  return Date.now() - new Date(product.created_at).getTime() < NEW_BADGE_WINDOW_MS;
+}
+
 export default function ProductsPage() {
   const { t } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
@@ -232,6 +238,9 @@ export default function ProductsPage() {
                 className="object-contain p-2"
               />
               <div className="absolute top-2 right-2 flex gap-1">
+                {isNewProduct(product) && (
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.5">{t("ใหม่", "New", "新")}</Badge>
+                )}
                 {product.is_featured && (
                   <Badge className="bg-[#C9A876] text-white text-[10px] px-1.5 py-0.5">{t("แนะนำ", "Featured", "推荐")}</Badge>
                 )}

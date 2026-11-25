@@ -27,10 +27,13 @@ import { ImportLeadsDialog } from "@/components/admin/import-leads-dialog";
 import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { META_AD_ACCOUNTS } from "@/lib/meta-ads";
 
-// "Kan & J" is currently the only salesperson whose Facebook ads run through
-// the main Futai ad account, so their Facebook platform row is filled from
-// Meta's real billed spend instead of being logged by hand.
-const META_AUTO_OWNER = "Kan & J";
+// Salespeople whose Facebook ads run through a known Meta ad account get
+// their Facebook platform row auto-filled from Meta's real billed spend on
+// that account, instead of being logged by hand.
+const META_AUTO_OWNER_ACCOUNTS: Record<string, string> = {
+  "Kan & J": META_AD_ACCOUNTS[0].id,
+  "Xiaoying": META_AD_ACCOUNTS[1].id,
+};
 
 interface SavedQuoteListItem {
   id: number;
@@ -586,24 +589,33 @@ export default function KpiPage() {
   const isSingleDay = scopeFrom === scopeTo;
   const adSpendEditDate = isSingleDay ? scopeFrom : todayStr();
 
-  // Real daily spend on the main Futai Meta ad account, keyed by date — used
-  // to auto-fill Kan & J's Facebook platform row below instead of a manual
-  // ad_spend entry. Covers whichever is wider: the viewed range or the
-  // single-day edit date (they differ when a multi-day range is selected).
-  const [metaSpendByDate, setMetaSpendByDate] = useState<Record<string, number>>({});
+  // Real daily spend per auto-owner's Meta ad account, keyed by owner then
+  // date — used to auto-fill their Facebook platform row below instead of a
+  // manual ad_spend entry. Covers whichever is wider: the viewed range or
+  // the single-day edit date (they differ when a multi-day range is
+  // selected).
+  const [metaSpendByOwner, setMetaSpendByOwner] = useState<Record<string, Record<string, number>>>({});
   useEffect(() => {
     const rangeFrom = scopeFrom < adSpendEditDate ? scopeFrom : adSpendEditDate;
     const rangeTo = scopeTo > adSpendEditDate ? scopeTo : adSpendEditDate;
     let cancelled = false;
-    fetch(`/api/admin/facebook-ads?from=${rangeFrom}&to=${rangeTo}&account=${META_AD_ACCOUNTS[0].id}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.rows) return;
-        const map: Record<string, number> = {};
-        for (const r of data.rows as { date: string; spend: number }[]) map[r.date] = r.spend;
-        setMetaSpendByDate(map);
-      })
-      .catch(() => {});
+    Promise.all(
+      Object.entries(META_AUTO_OWNER_ACCOUNTS).map(([owner, accountId]) =>
+        fetch(`/api/admin/facebook-ads?from=${rangeFrom}&to=${rangeTo}&account=${accountId}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            const map: Record<string, number> = {};
+            if (data?.rows) {
+              for (const r of data.rows as { date: string; spend: number }[]) map[r.date] = r.spend;
+            }
+            return [owner, map] as const;
+          })
+          .catch(() => [owner, {}] as const)
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      setMetaSpendByOwner(Object.fromEntries(entries));
+    });
     return () => {
       cancelled = true;
     };
@@ -617,8 +629,9 @@ export default function KpiPage() {
       const rows = rangeLeads.filter((l) => (name === NO_OWNER ? !l.owner : l.owner === name));
       const converted = rows.filter((l) => l.status === "converted");
       const platforms = AD_PLATFORMS.map((p) => {
-        const auto = name === META_AUTO_OWNER && p.key === "facebook";
+        const auto = p.key === "facebook" && name in META_AUTO_OWNER_ACCOUNTS;
         if (auto) {
+          const metaSpendByDate = metaSpendByOwner[name] ?? {};
           let rangeAdAmount = 0;
           for (let d = new Date(scopeFrom + "T00:00:00"); d <= new Date(scopeTo + "T00:00:00"); d.setDate(d.getDate() + 1)) {
             rangeAdAmount += metaSpendByDate[toLocalDateStr(d)] ?? 0;
@@ -653,7 +666,7 @@ export default function KpiPage() {
         platforms,
       };
     });
-  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo, metaSpendByDate]);
+  }, [rangeLeads, leads, adSpendRows, adSpendEditDate, scopeFrom, scopeTo, metaSpendByOwner]);
 
   const adSpendScopeTotal = useMemo(
     () => ownerSummary.reduce((sum, o) => sum + (isSingleDay ? o.editDayAmount : o.rangeAdAmount), 0),

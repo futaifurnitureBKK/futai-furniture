@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Play, Music2 } from "lucide-react";
 import { useLanguage } from "@/store/language";
@@ -134,10 +135,21 @@ export function ProductVideoGallery({ videos }: { videos: TikTokVideoData[] }) {
                       transition={{ duration: 0.35, ease: EASE }}
                       style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
                     >
-                      <div className="absolute top-3 left-3 flex items-center gap-1 text-white/60 text-[10px] font-medium tracking-wide">
-                        <Music2 size={12} />
-                        TikTok
-                      </div>
+                      {video.thumbnail ? (
+                        <Image
+                          src={video.thumbnail}
+                          alt={video.title}
+                          fill
+                          className="object-cover"
+                          sizes="220px"
+                          priority={isCenter}
+                        />
+                      ) : (
+                        <div className="absolute top-3 left-3 flex items-center gap-1 text-white/60 text-[10px] font-medium tracking-wide">
+                          <Music2 size={12} />
+                          TikTok
+                        </div>
+                      )}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center">
                           <Play size={18} className="text-[#C8102E] ml-0.5" fill="currentColor" />

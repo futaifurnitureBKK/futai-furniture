@@ -5,6 +5,7 @@ export interface TikTokVideoData {
   url: string;
   embedSrc: string;
   title: string;
+  thumbnail?: string;
 }
 
 // TikTok's oEmbed endpoint (no auth needed) accepts both canonical and
@@ -38,13 +39,13 @@ const fetchOEmbed = unstable_cache(
 );
 
 export async function getTikTokVideos(
-  videos: { url: string; title: string }[]
+  videos: { url: string; title: string; thumbnail?: string }[]
 ): Promise<TikTokVideoData[]> {
   const results = await Promise.all(
-    videos.map(async ({ url, title: fallbackTitle }) => {
+    videos.map(async ({ url, title: fallbackTitle, thumbnail }): Promise<TikTokVideoData | null> => {
       const data = await fetchOEmbed(url);
       if (!data) return null;
-      return { url, embedSrc: data.embedSrc, title: data.title || fallbackTitle };
+      return { url, embedSrc: data.embedSrc, title: data.title || fallbackTitle, thumbnail };
     })
   );
   return results.filter((v): v is TikTokVideoData => v !== null);

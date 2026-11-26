@@ -13,18 +13,8 @@ import { useCart } from "@/store/cart";
 import { useLanguage } from "@/store/language";
 import { toast } from "sonner";
 import type { Product } from "@/types";
-import type { TikTokVideoData } from "@/lib/tiktok";
-import { ProductVideoGallery } from "@/components/storefront/ProductVideoGallery";
 
-export function ProductPageClient({
-  product,
-  related,
-  videos,
-}: {
-  product: Product;
-  related: Product[];
-  videos: TikTokVideoData[];
-}) {
+export function ProductPageClient({ product, related }: { product: Product; related: Product[] }) {
   const { t, lang } = useLanguage();
   const { addItem } = useCart();
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -353,16 +343,6 @@ export function ProductPageClient({
                 dangerouslySetInnerHTML={{ __html: t(product.description_th, product.description_en, product.description_zh) }}
               />
             </div>
-          </FadeIn>
-        )}
-
-        {/* TikTok videos — "ดูให้ชัดก่อน ตัดสินใจ" */}
-        {videos.length > 0 && (
-          <FadeIn className="mt-16">
-            <h2 className="text-2xl font-bold text-[#1A1A1A] mb-8">
-              {t("ดูให้ชัดก่อน ตัดสินใจ", "See it clearly before you decide", "看清楚再决定")}
-            </h2>
-            <ProductVideoGallery videos={videos} />
           </FadeIn>
         )}
 

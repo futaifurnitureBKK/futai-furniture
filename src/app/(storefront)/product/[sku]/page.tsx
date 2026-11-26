@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ProductPageClient } from "@/components/storefront/ProductPageClient";
 import { getProductBySku, getProductsByCategory, getCategoryBySlug } from "@/lib/products";
-import { getTikTokVideos } from "@/lib/tiktok";
-import { TIKTOK_VIDEOS } from "@/lib/tiktok-videos";
 import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
@@ -39,12 +37,11 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProductBySku(sku);
   if (!product || !product.is_active) notFound();
 
-  const [related, category, videos] = await Promise.all([
+  const [related, category] = await Promise.all([
     getProductsByCategory(product.category_slug).then((products) =>
       products.filter((p) => p.sku !== sku).slice(0, 4)
     ),
     getCategoryBySlug(product.category_slug),
-    getTikTokVideos(TIKTOK_VIDEOS),
   ]);
 
   const breadcrumbJsonLd = {
@@ -102,7 +99,7 @@ export default async function ProductPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <ProductPageClient product={product} related={related} videos={videos} />
+      <ProductPageClient product={product} related={related} />
     </>
   );
 }

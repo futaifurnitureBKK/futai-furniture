@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Music2 } from "lucide-react";
 import { useLanguage } from "@/store/language";
 import type { TikTokVideoData } from "@/lib/tiktok";
 
@@ -130,31 +129,25 @@ export function ProductVideoGallery({ videos }: { videos: TikTokVideoData[] }) {
                     <motion.button
                       type="button"
                       onClick={() => (isCenter ? setPlayingIndex(mod(i, count)) : goTo(i))}
-                      className="relative overflow-hidden bg-[#1A1A1A] rounded-lg shadow-md"
+                      className="relative overflow-hidden bg-gradient-to-br from-[#2A2A2A] to-[#1A1A1A] rounded-lg shadow-md"
                       animate={{ scale, opacity }}
                       transition={{ duration: 0.35, ease: EASE }}
                       style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
                     >
-                      {video.thumbnail && (
-                        <Image
-                          src={video.thumbnail}
-                          alt={video.title}
-                          fill
-                          className="object-cover"
-                          sizes="220px"
-                          priority={isCenter}
-                          unoptimized
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/30" />
+                      <div className="absolute top-3 left-3 flex items-center gap-1 text-white/60 text-[10px] font-medium tracking-wide">
+                        <Music2 size={12} />
+                        TikTok
+                      </div>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center">
                           <Play size={18} className="text-[#C8102E] ml-0.5" fill="currentColor" />
                         </div>
                       </div>
-                      <p className="absolute bottom-0 inset-x-0 p-3 text-white text-xs font-medium leading-snug text-left line-clamp-3">
-                        {video.title}
-                      </p>
+                      <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                        <p className="text-white text-xs font-medium leading-snug text-left line-clamp-3">
+                          {video.title}
+                        </p>
+                      </div>
                       {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E] rounded-lg" />}
                     </motion.button>
                   </div>
@@ -205,7 +198,7 @@ export function ProductVideoGallery({ videos }: { videos: TikTokVideoData[] }) {
               onClick={(e) => e.stopPropagation()}
             >
               <iframe
-                src={`https://www.tiktok.com/embed/v2/${videos[playingIndex].videoId}`}
+                src={videos[playingIndex].embedSrc}
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; encrypted-media; fullscreen"
                 allowFullScreen

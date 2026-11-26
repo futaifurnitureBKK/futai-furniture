@@ -3,8 +3,8 @@
 // only a fallback shown if TikTok's oEmbed lookup fails; when it succeeds the
 // video's own caption is used instead.
 export const TIKTOK_VIDEOS: { url: string; title: string }[] = [
-  { url: "https://www.tiktok.com/@futaifurniture/video/REPLACE_ME_1", title: "ทั้งตึกนี้มีแต่ใจสู้ เฟอร์นิเจอร์" },
-  { url: "https://www.tiktok.com/@futaifurniture/video/REPLACE_ME_2", title: "ผลงานติดตั้งโต๊ะทำงานกลุ่ม" },
-  { url: "https://www.tiktok.com/@futaifurniture/video/REPLACE_ME_3", title: "SME ใช้พื้นที่คุ้มหรือยัง" },
-  { url: "https://www.tiktok.com/@futaifurniture/video/REPLACE_ME_4", title: "SME เลือกให้จบ งบไม่บานปลาย" },
+  { url: "https://vt.tiktok.com/ZSsMtH7Qx/", title: "ทั้งตึกนี้มีแต่ใจสู้ เฟอร์นิเจอร์" },
+  { url: "https://vt.tiktok.com/ZSsMt3wcv/", title: "ผลงานติดตั้งโต๊ะทำงานกลุ่ม" },
+  { url: "https://vt.tiktok.com/ZSsMtwFtw/", title: "SME ใช้พื้นที่คุ้มหรือยัง" },
+  { url: "https://vt.tiktok.com/ZSsMtKk7v/", title: "SME เลือกให้จบ งบไม่บานปลาย" },
 ];

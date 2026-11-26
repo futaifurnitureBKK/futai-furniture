@@ -155,11 +155,13 @@ export function ProductVideoGallery({ videos }: { videos: TikTokVideoData[] }) {
                           <Play size={18} className="text-[#C8102E] ml-0.5" fill="currentColor" />
                         </div>
                       </div>
-                      <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                        <p className="text-white text-xs font-medium leading-snug text-left line-clamp-3">
-                          {video.title}
-                        </p>
-                      </div>
+                      {video.title && (
+                        <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                          <p className="text-white text-xs font-medium leading-snug text-left line-clamp-3">
+                            {video.title}
+                          </p>
+                        </div>
+                      )}
                       {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E] rounded-lg" />}
                     </motion.button>
                   </div>

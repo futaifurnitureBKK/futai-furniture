@@ -6,8 +6,7 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const UNIT_H = 140; // one grid row's height; a featured tile spans 2 of these
-const FEATURED_EVERY = 6; // every Nth photo renders as a big 2x2 tile
+const TILE_H = 220; // every tile is this tall — no small/large mix
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
@@ -56,29 +55,25 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
 
       <div className="max-h-[620px] overflow-y-auto rounded-md pr-1">
         <div
-          className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-          style={{ gridAutoRows: UNIT_H, gridAutoFlow: "dense" }}
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+          style={{ gridAutoRows: TILE_H }}
         >
-          {photos.map((src, i) => {
-            const featured = i % FEATURED_EVERY === 0;
-            return (
-              <button
-                key={src}
-                type="button"
-                onClick={() => setLightboxIndex(i)}
-                className="relative overflow-hidden rounded-md bg-[#E8E5E0] group"
-                style={featured ? { gridColumn: "span 2", gridRow: "span 2" } : undefined}
-              >
-                <Image
-                  src={src}
-                  alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes={featured ? "420px" : "210px"}
-                />
-              </button>
-            );
-          })}
+          {photos.map((src, i) => (
+            <button
+              key={src}
+              type="button"
+              onClick={() => setLightboxIndex(i)}
+              className="relative overflow-hidden rounded-md bg-[#E8E5E0] group"
+            >
+              <Image
+                src={src}
+                alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              />
+            </button>
+          ))}
         </div>
       </div>
 

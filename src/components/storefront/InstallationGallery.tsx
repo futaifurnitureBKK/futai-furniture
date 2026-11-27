@@ -1,80 +1,37 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const COL_WIDTH = 260;
-const BOX_W = 300;
-const BOX_H = 220;
-const CONTAINER_H = 360;
-const AUTOPLAY_MS = 2400;
-const RADIUS = 8; // how many items to render on each side of center
+const CARD_W = 210;
+const ROW_H = 150;
+const ROW_GAP = 12;
+const PER_ROW_CAP = 30; // how many distinct photos each row renders before looping
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
+
+type Item = { src: string; i: number };
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
   const { t } = useLanguage();
   const count = photos.length;
-
-  // Render 3 copies back to back so the strip can keep sliding one direction
-  // forever. `centerIndex` is an index into this tripled array and always
-  // stays inside the middle copy — when it drifts into copy 1 or 3, it gets
-  // silently shifted back by ±count (same photo, so the jump is invisible).
-  const track = useMemo(() => [...photos, ...photos, ...photos], [photos]);
-
-  // `skip` travels together with the index it belongs to, so the render that
-  // consumes it always sees the right value — no ref read during render.
-  const [centerIndex, setCenterIndex] = useState(() => ({
-    value: count + Math.floor(count / 2),
-    skip: false,
-  }));
   const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [trackWidth, setTrackWidth] = useState(0);
-  const trackContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = trackContainerRef.current;
-    if (!el) return;
-    const update = () => setTrackWidth(el.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  // Two rows, scrolling opposite directions. Each row gets every other photo
+  // (capped for render/perf) and is duplicated once so the CSS marquee
+  // (0 -> -50%) loops seamlessly. The full set stays reachable through the
+  // lightbox, not just what's visible in the strips.
+  const { rowA, rowB } = useMemo(() => {
+    const withIndex: Item[] = photos.map((src, i) => ({ src, i }));
+    const a = withIndex.filter((_, idx) => idx % 2 === 0).slice(0, PER_ROW_CAP);
+    const b = withIndex.filter((_, idx) => idx % 2 === 1).slice(0, PER_ROW_CAP);
+    return { rowA: [...a, ...a], rowB: [...b, ...b] };
+  }, [photos]);
 
-  const step = useCallback(
-    (delta: number) => {
-      setCenterIndex(({ value }) => {
-        let n = value + delta;
-        let skip = false;
-        if (n >= 2 * count) {
-          skip = true;
-          n -= count;
-        } else if (n < count) {
-          skip = true;
-          n += count;
-        }
-        return { value: n, skip };
-      });
-    },
-    [count]
-  );
-  const prev = useCallback(() => step(-1), [step]);
-  const next = useCallback(() => step(1), [step]);
-  const goTo = useCallback((i: number) => step(i - centerIndex.value), [step, centerIndex.value]);
-
-  // Autoplay — endless loop in one direction, no bounce, no visible jump-cut.
-  useEffect(() => {
-    if (paused || lightboxIndex !== null || count <= 1) return;
-    const id = setInterval(() => step(1), AUTOPLAY_MS);
-    return () => clearInterval(id);
-  }, [paused, lightboxIndex, count, step]);
-
-  // Lightbox keyboard nav
   const closeLightbox = () => setLightboxIndex(null);
   const lightboxPrev = () => setLightboxIndex((i) => (i === null ? null : mod(i - 1, count)));
   const lightboxNext = () => setLightboxIndex((i) => (i === null ? null : mod(i + 1, count)));
@@ -94,86 +51,82 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
     };
   }, [lightboxIndex]);
 
-  return (
-    <div className="flex flex-col items-center">
-      <div className="flex items-center gap-3 w-full">
-        {/* ── Left button ──────────────────────────────────────────── */}
+  const renderRow = (items: Item[], reverse: boolean, durationSec: number) => (
+    <div
+      className="flex"
+      style={{
+        gap: ROW_GAP,
+        animation: `marquee ${durationSec}s linear infinite${reverse ? " reverse" : ""}`,
+        animationPlayState: paused ? "paused" : "running",
+      }}
+    >
+      {items.map((item, idx) => (
         <button
+          key={`${item.i}-${idx}`}
           type="button"
-          onClick={prev}
-          aria-label={t("เลื่อนไปทางซ้าย", "Scroll left", "向左滚动")}
-          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
+          onClick={() => setLightboxIndex(item.i)}
+          className="relative flex-none overflow-hidden rounded-md shadow-sm bg-[#E8E5E0] hover:opacity-90 transition-opacity"
+          style={{ width: CARD_W, height: ROW_H }}
         >
-          <ChevronLeft size={18} />
+          <Image
+            src={item.src}
+            alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+            fill
+            className="object-cover"
+            sizes="210px"
+          />
         </button>
+      ))}
+    </div>
+  );
 
-        {/* ── Horizontal carousel ──────────────────────────────────── */}
-        <div
-          ref={trackContainerRef}
-          className="relative flex-1 flex items-center overflow-hidden"
-          style={{ height: CONTAINER_H }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          <div className="pointer-events-none absolute left-0 inset-y-0 w-16 sm:w-24 bg-gradient-to-r from-white to-transparent z-10" />
-          <div className="pointer-events-none absolute right-0 inset-y-0 w-16 sm:w-24 bg-gradient-to-l from-white to-transparent z-10" />
+  return (
+    <div>
+      <div className="flex items-end justify-between flex-wrap gap-2 mb-4">
+        <p className="text-[#666] text-sm max-w-md">
+          {t(
+            `ภาพถ่ายหน้างานจริงจากทีมติดตั้งกว่า ${count}+ โปรเจกต์ทั่วประเทศ`,
+            `Real job-site photos from ${count}+ installations nationwide`,
+            `来自全国${count}+个安装项目的真实现场照片`
+          )}
+        </p>
+        <p className="text-[#999] text-xs hidden sm:block">
+          {t(
+            "เลื่อนอัตโนมัติ 2 แถว · วางเมาส์ค้างเพื่อหยุด หรือคลิกเพื่อดูภาพเต็มจอ",
+            "Auto-scrolling, 2 rows · hover to pause, click to view full screen",
+            "自动滚动，2排 · 悬停暂停，点击查看全屏"
+          )}
+        </p>
+      </div>
 
-          <motion.div
-            className="absolute top-1/2 left-0"
-            style={{ y: "-50%" }}
-            animate={{ x: trackWidth / 2 - COL_WIDTH / 2 - centerIndex.value * COL_WIDTH }}
-            transition={centerIndex.skip ? { duration: 0 } : { type: "spring", stiffness: 240, damping: 30 }}
-          >
-            <div className="flex">
-              {track.map((src, i) => {
-                const dist = i - centerIndex.value;
-                const abs = Math.abs(dist);
-                if (abs > RADIUS) return <div key={i} style={{ width: COL_WIDTH }} />;
+      <div
+        className="relative overflow-hidden"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div className="pointer-events-none absolute left-0 inset-y-0 w-10 sm:w-20 bg-gradient-to-r from-white to-transparent z-10" />
+        <div className="pointer-events-none absolute right-0 inset-y-0 w-10 sm:w-20 bg-gradient-to-l from-white to-transparent z-10" />
 
-                const isCenter = dist === 0;
-                const scale = isCenter ? 1.28 : Math.max(0.55, 1 - abs * 0.18);
-                const opacity = Math.max(0, 1 - abs * 0.3);
-
-                return (
-                  <div key={i} className="flex items-center justify-center" style={{ width: COL_WIDTH }}>
-                    <motion.button
-                      type="button"
-                      onClick={() => (isCenter ? setLightboxIndex(mod(i, count)) : goTo(i))}
-                      className="relative overflow-hidden bg-[#E8E5E0] rounded-sm shadow-md"
-                      animate={{ scale, opacity }}
-                      transition={{ duration: 0.35, ease: EASE }}
-                      style={{ width: BOX_W, height: BOX_H, zIndex: isCenter ? 5 : 4 - abs }}
-                    >
-                      <Image
-                        src={src}
-                        alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-                        fill
-                        className="object-cover"
-                        sizes="300px"
-                        priority={isCenter}
-                      />
-                      {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}
-                    </motion.button>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
+        <div className="flex flex-col" style={{ gap: ROW_GAP }}>
+          {renderRow(rowA, false, 50)}
+          {renderRow(rowB, true, 58)}
         </div>
+      </div>
 
-        {/* ── Right button ─────────────────────────────────────────── */}
+      <div className="flex justify-end mt-4">
         <button
           type="button"
-          onClick={next}
-          aria-label={t("เลื่อนไปทางขวา", "Scroll right", "向右滚动")}
-          className="flex-none w-9 h-9 rounded-full border border-[#E8E5E0] hover:border-[#C8102E] hover:text-[#C8102E] text-[#999] flex items-center justify-center transition-colors"
+          onClick={() => setLightboxIndex(0)}
+          className="text-[#C8102E] text-sm font-semibold inline-flex items-center gap-1 hover:underline"
         >
-          <ChevronRight size={18} />
+          {t(
+            `เปิดดูคลังภาพทั้งหมด (${count} ภาพ)`,
+            `View the full gallery (${count} photos)`,
+            `查看完整图库（${count}张）`
+          )}
+          <ArrowUpRight size={14} />
         </button>
       </div>
-      <p className="text-[#999] text-xs mt-3 tracking-wide">
-        {mod(centerIndex.value, count) + 1} / {count}
-      </p>
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}
       <AnimatePresence>

@@ -6,10 +6,10 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const COL_WIDTH = 190;
-const BOX_W = 220;
-const BOX_H = 160;
-const CONTAINER_H = 260;
+const COL_WIDTH = 260;
+const BOX_W = 300;
+const BOX_H = 220;
+const CONTAINER_H = 360;
 const AUTOPLAY_MS = 2400;
 const RADIUS = 8; // how many items to render on each side of center
 
@@ -149,7 +149,7 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
                         alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
                         fill
                         className="object-cover"
-                        sizes="220px"
+                        sizes="300px"
                         priority={isCenter}
                       />
                       {isCenter && <div className="absolute inset-0 ring-2 ring-[#C8102E]" />}

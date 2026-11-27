@@ -9,7 +9,7 @@ const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 const CARD_W = 210;
 const ROW_H = 150;
 const ROW_GAP = 12;
-const PER_ROW_CAP = 30; // how many distinct photos each row renders before looping
+const PX_PER_SEC = 42; // scroll speed — row duration scales with row length so it stays this fast regardless of photo count
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
@@ -22,14 +22,19 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Two rows, scrolling opposite directions. Each row gets every other photo
-  // (capped for render/perf) and is duplicated once so the CSS marquee
-  // (0 -> -50%) loops seamlessly. The full set stays reachable through the
-  // lightbox, not just what's visible in the strips.
-  const { rowA, rowB } = useMemo(() => {
+  // — the full set, not a sample — and is duplicated once so the CSS
+  // marquee (0 -> -50%) loops seamlessly.
+  const { rowA, rowB, durA, durB } = useMemo(() => {
     const withIndex: Item[] = photos.map((src, i) => ({ src, i }));
-    const a = withIndex.filter((_, idx) => idx % 2 === 0).slice(0, PER_ROW_CAP);
-    const b = withIndex.filter((_, idx) => idx % 2 === 1).slice(0, PER_ROW_CAP);
-    return { rowA: [...a, ...a], rowB: [...b, ...b] };
+    const a = withIndex.filter((_, idx) => idx % 2 === 0);
+    const b = withIndex.filter((_, idx) => idx % 2 === 1);
+    const widthOf = (n: number) => n * (CARD_W + ROW_GAP);
+    return {
+      rowA: [...a, ...a],
+      rowB: [...b, ...b],
+      durA: Math.max(20, widthOf(a.length) / PX_PER_SEC),
+      durB: Math.max(20, widthOf(b.length) / PX_PER_SEC),
+    };
   }, [photos]);
 
   const closeLightbox = () => setLightboxIndex(null);
@@ -108,8 +113,8 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
         <div className="pointer-events-none absolute right-0 inset-y-0 w-10 sm:w-20 bg-gradient-to-l from-white to-transparent z-10" />
 
         <div className="flex flex-col" style={{ gap: ROW_GAP }}>
-          {renderRow(rowA, false, 50)}
-          {renderRow(rowB, true, 58)}
+          {renderRow(rowA, false, durA)}
+          {renderRow(rowB, true, durB)}
         </div>
       </div>
 

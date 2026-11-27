@@ -1,41 +1,20 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/store/language";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const CARD_W = 210;
-const ROW_H = 150;
-const ROW_GAP = 12;
-const PX_PER_SEC = 42; // scroll speed — row duration scales with row length so it stays this fast regardless of photo count
+const UNIT_H = 140; // one grid row's height; a featured tile spans 2 of these
+const FEATURED_EVERY = 6; // every Nth photo renders as a big 2x2 tile
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
-
-type Item = { src: string; i: number };
 
 export function InstallationGallery({ photos }: { photos: string[] }) {
   const { t } = useLanguage();
   const count = photos.length;
-  const [paused, setPaused] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  // Two rows, scrolling opposite directions. Each row gets every other photo
-  // — the full set, not a sample — and is duplicated once so the CSS
-  // marquee (0 -> -50%) loops seamlessly.
-  const { rowA, rowB, durA, durB } = useMemo(() => {
-    const withIndex: Item[] = photos.map((src, i) => ({ src, i }));
-    const a = withIndex.filter((_, idx) => idx % 2 === 0);
-    const b = withIndex.filter((_, idx) => idx % 2 === 1);
-    const widthOf = (n: number) => n * (CARD_W + ROW_GAP);
-    return {
-      rowA: [...a, ...a],
-      rowB: [...b, ...b],
-      durA: Math.max(20, widthOf(a.length) / PX_PER_SEC),
-      durB: Math.max(20, widthOf(b.length) / PX_PER_SEC),
-    };
-  }, [photos]);
 
   const closeLightbox = () => setLightboxIndex(null);
   const lightboxPrev = () => setLightboxIndex((i) => (i === null ? null : mod(i - 1, count)));
@@ -56,35 +35,6 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
     };
   }, [lightboxIndex]);
 
-  const renderRow = (items: Item[], reverse: boolean, durationSec: number) => (
-    <div
-      className="flex"
-      style={{
-        gap: ROW_GAP,
-        animation: `marquee ${durationSec}s linear infinite${reverse ? " reverse" : ""}`,
-        animationPlayState: paused ? "paused" : "running",
-      }}
-    >
-      {items.map((item, idx) => (
-        <button
-          key={`${item.i}-${idx}`}
-          type="button"
-          onClick={() => setLightboxIndex(item.i)}
-          className="relative flex-none overflow-hidden rounded-md shadow-sm bg-[#E8E5E0] hover:opacity-90 transition-opacity"
-          style={{ width: CARD_W, height: ROW_H }}
-        >
-          <Image
-            src={item.src}
-            alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
-            fill
-            className="object-cover"
-            sizes="210px"
-          />
-        </button>
-      ))}
-    </div>
-  );
-
   return (
     <div>
       <div className="flex items-end justify-between flex-wrap gap-2 mb-4">
@@ -97,40 +47,39 @@ export function InstallationGallery({ photos }: { photos: string[] }) {
         </p>
         <p className="text-[#999] text-xs hidden sm:block">
           {t(
-            "เลื่อนอัตโนมัติ 2 แถว · วางเมาส์ค้างเพื่อหยุด หรือคลิกเพื่อดูภาพเต็มจอ",
-            "Auto-scrolling, 2 rows · hover to pause, click to view full screen",
-            "自动滚动，2排 · 悬停暂停，点击查看全屏"
+            `ภาพทั้งหมด ${count} ภาพ · เลื่อนดูเพิ่มเติม หรือคลิกเพื่อดูภาพเต็มจอ`,
+            `All ${count} photos · scroll for more, click to view full screen`,
+            `共${count}张照片 · 滚动查看更多，点击查看全屏`
           )}
         </p>
       </div>
 
-      <div
-        className="relative overflow-hidden"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        <div className="pointer-events-none absolute left-0 inset-y-0 w-10 sm:w-20 bg-gradient-to-r from-white to-transparent z-10" />
-        <div className="pointer-events-none absolute right-0 inset-y-0 w-10 sm:w-20 bg-gradient-to-l from-white to-transparent z-10" />
-
-        <div className="flex flex-col" style={{ gap: ROW_GAP }}>
-          {renderRow(rowA, false, durA)}
-          {renderRow(rowB, true, durB)}
-        </div>
-      </div>
-
-      <div className="flex justify-end mt-4">
-        <button
-          type="button"
-          onClick={() => setLightboxIndex(0)}
-          className="text-[#C8102E] text-sm font-semibold inline-flex items-center gap-1 hover:underline"
+      <div className="max-h-[620px] overflow-y-auto rounded-md pr-1">
+        <div
+          className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+          style={{ gridAutoRows: UNIT_H, gridAutoFlow: "dense" }}
         >
-          {t(
-            `เปิดดูคลังภาพทั้งหมด (${count} ภาพ)`,
-            `View the full gallery (${count} photos)`,
-            `查看完整图库（${count}张）`
-          )}
-          <ArrowUpRight size={14} />
-        </button>
+          {photos.map((src, i) => {
+            const featured = i % FEATURED_EVERY === 0;
+            return (
+              <button
+                key={src}
+                type="button"
+                onClick={() => setLightboxIndex(i)}
+                className="relative overflow-hidden rounded-md bg-[#E8E5E0] group"
+                style={featured ? { gridColumn: "span 2", gridRow: "span 2" } : undefined}
+              >
+                <Image
+                  src={src}
+                  alt={t("ผลงานติดตั้งจริง", "Real installation", "真实安装案例")}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  sizes={featured ? "420px" : "210px"}
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Lightbox ─────────────────────────────────────────────────── */}
